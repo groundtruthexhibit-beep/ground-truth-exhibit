@@ -21,7 +21,7 @@ Authorized state transition
 A useful shorthand is:
 
 ```text
-Evidence → Authority → Verification
+Evidence → Verification → Authority
 ```
 
 The ordering is not intended to imply that evidence alone grants authority. Verification determines whether the evidence satisfies the applicable authority contract.
