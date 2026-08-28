@@ -1,0 +1,16 @@
+# Local/editor artifacts
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*.tmp
+
+# Environment and secrets
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+secrets/
+credentials/
