@@ -1,5 +1,7 @@
 # Evidence Model
 
+[Overview](README.md) · [Architecture](ARCHITECTURE.md) · [Security model](SECURITY_MODEL.md) · [Alpha completion](ALPHA_COMPLETION.md) · [Disclosure boundary](DISCLOSURE_BOUNDARY.md)
+
 Ground Truth uses evidence to support authority decisions, but evidence and authority are not interchangeable.
 
 ## Evidence is not authority
@@ -16,6 +18,8 @@ The following can be useful evidence:
 - artifact identity and digest checks.
 
 None of these facts independently grants authority.
+
+Models and agents may propose actions, results, and supporting evidence. They cannot turn those assertions into authority or authorize themselves; an applicable authority decision remains required.
 
 ## Evidence-binding principle
 

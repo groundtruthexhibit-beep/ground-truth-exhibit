@@ -1,5 +1,7 @@
 # Security Model
 
+[Overview](README.md) · [Architecture](ARCHITECTURE.md) · [Evidence model](EVIDENCE_MODEL.md) · [Alpha completion](ALPHA_COMPLETION.md) · [Disclosure boundary](DISCLOSURE_BOUNDARY.md)
+
 Ground Truth treats the authority boundary as more important than the intelligence of the system requesting authority.
 
 ## Primary security objective
@@ -11,6 +13,8 @@ A subject under evaluation must not be able to convert its own assertions into a
 ### Fail closed
 
 When a required identity, invariant, proof, or evidence binding cannot be established, the system does not silently authorize the transition.
+
+This is represented as `UNAVAILABLE` when the decision cannot be established, rather than as success. `UNAVAILABLE` and `DENIED` are diagnostically distinct, but neither permits an authority-bearing state transition.
 
 ### Exact identity binding
 
