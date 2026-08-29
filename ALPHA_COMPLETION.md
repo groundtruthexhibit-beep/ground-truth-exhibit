@@ -1,5 +1,7 @@
 # Alpha Completion
 
+[Overview](README.md) · [Architecture](ARCHITECTURE.md) · [Security model](SECURITY_MODEL.md) · [Evidence model](EVIDENCE_MODEL.md) · [Disclosure boundary](DISCLOSURE_BOUNDARY.md)
+
 Ground Truth Alpha is formally complete within its authorized lifecycle boundary.
 
 The terminal authority identity is:
@@ -19,6 +21,8 @@ At that terminal boundary:
 ## What Alpha completion means
 
 Alpha completion means the explicitly authorized Alpha lifecycle reached its terminal control state after implementation, adversarial validation, evidence admission, and human-controlled authority transitions.
+
+It is a completion statement about that bounded lifecycle and its admitted evidence. It closes the authorized Alpha scope; it does not authorize deployment, broaden the scope, or open a subsequent phase.
 
 ## What Alpha completion does not mean
 

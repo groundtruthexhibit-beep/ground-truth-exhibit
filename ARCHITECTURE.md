@@ -1,5 +1,7 @@
 # Architecture
 
+[Overview](README.md) · [Security model](SECURITY_MODEL.md) · [Evidence model](EVIDENCE_MODEL.md) · [Alpha completion](ALPHA_COMPLETION.md) · [Disclosure boundary](DISCLOSURE_BOUNDARY.md)
+
 Ground Truth is a vendor-neutral authority and verification plane for autonomous systems.
 
 Its purpose is not to make an AI system more intelligent. Its purpose is to establish whether a proposed state transition has earned authority under explicit, testable conditions.
@@ -51,6 +53,8 @@ The authority plane is designed around outcomes equivalent to:
 - `UNAVAILABLE`
 
 `UNAVAILABLE` is not silently converted into success.
+
+`DENIED` is an affirmative authority decision that the applicable conditions were not satisfied. `UNAVAILABLE` means a required identity, invariant, proof, or evidence binding could not be established. Both result in no authorized state transition; uncertainty does not degrade into permission.
 
 ## Lifecycle discipline
 
