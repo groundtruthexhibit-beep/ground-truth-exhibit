@@ -20,6 +20,8 @@ This is represented as `UNAVAILABLE` when the decision cannot be established, ra
 
 Authority decisions are tied to the intended artifact and control state rather than to an approximate description of them.
 
+Exact identity must remain continuous from verification through the authority-consuming transition. Names, paths, tags, mutable references, or handles alone are not sufficient identity. If the artifact, configuration, or control state used at transition cannot be shown to match the verified binding, authorization must not occur.
+
 ### Replay and rollback resistance
 
 Authority-sensitive state must not become valid again merely because an older or previously accepted value reappears.
@@ -27,6 +29,16 @@ Authority-sensitive state must not become valid again merely because an older or
 ### Privilege separation
 
 Operational capability and authority-bearing capability are treated as separate concerns.
+
+Models and agents cannot confer authority on themselves directly or indirectly through reciprocal, cyclic, delegated, or collusive authorization. The applicable authority boundary must remain independent of the subjects whose proposals, evidence, or actions it governs.
+
+### Continuing authority
+
+If an authority grant is continuing rather than one-shot, continued use requires the grant to remain valid under its defined conditions. When those conditions require re-evaluation, an `UNAVAILABLE` or `DENIED` result must not silently preserve permission.
+
+### Authority-boundary selection
+
+Selection of the applicable verification and authority boundary is authority-sensitive state. A subject requesting authority cannot select, replace, or route around that boundary to obtain a favorable result. A prior `DENIED` or `UNAVAILABLE` result must not be bypassed merely by selecting another verifier unless an independently authorized transition legitimately changes the applicable boundary.
 
 ### Immutable evidence dependency
 
