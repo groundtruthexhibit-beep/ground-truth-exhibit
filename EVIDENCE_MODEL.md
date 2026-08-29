@@ -23,13 +23,15 @@ Models and agents may propose actions, results, and supporting evidence. They ca
 
 ## Evidence-binding principle
 
-Evidence is meaningful only when it is bound to the artifact, configuration, control state, and decision it is intended to support.
+Evidence is meaningful only when it is bound to the artifact, configuration, control state, and specific decision or transition it is intended to support.
 
 A useful rule is:
 
 > New artifact. New evidence.
 
 Evidence for one exact artifact must not be silently reused to authorize a different artifact.
+
+Evidence from one decision or transition must not be silently reused to authorize another unless the applicable authority contract explicitly permits that reuse. Even when reuse is permitted, the evidence does not itself confer authority; an explicit authority decision remains required.
 
 ## Independent verification
 
