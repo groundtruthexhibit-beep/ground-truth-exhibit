@@ -81,7 +81,10 @@ It is not the private engineering repository and is not a source-code mirror of 
 - [Historical hostile-review catalog](HOSTILE_REVIEW_CATALOG.md) — historical review evidence for the earlier candidate contract; file presence does not establish current authority.
 - [Layer 2 commit-time authority review](LAYER2_COMMIT_TIME_AUTHORITY_REVIEW.md) — current public Layer 2 analysis.
 - [Research pressure map](RESEARCH_PRESSURE_MAP.md) — current public research-pressure analysis; research is evidence, not authority.
+- [Agent boundary escape frontier delta](FRONTIER_DELTA_AGENT_BOUNDARY_ESCAPE.md) — completed bounded review of sandbox escape, privilege escalation, delegated and derivative actors, connector/tool substitution, credential hopping, browser/computer-use escape, restart and persistence, monitor evasion, and authority-boundary routing.
 
 ## Current boundary
 
-No later phase is authorized by the Alpha completion state. Future work requires a new explicit authority decision.
+The agent-boundary-escape review found `NO REPRODUCIBLE IN-SCOPE COUNTEREXAMPLE FOUND`. This is failure to falsify the current six-invariant authority model within the reviewed scope, not proof of completeness, correctness, production safety, or implementation sufficiency. It does not establish that Ground Truth solves sandbox escape or prevents privilege escalation.
+
+No later phase is authorized by the Alpha completion state. The current public documentation direction is an adversarial casebook and minimal reproducible authority-boundary attack scenarios. A future runnable authority lab may proceed only after a separate explicit implementation-authority decision.
