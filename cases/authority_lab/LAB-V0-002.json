@@ -5,7 +5,7 @@
   "title": "Privilege escalation during T2",
   "objective": "Distinguish an established prohibited privilege change from missing state.",
   "authority_tuple": {"subject": "S", "artifact": "A", "control_state": "P2", "identity_basis": "I1", "boundary_epoch": "B1", "decision": "AUTHORIZED"},
-  "t1": {"result": "AUTHORIZED", "evidence": ["EV-P1"]},
+  "t1": {"result": "AUTHORIZED", "evidence": ["EV-P1"], "authority_state": {"subject": "S", "artifact": "A", "control_state": "P1", "identity_basis": "I1", "boundary_epoch": "B1", "decision": "AUTHORIZED", "evidence_id": "EV-P1", "execution_context": "E1", "applicable_boundary": "AUTH-BOUNDARY-1", "grant_id": "GRANT-002", "consumption_state": "UNUSED", "subject_mode": "DIRECT"}},
   "t2": {"creates_authority": false, "mutations": [{"field": "privilege", "before": "P1", "after": "P2"}]},
   "t3": {
     "facts": {
@@ -16,10 +16,19 @@
       "boundary_epoch": {"state": "KNOWN", "value": "B1"},
       "decision_binding": {"state": "KNOWN", "value": "EV-P1"},
       "applicable_boundary": {"state": "KNOWN", "value": "AUTH-BOUNDARY-1"},
+      "evidence_binding": {"state": "KNOWN", "value": "CURRENT"},
+      "execution_context": {"state": "KNOWN", "value": "E1"},
+      "freshness": {"state": "KNOWN", "value": "CURRENT"},
       "privilege_state": {"state": "KNOWN", "value": "P2"},
-      "consumption_state": {"state": "KNOWN", "value": "UNUSED"}
+      "consumption_state": {"state": "KNOWN", "value": "UNUSED"},
+      "boundary_epoch_binding": {"state": "KNOWN", "value": {"applicable_boundary": "AUTH-BOUNDARY-1", "boundary_epoch": "B1"}},
+      "execution_control_binding": {"state": "KNOWN", "value": {"execution_context": "E1", "control_state": "P2"}},
+      "consumption_binding": {"state": "KNOWN", "value": {"grant_id": "GRANT-002", "subject": "S", "artifact": "A", "boundary_epoch": "B1"}},
+      "delegation_binding": {"state": "KNOWN", "value": {"relationship": "DIRECT", "subject": "S", "artifact": "A", "control_state": "P2", "boundary_epoch": "B1", "applicable_boundary": "AUTH-BOUNDARY-1"}},
+      "closure_binding": {"state": "KNOWN", "value": {"relationship": "EXACT_EFFECT", "source_artifact": "A", "target_artifact": "A"}}
     },
     "required_facts": ["subject_identity", "artifact_identity", "control_state", "identity_basis", "boundary_epoch", "decision_binding", "applicable_boundary", "privilege_state", "consumption_state"],
+    "required_values": {"subject_identity": "S", "artifact_identity": "A", "control_state": "P2", "identity_basis": "I1", "boundary_epoch": "B1", "decision_binding": "EV-P1", "applicable_boundary": "AUTH-BOUNDARY-1", "evidence_binding": "CURRENT", "execution_context": "E1", "freshness": "CURRENT", "consumption_state": "UNUSED", "privilege_state": "P2"},
     "prohibition": {"state": "KNOWN", "applies": true, "id": "PRIVILEGE_EXPANSION_PROHIBITED"},
     "authority_question": "May S commit A while established privilege P2 is active?"
   },

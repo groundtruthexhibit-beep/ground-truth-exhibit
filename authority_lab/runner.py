@@ -7,7 +7,14 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Any, Mapping
 
-from .model import AuthorityOutcome, FactState, HarnessStatus, OracleInput, RunResult
+from .model import (
+    AuthorityOutcome,
+    FactState,
+    HarnessStatus,
+    MANDATORY_T3_FACTS,
+    OracleInput,
+    RunResult,
+)
 from .oracle import evaluate
 
 
@@ -63,7 +70,10 @@ def format_trace(result: RunResult) -> str:
     for mutation in case.t2_mutations:
         lines.append(f"{mutation.field}: {mutation.before} -> {mutation.after}")
     lines.extend(("", "T3"))
-    for name in case.required_facts:
+    required_facts = tuple(
+        dict.fromkeys((*MANDATORY_T3_FACTS, *case.required_facts, *case.required_values))
+    )
+    for name in required_facts:
         fact = case.facts.get(name)
         if fact is None:
             rendered = "UNKNOWN"

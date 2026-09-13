@@ -5,7 +5,7 @@
   "title": "Connector endpoint substitution",
   "objective": "Test stable connector naming with conflicting endpoint identity.",
   "authority_tuple": {"subject": "S", "artifact": "A", "control_state": "C1", "identity_basis": "CONNECTOR-NAME", "boundary_epoch": "B1", "decision": "AUTHORIZED"},
-  "t1": {"result": "AUTHORIZED", "evidence": ["EV-X1"]},
+  "t1": {"result": "AUTHORIZED", "evidence": ["EV-X1"], "authority_state": {"subject": "S", "artifact": "A", "control_state": "C1", "identity_basis": "CONNECTOR-NAME", "boundary_epoch": "B1", "decision": "AUTHORIZED", "evidence_id": "EV-X1", "execution_context": "E1", "applicable_boundary": "AUTH-BOUNDARY-1", "grant_id": "GRANT-004", "consumption_state": "UNUSED", "subject_mode": "DIRECT"}},
   "t2": {"creates_authority": false, "mutations": [{"field": "connector_endpoint", "before": "X1", "after": "X2"}]},
   "t3": {
     "facts": {
@@ -16,10 +16,19 @@
       "boundary_epoch": {"state": "KNOWN", "value": "B1"},
       "decision_binding": {"state": "KNOWN", "value": "EV-X1"},
       "applicable_boundary": {"state": "KNOWN", "value": "AUTH-BOUNDARY-1"},
+      "evidence_binding": {"state": "KNOWN", "value": "CURRENT"},
+      "execution_context": {"state": "KNOWN", "value": "E1"},
+      "freshness": {"state": "KNOWN", "value": "CURRENT"},
       "tool_connector_identity": {"state": "CONFLICTING", "values": ["X1", "X2"]},
-      "consumption_state": {"state": "KNOWN", "value": "UNUSED"}
+      "consumption_state": {"state": "KNOWN", "value": "UNUSED"},
+      "boundary_epoch_binding": {"state": "KNOWN", "value": {"applicable_boundary": "AUTH-BOUNDARY-1", "boundary_epoch": "B1"}},
+      "execution_control_binding": {"state": "KNOWN", "value": {"execution_context": "E1", "control_state": "C1"}},
+      "consumption_binding": {"state": "KNOWN", "value": {"grant_id": "GRANT-004", "subject": "S", "artifact": "A", "boundary_epoch": "B1"}},
+      "delegation_binding": {"state": "KNOWN", "value": {"relationship": "DIRECT", "subject": "S", "artifact": "A", "control_state": "C1", "boundary_epoch": "B1", "applicable_boundary": "AUTH-BOUNDARY-1"}},
+      "closure_binding": {"state": "KNOWN", "value": {"relationship": "EXACT_EFFECT", "source_artifact": "A", "target_artifact": "A"}}
     },
     "required_facts": ["subject_identity", "artifact_identity", "control_state", "identity_basis", "boundary_epoch", "decision_binding", "applicable_boundary", "tool_connector_identity", "consumption_state"],
+    "required_values": {"subject_identity": "S", "artifact_identity": "A", "control_state": "C1", "identity_basis": "CONNECTOR-NAME", "boundary_epoch": "B1", "decision_binding": "EV-X1", "applicable_boundary": "AUTH-BOUNDARY-1", "evidence_binding": "CURRENT", "execution_context": "E1", "freshness": "CURRENT", "consumption_state": "UNUSED", "tool_connector_identity": "X1"},
     "prohibition": {"state": "KNOWN", "applies": false, "id": "none"},
     "authority_question": "May the X1-bound decision be consumed through the connector now resolving to X2?"
   },

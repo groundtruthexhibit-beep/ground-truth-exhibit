@@ -5,7 +5,7 @@
   "title": "Derived report cannot inherit source authority",
   "objective": "Ensure transformation and signing do not transfer authority to a derived artifact.",
   "authority_tuple": {"subject": "TRANSFORMER-Y", "artifact": "REPORT-Z", "control_state": "DERIVED", "identity_basis": "Z-DIGEST", "boundary_epoch": "B1", "decision": "AUTHORIZED"},
-  "t1": {"result": "AUTHORIZED", "evidence": ["SOURCE-X"]},
+  "t1": {"result": "AUTHORIZED", "evidence": ["SOURCE-X"], "authority_state": {"subject": "TRANSFORMER-Y", "artifact": "SOURCE-X", "control_state": "SOURCE", "identity_basis": "X-DIGEST", "boundary_epoch": "B1", "decision": "AUTHORIZED", "evidence_id": "SOURCE-X", "execution_context": "E1", "applicable_boundary": "AUTH-BOUNDARY-1", "grant_id": "GRANT-012-SOURCE-X", "consumption_state": "UNUSED", "subject_mode": "DIRECT"}},
   "t2": {"creates_authority": false, "mutations": [{"field": "artifact", "before": "SOURCE-X", "after": "REPORT-Z"}]},
   "t3": {
     "facts": {
@@ -16,11 +16,20 @@
       "boundary_epoch": {"state": "KNOWN", "value": "B1"},
       "decision_binding": {"state": "KNOWN", "value": "SOURCE-X-ONLY"},
       "applicable_boundary": {"state": "KNOWN", "value": "AUTH-BOUNDARY-1"},
+      "evidence_binding": {"state": "KNOWN", "value": "CURRENT"},
+      "execution_context": {"state": "KNOWN", "value": "E1"},
+      "freshness": {"state": "KNOWN", "value": "CURRENT"},
       "derived_authority_binding": {"state": "UNKNOWN"},
       "provenance": {"state": "KNOWN", "value": "Z-TRANSFORMED-FROM-X"},
-      "consumption_state": {"state": "KNOWN", "value": "UNUSED"}
+      "consumption_state": {"state": "KNOWN", "value": "UNUSED"},
+      "boundary_epoch_binding": {"state": "KNOWN", "value": {"applicable_boundary": "AUTH-BOUNDARY-1", "boundary_epoch": "B1"}},
+      "execution_control_binding": {"state": "KNOWN", "value": {"execution_context": "E1", "control_state": "DERIVED"}},
+      "consumption_binding": {"state": "KNOWN", "value": {"grant_id": "GRANT-012-SOURCE-X", "subject": "TRANSFORMER-Y", "artifact": "SOURCE-X", "boundary_epoch": "B1"}},
+      "delegation_binding": {"state": "KNOWN", "value": {"relationship": "DIRECT", "subject": "TRANSFORMER-Y", "artifact": "REPORT-Z", "control_state": "DERIVED", "boundary_epoch": "B1", "applicable_boundary": "AUTH-BOUNDARY-1"}},
+      "closure_binding": {"state": "UNKNOWN"}
     },
     "required_facts": ["subject_identity", "artifact_identity", "control_state", "identity_basis", "boundary_epoch", "decision_binding", "applicable_boundary", "derived_authority_binding", "provenance", "consumption_state"],
+    "required_values": {"subject_identity": "TRANSFORMER-Y", "artifact_identity": "REPORT-Z", "control_state": "DERIVED", "identity_basis": "Z-DIGEST", "boundary_epoch": "B1", "decision_binding": "REPORT-Z-AUTHORITY", "applicable_boundary": "AUTH-BOUNDARY-1", "evidence_binding": "CURRENT", "execution_context": "E1", "freshness": "CURRENT", "consumption_state": "UNUSED", "derived_authority_binding": "EXPLICIT", "provenance": "Z-TRANSFORMED-FROM-X"},
     "prohibition": {"state": "KNOWN", "applies": false, "id": "none"},
     "authority_question": "May derived report Z inherit authority from source artifact X?"
   },

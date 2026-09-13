@@ -5,7 +5,7 @@
   "title": "Monitor remains in E1 while actor escapes",
   "objective": "Test locally valid monitoring after the acting lineage leaves monitor coverage.",
   "authority_tuple": {"subject": "S", "artifact": "A", "control_state": "E2", "identity_basis": "I1", "boundary_epoch": "B1", "decision": "AUTHORIZED"},
-  "t1": {"result": "AUTHORIZED", "evidence": ["MONITOR-E1-PASS"]},
+  "t1": {"result": "AUTHORIZED", "evidence": ["MONITOR-E1-PASS"], "authority_state": {"subject": "S", "artifact": "A", "control_state": "E1", "identity_basis": "I1", "boundary_epoch": "B1", "decision": "AUTHORIZED", "evidence_id": "MONITOR-E1-PASS", "execution_context": "E1", "applicable_boundary": "AUTH-BOUNDARY-1", "grant_id": "GRANT-006-E1", "consumption_state": "UNUSED", "subject_mode": "DIRECT"}},
   "t2": {"creates_authority": false, "mutations": [{"field": "actor_context", "before": "E1", "after": "E2"}, {"field": "monitor_context", "before": "E1", "after": "E1"}]},
   "t3": {
     "facts": {
@@ -16,11 +16,19 @@
       "boundary_epoch": {"state": "KNOWN", "value": "B1"},
       "decision_binding": {"state": "KNOWN", "value": "MONITOR-E1-PASS"},
       "applicable_boundary": {"state": "KNOWN", "value": "AUTH-BOUNDARY-1"},
+      "evidence_binding": {"state": "KNOWN", "value": "CURRENT"},
       "execution_context": {"state": "UNKNOWN"},
+      "freshness": {"state": "KNOWN", "value": "CURRENT"},
       "monitor_coverage": {"state": "UNKNOWN"},
-      "consumption_state": {"state": "KNOWN", "value": "UNUSED"}
+      "consumption_state": {"state": "KNOWN", "value": "UNUSED"},
+      "boundary_epoch_binding": {"state": "KNOWN", "value": {"applicable_boundary": "AUTH-BOUNDARY-1", "boundary_epoch": "B1"}},
+      "execution_control_binding": {"state": "UNKNOWN"},
+      "consumption_binding": {"state": "KNOWN", "value": {"grant_id": "GRANT-006-E1", "subject": "S", "artifact": "A", "boundary_epoch": "B1"}},
+      "delegation_binding": {"state": "KNOWN", "value": {"relationship": "DIRECT", "subject": "S", "artifact": "A", "control_state": "E2", "boundary_epoch": "B1", "applicable_boundary": "AUTH-BOUNDARY-1"}},
+      "closure_binding": {"state": "KNOWN", "value": {"relationship": "EXACT_EFFECT", "source_artifact": "A", "target_artifact": "A"}}
     },
     "required_facts": ["subject_identity", "artifact_identity", "control_state", "identity_basis", "boundary_epoch", "decision_binding", "applicable_boundary", "execution_context", "monitor_coverage", "consumption_state"],
+    "required_values": {"subject_identity": "S", "artifact_identity": "A", "control_state": "E2", "identity_basis": "I1", "boundary_epoch": "B1", "decision_binding": "MONITOR-E1-PASS", "applicable_boundary": "AUTH-BOUNDARY-1", "evidence_binding": "CURRENT", "execution_context": "E2", "freshness": "CURRENT", "consumption_state": "UNUSED", "monitor_coverage": "COMPLETE"},
     "prohibition": {"state": "KNOWN", "applies": false, "id": "none"},
     "authority_question": "Does the E1 monitor report establish authority for the actor in E2?"
   },
