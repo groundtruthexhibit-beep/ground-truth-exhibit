@@ -16,10 +16,13 @@
       "boundary_epoch": {"state": "CONFLICTING", "values": ["B1", "B2"]},
       "decision_binding": {"state": "KNOWN", "value": "CACHE-D1-B1"},
       "applicable_boundary": {"state": "KNOWN", "value": "AUTH-BOUNDARY-1"},
+      "evidence_binding": {"state": "KNOWN", "value": "CURRENT"},
+      "execution_context": {"state": "KNOWN", "value": "E1"},
       "freshness": {"state": "UNKNOWN"},
       "consumption_state": {"state": "KNOWN", "value": "UNUSED"}
     },
     "required_facts": ["subject_identity", "artifact_identity", "control_state", "identity_basis", "boundary_epoch", "decision_binding", "applicable_boundary", "freshness", "consumption_state"],
+    "required_values": {"subject_identity": "S", "artifact_identity": "A", "control_state": "C1", "identity_basis": "I1", "boundary_epoch": "B1", "decision_binding": "CACHE-D1-B1", "applicable_boundary": "AUTH-BOUNDARY-1", "evidence_binding": "CURRENT", "execution_context": "E1", "freshness": "CURRENT", "consumption_state": "UNUSED"},
     "prohibition": {"state": "KNOWN", "applies": false, "id": "none"},
     "authority_question": "May cached B1 authority be consumed after the possible B2 transition?"
   },

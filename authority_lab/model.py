@@ -42,6 +42,20 @@ TUPLE_FIELDS = (
     "decision",
 )
 
+MANDATORY_T3_FACTS = (
+    "subject_identity",
+    "artifact_identity",
+    "control_state",
+    "identity_basis",
+    "boundary_epoch",
+    "decision_binding",
+    "applicable_boundary",
+    "evidence_binding",
+    "execution_context",
+    "freshness",
+    "consumption_state",
+)
+
 
 @dataclass(frozen=True)
 class AuthorityTuple:
@@ -121,6 +135,7 @@ class OracleInput:
     t2_mutations: tuple[Mutation, ...]
     facts: Mapping[str, Fact]
     required_facts: tuple[str, ...]
+    required_values: Mapping[str, Any]
     prohibition: Prohibition
     applicable_invariants: tuple[str, ...]
     authority_question: str
@@ -143,6 +158,7 @@ class OracleInput:
         if len(required_facts) != len(set(required_facts)):
             raise ValueError("required_facts must not contain duplicates")
         facts = {name: Fact.from_mapping(raw) for name, raw in t3["facts"].items()}
+        required_values = dict(t3.get("required_values", {}))
         mutations = tuple(
             Mutation(str(item["field"]), item.get("before"), item.get("after"))
             for item in t2["mutations"]
@@ -156,6 +172,7 @@ class OracleInput:
             t2_mutations=mutations,
             facts=facts,
             required_facts=required_facts,
+            required_values=required_values,
             prohibition=Prohibition.from_mapping(t3["prohibition"]),
             applicable_invariants=invariants,
             authority_question=str(t3["authority_question"]),

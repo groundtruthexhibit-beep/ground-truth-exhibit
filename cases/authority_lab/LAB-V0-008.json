@@ -16,10 +16,14 @@
       "boundary_epoch": {"state": "KNOWN", "value": "B1"},
       "decision_binding": {"state": "KNOWN", "value": "ONE-SHOT-U"},
       "applicable_boundary": {"state": "KNOWN", "value": "AUTH-BOUNDARY-1"},
+      "evidence_binding": {"state": "KNOWN", "value": "CURRENT"},
+      "execution_context": {"state": "KNOWN", "value": "E1"},
+      "freshness": {"state": "KNOWN", "value": "CURRENT"},
       "commit_state": {"state": "KNOWN", "value": "COMMITTED"},
       "consumption_state": {"state": "KNOWN", "value": "CONSUMED"}
     },
     "required_facts": ["subject_identity", "artifact_identity", "control_state", "identity_basis", "boundary_epoch", "decision_binding", "applicable_boundary", "commit_state", "consumption_state"],
+    "required_values": {"subject_identity": "S", "artifact_identity": "A", "control_state": "RETRY", "identity_basis": "I1", "boundary_epoch": "B1", "decision_binding": "ONE-SHOT-U", "applicable_boundary": "AUTH-BOUNDARY-1", "evidence_binding": "CURRENT", "execution_context": "E1", "freshness": "CURRENT", "consumption_state": "CONSUMED", "commit_state": "COMMITTED"},
     "prohibition": {"state": "KNOWN", "applies": true, "id": "ONE_SHOT_REPLAY_PROHIBITED"},
     "authority_question": "May the consumed one-shot authority be reused after acknowledgment loss?"
   },

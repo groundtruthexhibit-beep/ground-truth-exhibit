@@ -13,6 +13,7 @@ from authority_lab.model import (
     FactState,
     HarnessStatus,
     INVARIANTS,
+    MANDATORY_T3_FACTS,
     OracleInput,
     TUPLE_FIELDS,
 )
@@ -33,6 +34,11 @@ def actual(payload: dict) -> AuthorityOutcome:
 
 
 class AuthorityLabTests(unittest.TestCase):
+    def assert_unavailable_with_reason(self, payload: dict, reason_code: str) -> None:
+        result = evaluate(OracleInput.from_fixture(payload))
+        self.assertIs(AuthorityOutcome.UNAVAILABLE, result.outcome)
+        self.assertIn(reason_code, {reason.code for reason in result.reasons})
+
     def test_v0_contains_twelve_deterministic_fixtures(self) -> None:
         paths = discover(CASES)
         self.assertEqual(12, len(paths))
@@ -76,6 +82,89 @@ class AuthorityLabTests(unittest.TestCase):
         payload["authority_tuple"]["decision"] = AuthorityOutcome.UNAVAILABLE.value
         payload["t2"]["creates_authority"] = True
         self.assertIs(AuthorityOutcome.UNAVAILABLE, actual(payload))
+
+    def test_t2_authority_claim_invalidates_otherwise_authorized_input(self) -> None:
+        payload = fixture("LAB-V0-001")
+        payload["t2"]["creates_authority"] = True
+        self.assert_unavailable_with_reason(payload, "T2_AUTHORITY_CLAIM")
+
+    def test_consumed_value_cannot_authorize(self) -> None:
+        payload = fixture("LAB-V0-001")
+        payload["t3"]["facts"]["consumption_state"]["value"] = "CONSUMED"
+        self.assert_unavailable_with_reason(payload, "REQUIRED_VALUE_MISMATCH")
+
+    def test_stale_freshness_cannot_authorize(self) -> None:
+        payload = fixture("LAB-V0-001")
+        payload["t3"]["facts"]["freshness"]["value"] = "STALE"
+        self.assert_unavailable_with_reason(payload, "REQUIRED_VALUE_MISMATCH")
+
+    def test_wrong_evidence_binding_cannot_authorize(self) -> None:
+        payload = fixture("LAB-V0-001")
+        payload["t3"]["facts"]["evidence_binding"]["value"] = "STALE"
+        self.assert_unavailable_with_reason(payload, "REQUIRED_VALUE_MISMATCH")
+
+    def test_changed_execution_context_cannot_authorize_without_rebinding(self) -> None:
+        payload = fixture("LAB-V0-001")
+        payload["t3"]["facts"]["execution_context"]["value"] = "E2"
+        self.assert_unavailable_with_reason(payload, "REQUIRED_VALUE_MISMATCH")
+
+    def test_wrong_applicable_boundary_cannot_authorize(self) -> None:
+        payload = fixture("LAB-V0-001")
+        payload["t3"]["facts"]["applicable_boundary"]["value"] = "OTHER-BOUNDARY"
+        self.assert_unavailable_with_reason(payload, "REQUIRED_VALUE_MISMATCH")
+
+    def test_wrong_decision_binding_cannot_authorize(self) -> None:
+        payload = fixture("LAB-V0-001")
+        payload["t3"]["facts"]["decision_binding"]["value"] = "OTHER"
+        self.assert_unavailable_with_reason(payload, "DECISION_EVIDENCE_BINDING_MISMATCH")
+
+    def test_unrelated_delegation_binding_cannot_authorize(self) -> None:
+        payload = fixture("LAB-V0-010")
+        payload["t3"]["facts"]["delegation_binding"]["value"] = "UNRELATED"
+        self.assert_unavailable_with_reason(payload, "REQUIRED_VALUE_MISMATCH")
+
+    def test_implicit_closure_cannot_authorize(self) -> None:
+        payload = fixture("LAB-V0-010")
+        payload["t3"]["facts"]["closure_binding"]["value"] = "IMPLICIT"
+        self.assert_unavailable_with_reason(payload, "REQUIRED_VALUE_MISMATCH")
+
+    def test_fixture_cannot_remove_any_mandatory_t3_fact(self) -> None:
+        for field in MANDATORY_T3_FACTS:
+            with self.subTest(field=field):
+                payload = fixture("LAB-V0-001")
+                payload["t3"]["required_facts"].remove(field)
+                payload["t3"]["facts"][field] = {"state": "UNKNOWN"}
+                self.assert_unavailable_with_reason(payload, "REQUIRED_FACT_UNAVAILABLE")
+
+    def test_missing_required_value_cannot_authorize(self) -> None:
+        payload = fixture("LAB-V0-001")
+        del payload["t3"]["required_values"]["execution_context"]
+        self.assert_unavailable_with_reason(payload, "REQUIRED_VALUE_UNSPECIFIED")
+
+    def test_fixture_required_values_cannot_launder_nonpermitting_core_values(self) -> None:
+        for field, value in (
+            ("consumption_state", "CONSUMED"),
+            ("freshness", "STALE"),
+            ("evidence_binding", "STALE"),
+        ):
+            with self.subTest(field=field):
+                payload = fixture("LAB-V0-001")
+                payload["t3"]["facts"][field]["value"] = value
+                payload["t3"]["required_values"][field] = value
+                self.assert_unavailable_with_reason(payload, "VALUE_NOT_AUTHORITY_PERMITTING")
+
+    def test_every_fixture_specifies_the_mandatory_authority_values(self) -> None:
+        for path in discover(CASES):
+            with self.subTest(path=path.name):
+                payload = load_fixture(path)
+                self.assertTrue(
+                    set(MANDATORY_T3_FACTS).issubset(payload["t3"]["required_values"])
+                )
+                self.assertTrue(
+                    set(payload["t3"]["required_facts"]).issubset(
+                        payload["t3"]["required_values"]
+                    )
+                )
 
     def test_wrong_expectation_does_not_change_actual(self) -> None:
         payload = fixture("LAB-V0-001")
@@ -123,6 +212,8 @@ class AuthorityLabTests(unittest.TestCase):
         denied["authority_tuple"]["control_state"] = "E2"
         denied["t3"]["facts"]["execution_context"] = {"state": "KNOWN", "value": "E2"}
         denied["t3"]["facts"]["boundary_continuity"] = {"state": "KNOWN", "value": "ESTABLISHED"}
+        denied["t3"]["required_values"]["control_state"] = "E2"
+        denied["t3"]["required_values"]["execution_context"] = "E2"
         denied["t3"]["prohibition"] = {
             "state": "KNOWN",
             "applies": True,
@@ -143,6 +234,7 @@ class AuthorityLabTests(unittest.TestCase):
             ("INV-CONT", "INV-DISC", "INV-BND", "INV-EVD", "INV-USE", "INV-CLO"),
             INVARIANTS,
         )
+        self.assertEqual(11, len(MANDATORY_T3_FACTS))
 
     def test_tuple_mismatch_is_unavailable(self) -> None:
         payload = fixture("LAB-V0-001")

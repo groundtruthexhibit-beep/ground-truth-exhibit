@@ -22,6 +22,7 @@
       "consumption_state": {"state": "KNOWN", "value": "UNUSED"}
     },
     "required_facts": ["subject_identity", "artifact_identity", "control_state", "identity_basis", "boundary_epoch", "decision_binding", "applicable_boundary", "evidence_binding", "execution_context", "freshness", "consumption_state"],
+    "required_values": {"subject_identity": "S", "artifact_identity": "A", "control_state": "C1", "identity_basis": "I1", "boundary_epoch": "B1", "decision_binding": "EV-A-B1", "applicable_boundary": "AUTH-BOUNDARY-1", "evidence_binding": "CURRENT", "execution_context": "E1", "freshness": "CURRENT", "consumption_state": "UNUSED"},
     "prohibition": {"state": "KNOWN", "applies": false, "id": "none"},
     "authority_question": "May S commit exact artifact A in unchanged E1 at B1?"
   },

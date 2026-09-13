@@ -2,18 +2,16 @@
 
 from __future__ import annotations
 
-from .model import AuthorityOutcome, FactState, INVARIANTS, OracleInput, OracleResult, Reason
-
-
-BASE_REQUIRED_FACTS = (
-    "subject_identity",
-    "artifact_identity",
-    "control_state",
-    "identity_basis",
-    "boundary_epoch",
-    "decision_binding",
-    "applicable_boundary",
+from .model import (
+    AuthorityOutcome,
+    FactState,
+    INVARIANTS,
+    MANDATORY_T3_FACTS,
+    OracleInput,
+    OracleResult,
+    Reason,
 )
+
 
 TUPLE_FACT_BINDINGS = (
     ("subject_identity", "subject"),
@@ -23,6 +21,13 @@ TUPLE_FACT_BINDINGS = (
     ("boundary_epoch", "boundary_epoch"),
 )
 
+AUTHORITY_PERMITTING_VALUES = {
+    "consumption_state": "UNUSED",
+    "evidence_binding": "CURRENT",
+    "freshness": "CURRENT",
+    "closure_binding": "EXPLICIT",
+}
+
 
 def _engaged(case: OracleInput) -> tuple[str, ...]:
     selected = set(case.applicable_invariants)
@@ -31,7 +36,7 @@ def _engaged(case: OracleInput) -> tuple[str, ...]:
 
 def evaluate(case: OracleInput) -> OracleResult:
     """Compute an authority outcome without fixture expectation access."""
-    required_facts = tuple(dict.fromkeys((*BASE_REQUIRED_FACTS, *case.required_facts)))
+    required_facts = tuple(dict.fromkeys((*MANDATORY_T3_FACTS, *case.required_facts)))
     unestablished: list[str] = []
     conflicting: list[str] = []
     for name in required_facts:
@@ -89,6 +94,65 @@ def evaluate(case: OracleInput) -> OracleResult:
             _engaged(case),
         )
 
+    if case.facts["decision_binding"].value not in case.t1_evidence:
+        return OracleResult(
+            AuthorityOutcome.UNAVAILABLE,
+            (
+                Reason(
+                    "DECISION_EVIDENCE_BINDING_MISMATCH",
+                    "The current decision binding is not bound to the T1 evidence.",
+                    ("decision_binding",),
+                ),
+            ),
+            _engaged(case),
+        )
+
+    missing_value_requirements = tuple(
+        name for name in required_facts if name not in case.required_values
+    )
+    if missing_value_requirements:
+        return OracleResult(
+            AuthorityOutcome.UNAVAILABLE,
+            (
+                Reason(
+                    "REQUIRED_VALUE_UNSPECIFIED",
+                    "Authority-permitting values are not specified for required facts.",
+                    missing_value_requirements,
+                ),
+            ),
+            _engaged(case),
+        )
+
+    value_mismatches = tuple(
+        name
+        for name in required_facts
+        if case.facts[name].value != case.required_values[name]
+    )
+    if value_mismatches:
+        return OracleResult(
+            AuthorityOutcome.UNAVAILABLE,
+            (
+                Reason(
+                    "REQUIRED_VALUE_MISMATCH",
+                    "Established facts do not match the authority-permitting values required by the case schema.",
+                    value_mismatches,
+                ),
+            ),
+            _engaged(case),
+        )
+
+    if case.t2_creates_authority:
+        return OracleResult(
+            AuthorityOutcome.UNAVAILABLE,
+            (
+                Reason(
+                    "T2_AUTHORITY_CLAIM",
+                    "T2 preparation is non-authoritative and cannot create or preserve authority.",
+                ),
+            ),
+            _engaged(case),
+        )
+
     if case.t1_result is AuthorityOutcome.UNAVAILABLE:
         return OracleResult(
             AuthorityOutcome.UNAVAILABLE,
@@ -108,6 +172,24 @@ def evaluate(case: OracleInput) -> OracleResult:
                 Reason(
                     "ESTABLISHED_PROHIBITION",
                     f"Established applicable condition prohibits the transition: {case.prohibition.identifier}.",
+                ),
+            ),
+            _engaged(case),
+        )
+
+    nonpermitting_values = tuple(
+        name
+        for name, permitting_value in AUTHORITY_PERMITTING_VALUES.items()
+        if name in required_facts and case.facts[name].value != permitting_value
+    )
+    if nonpermitting_values:
+        return OracleResult(
+            AuthorityOutcome.UNAVAILABLE,
+            (
+                Reason(
+                    "VALUE_NOT_AUTHORITY_PERMITTING",
+                    "Known state alone does not establish an authority-permitting value.",
+                    nonpermitting_values,
                 ),
             ),
             _engaged(case),

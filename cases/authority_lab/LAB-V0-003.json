@@ -16,11 +16,14 @@
       "boundary_epoch": {"state": "KNOWN", "value": "B1"},
       "decision_binding": {"state": "KNOWN", "value": "EV-E1"},
       "applicable_boundary": {"state": "KNOWN", "value": "AUTH-BOUNDARY-1"},
+      "evidence_binding": {"state": "KNOWN", "value": "CURRENT"},
       "execution_context": {"state": "UNKNOWN"},
+      "freshness": {"state": "KNOWN", "value": "CURRENT"},
       "boundary_continuity": {"state": "UNKNOWN"},
       "consumption_state": {"state": "KNOWN", "value": "UNUSED"}
     },
     "required_facts": ["subject_identity", "artifact_identity", "control_state", "identity_basis", "boundary_epoch", "decision_binding", "applicable_boundary", "execution_context", "boundary_continuity", "consumption_state"],
+    "required_values": {"subject_identity": "S", "artifact_identity": "A", "control_state": "E1", "identity_basis": "I1", "boundary_epoch": "B1", "decision_binding": "EV-E1", "applicable_boundary": "AUTH-BOUNDARY-1", "evidence_binding": "CURRENT", "execution_context": "E1", "freshness": "CURRENT", "consumption_state": "UNUSED", "boundary_continuity": "ESTABLISHED"},
     "prohibition": {"state": "KNOWN", "applies": false, "id": "none"},
     "authority_question": "Does the E1 authority still bind the acting process in E2?"
   },

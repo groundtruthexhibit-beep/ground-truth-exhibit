@@ -16,11 +16,15 @@
       "boundary_epoch": {"state": "KNOWN", "value": "B1"},
       "decision_binding": {"state": "KNOWN", "value": "SOURCE-X-ONLY"},
       "applicable_boundary": {"state": "KNOWN", "value": "AUTH-BOUNDARY-1"},
+      "evidence_binding": {"state": "KNOWN", "value": "CURRENT"},
+      "execution_context": {"state": "KNOWN", "value": "E1"},
+      "freshness": {"state": "KNOWN", "value": "CURRENT"},
       "derived_authority_binding": {"state": "UNKNOWN"},
       "provenance": {"state": "KNOWN", "value": "Z-TRANSFORMED-FROM-X"},
       "consumption_state": {"state": "KNOWN", "value": "UNUSED"}
     },
     "required_facts": ["subject_identity", "artifact_identity", "control_state", "identity_basis", "boundary_epoch", "decision_binding", "applicable_boundary", "derived_authority_binding", "provenance", "consumption_state"],
+    "required_values": {"subject_identity": "TRANSFORMER-Y", "artifact_identity": "REPORT-Z", "control_state": "DERIVED", "identity_basis": "Z-DIGEST", "boundary_epoch": "B1", "decision_binding": "REPORT-Z-AUTHORITY", "applicable_boundary": "AUTH-BOUNDARY-1", "evidence_binding": "CURRENT", "execution_context": "E1", "freshness": "CURRENT", "consumption_state": "UNUSED", "derived_authority_binding": "EXPLICIT", "provenance": "Z-TRANSFORMED-FROM-X"},
     "prohibition": {"state": "KNOWN", "applies": false, "id": "none"},
     "authority_question": "May derived report Z inherit authority from source artifact X?"
   },

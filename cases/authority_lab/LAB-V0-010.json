@@ -16,12 +16,15 @@
       "boundary_epoch": {"state": "KNOWN", "value": "B1"},
       "decision_binding": {"state": "KNOWN", "value": "DELEGATION-D-A-B1"},
       "applicable_boundary": {"state": "KNOWN", "value": "AUTH-BOUNDARY-1"},
+      "evidence_binding": {"state": "KNOWN", "value": "CURRENT"},
+      "execution_context": {"state": "KNOWN", "value": "E1"},
       "delegation_binding": {"state": "KNOWN", "value": "S-TO-D-A"},
       "closure_binding": {"state": "KNOWN", "value": "EXPLICIT"},
       "consumption_state": {"state": "KNOWN", "value": "UNUSED"},
       "freshness": {"state": "KNOWN", "value": "CURRENT"}
     },
     "required_facts": ["subject_identity", "artifact_identity", "control_state", "identity_basis", "boundary_epoch", "decision_binding", "applicable_boundary", "delegation_binding", "closure_binding", "consumption_state", "freshness"],
+    "required_values": {"subject_identity": "DELEGATE-D", "artifact_identity": "A", "control_state": "DELEGATED-SCOPE-1", "identity_basis": "D-ID", "boundary_epoch": "B1", "decision_binding": "DELEGATION-D-A-B1", "applicable_boundary": "AUTH-BOUNDARY-1", "evidence_binding": "CURRENT", "execution_context": "E1", "freshness": "CURRENT", "consumption_state": "UNUSED", "delegation_binding": "S-TO-D-A", "closure_binding": "EXPLICIT"},
     "prohibition": {"state": "KNOWN", "applies": false, "id": "none"},
     "authority_question": "May explicitly bound delegate D commit exact artifact A?"
   },
