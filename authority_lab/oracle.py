@@ -38,16 +38,30 @@ STATE_MUTATION_FIELDS = {
     "identity_basis": ("identity_basis",),
     "boundary_epoch": ("boundary_epoch",),
     "applicable_boundary": ("applicable_boundary",),
+    "consumption_state": ("consumption", "consumption_state"),
 }
 
-CANONICAL_MUTATION_STATE_FIELDS = (
+CANONICAL_MUTATION_STATE_FIELDS = {
+    "subject": ("subject",),
+    "artifact": ("artifact",),
+    "control_state": ("control_state",),
+    "identity_basis": ("identity_basis",),
+    "boundary_epoch": ("boundary_epoch",),
+    "execution_context": ("execution_context",),
+    "applicable_boundary": ("applicable_boundary",),
+    "consumption_state": ("consumption", "consumption_state"),
+}
+
+GRANT_SCOPE_FIELDS = (
     "subject",
     "artifact",
     "control_state",
     "identity_basis",
     "boundary_epoch",
+    "decision",
     "execution_context",
     "applicable_boundary",
+    "subject_mode",
 )
 
 
@@ -85,6 +99,7 @@ def _state_differences(case: OracleInput, state: AuthorityStateBinding) -> tuple
         "evidence_id": case.facts["decision_binding"].value,
         "execution_context": case.facts["execution_context"].value,
         "applicable_boundary": case.facts["applicable_boundary"].value,
+        "consumption_state": case.facts["consumption_state"].value,
     }
     return tuple(name for name, value in current.items() if value != getattr(state, name))
 
@@ -97,8 +112,10 @@ def _current_state_value(case: OracleInput, field: str) -> Any:
 
 def _mutation_chain_mismatches(case: OracleInput) -> tuple[str, ...]:
     mismatches: list[str] = []
-    for field in CANONICAL_MUTATION_STATE_FIELDS:
-        mutations = tuple(mutation for mutation in case.t2_mutations if mutation.field == field)
+    for field, mutation_fields in CANONICAL_MUTATION_STATE_FIELDS.items():
+        mutations = tuple(
+            mutation for mutation in case.t2_mutations if mutation.field in mutation_fields
+        )
         if not mutations:
             continue
         value = getattr(case.t1_authority_state, field)
@@ -111,6 +128,18 @@ def _mutation_chain_mismatches(case: OracleInput) -> tuple[str, ...]:
             if value != _current_state_value(case, field):
                 mismatches.append(field)
     return tuple(dict.fromkeys(mismatches))
+
+
+def _consumption_regenerated(case: OracleInput) -> bool:
+    consumed = case.t1_authority_state.consumption_state == "CONSUMED"
+    for mutation in case.t2_mutations:
+        if mutation.field not in {"consumption", "consumption_state"}:
+            continue
+        if mutation.after == "CONSUMED":
+            consumed = True
+        elif consumed and mutation.after == "UNUSED":
+            return True
+    return False
 
 
 def _has_exact_mutation(
@@ -182,6 +211,7 @@ def _state_has_empty_identifier(state: AuthorityStateBinding) -> bool:
             state.execution_context,
             state.applicable_boundary,
             state.grant_id,
+            state.consumption_state,
             state.subject_mode,
         )
     )
@@ -361,6 +391,13 @@ def evaluate(case: OracleInput) -> OracleResult:
             "Required T1 relational identifiers must be non-empty.",
             ("t1.authority_state",),
         )
+    if t1_state.consumption_state != "UNUSED":
+        return _unavailable(
+            case,
+            "T1_GRANT_NOT_CONSUMABLE",
+            "The evaluated T1 grant was not established as unused.",
+            ("t1.authority_state.consumption_state",),
+        )
 
     mutation_chain_mismatches = _mutation_chain_mismatches(case)
     if mutation_chain_mismatches:
@@ -369,6 +406,13 @@ def evaluate(case: OracleInput) -> OracleResult:
             "T2_T3_HYBRID_STATE",
             "IMPLEMENTATION_OBLIGATION: ordered T2 mutations do not produce the exact observed T3 state.",
             mutation_chain_mismatches,
+        )
+    if _consumption_regenerated(case):
+        return _unavailable(
+            case,
+            "CONSUMPTION_CONTINUITY_UNAVAILABLE",
+            "IMPLEMENTATION_OBLIGATION: a consumed grant cannot be reset to unused by preparation, restart, recovery, or re-establishment.",
+            ("consumption_state", "consumption_binding"),
         )
 
     differences = _state_differences(case, t1_state)
@@ -420,6 +464,26 @@ def evaluate(case: OracleInput) -> OracleResult:
                 missing_mutations,
             )
         active_state = reestablishment.current
+
+    grant_scope_changed = any(
+        getattr(t1_state, field) != getattr(active_state, field)
+        for field in GRANT_SCOPE_FIELDS
+    )
+    if grant_scope_changed and active_state.grant_id == t1_state.grant_id:
+        transition = case.grant_transition
+        if (
+            case.grant_transition_state is not FactState.KNOWN
+            or transition is None
+            or transition.relationship != "AUTHORITY_PRESERVING"
+            or transition.previous != t1_state
+            or transition.current != active_state
+        ):
+            return _unavailable(
+                case,
+                "GRANT_EFFECT_RELATIONSHIP_UNAVAILABLE",
+                "MODEL_LIMITATION: the prior grant cannot be retargeted to changed exact authority scope without an explicit authority-preserving transition.",
+                ("grant_transition",),
+            )
 
     expected_execution_relation = {
         "execution_context": case.facts["execution_context"].value,

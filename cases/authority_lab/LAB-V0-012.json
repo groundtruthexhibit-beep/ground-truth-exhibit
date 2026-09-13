@@ -5,7 +5,7 @@
   "title": "Derived report cannot inherit source authority",
   "objective": "Ensure transformation and signing do not transfer authority to a derived artifact.",
   "authority_tuple": {"subject": "TRANSFORMER-Y", "artifact": "REPORT-Z", "control_state": "DERIVED", "identity_basis": "Z-DIGEST", "boundary_epoch": "B1", "decision": "AUTHORIZED"},
-  "t1": {"result": "AUTHORIZED", "evidence": ["SOURCE-X"], "authority_state": {"subject": "TRANSFORMER-Y", "artifact": "SOURCE-X", "control_state": "SOURCE", "identity_basis": "X-DIGEST", "boundary_epoch": "B1", "decision": "AUTHORIZED", "evidence_id": "SOURCE-X", "execution_context": "E1", "applicable_boundary": "AUTH-BOUNDARY-1", "grant_id": "GRANT-012-SOURCE-X", "subject_mode": "DIRECT"}},
+  "t1": {"result": "AUTHORIZED", "evidence": ["SOURCE-X"], "authority_state": {"subject": "TRANSFORMER-Y", "artifact": "SOURCE-X", "control_state": "SOURCE", "identity_basis": "X-DIGEST", "boundary_epoch": "B1", "decision": "AUTHORIZED", "evidence_id": "SOURCE-X", "execution_context": "E1", "applicable_boundary": "AUTH-BOUNDARY-1", "grant_id": "GRANT-012-SOURCE-X", "consumption_state": "UNUSED", "subject_mode": "DIRECT"}},
   "t2": {"creates_authority": false, "mutations": [{"field": "artifact", "before": "SOURCE-X", "after": "REPORT-Z"}]},
   "t3": {
     "facts": {

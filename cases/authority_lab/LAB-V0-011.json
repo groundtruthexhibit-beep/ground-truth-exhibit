@@ -5,7 +5,7 @@
   "title": "Aggregate result lacks distinct authority binding",
   "objective": "Ensure constituent judgments do not automatically authorize an aggregate artifact.",
   "authority_tuple": {"subject": "AGGREGATOR-G", "artifact": "AGGREGATE-G", "control_state": "QUORUM-3", "identity_basis": "G-ID", "boundary_epoch": "B1", "decision": "AUTHORIZED"},
-  "t1": {"result": "AUTHORIZED", "evidence": ["M-JUDGMENT", "R-JUDGMENT", "Q-JUDGMENT"], "authority_state": {"subject": "AGGREGATOR-G", "artifact": "CONSTITUENT-JUDGMENTS", "control_state": "QUORUM-3", "identity_basis": "G-ID", "boundary_epoch": "B1", "decision": "AUTHORIZED", "evidence_id": "M-JUDGMENT", "execution_context": "E1", "applicable_boundary": "AUTH-BOUNDARY-1", "grant_id": "GRANT-011-CONSTITUENTS", "subject_mode": "DIRECT"}},
+  "t1": {"result": "AUTHORIZED", "evidence": ["M-JUDGMENT", "R-JUDGMENT", "Q-JUDGMENT"], "authority_state": {"subject": "AGGREGATOR-G", "artifact": "CONSTITUENT-JUDGMENTS", "control_state": "QUORUM-3", "identity_basis": "G-ID", "boundary_epoch": "B1", "decision": "AUTHORIZED", "evidence_id": "M-JUDGMENT", "execution_context": "E1", "applicable_boundary": "AUTH-BOUNDARY-1", "grant_id": "GRANT-011-CONSTITUENTS", "consumption_state": "UNUSED", "subject_mode": "DIRECT"}},
   "t2": {"creates_authority": false, "mutations": [{"field": "artifact", "before": "CONSTITUENT-JUDGMENTS", "after": "AGGREGATE-G"}]},
   "t3": {
     "facts": {

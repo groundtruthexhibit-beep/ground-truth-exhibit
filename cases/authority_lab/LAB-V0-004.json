@@ -5,7 +5,7 @@
   "title": "Connector endpoint substitution",
   "objective": "Test stable connector naming with conflicting endpoint identity.",
   "authority_tuple": {"subject": "S", "artifact": "A", "control_state": "C1", "identity_basis": "CONNECTOR-NAME", "boundary_epoch": "B1", "decision": "AUTHORIZED"},
-  "t1": {"result": "AUTHORIZED", "evidence": ["EV-X1"], "authority_state": {"subject": "S", "artifact": "A", "control_state": "C1", "identity_basis": "CONNECTOR-NAME", "boundary_epoch": "B1", "decision": "AUTHORIZED", "evidence_id": "EV-X1", "execution_context": "E1", "applicable_boundary": "AUTH-BOUNDARY-1", "grant_id": "GRANT-004", "subject_mode": "DIRECT"}},
+  "t1": {"result": "AUTHORIZED", "evidence": ["EV-X1"], "authority_state": {"subject": "S", "artifact": "A", "control_state": "C1", "identity_basis": "CONNECTOR-NAME", "boundary_epoch": "B1", "decision": "AUTHORIZED", "evidence_id": "EV-X1", "execution_context": "E1", "applicable_boundary": "AUTH-BOUNDARY-1", "grant_id": "GRANT-004", "consumption_state": "UNUSED", "subject_mode": "DIRECT"}},
   "t2": {"creates_authority": false, "mutations": [{"field": "connector_endpoint", "before": "X1", "after": "X2"}]},
   "t3": {
     "facts": {

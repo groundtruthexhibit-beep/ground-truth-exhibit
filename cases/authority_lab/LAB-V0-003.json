@@ -5,7 +5,7 @@
   "title": "Flagship sandbox escape after T1",
   "objective": "Derive commit-time authority after the acting process leaves its evaluated environment.",
   "authority_tuple": {"subject": "S", "artifact": "A", "control_state": "E1", "identity_basis": "I1", "boundary_epoch": "B1", "decision": "AUTHORIZED"},
-  "t1": {"result": "AUTHORIZED", "evidence": ["EV-E1"], "authority_state": {"subject": "S", "artifact": "A", "control_state": "E1", "identity_basis": "I1", "boundary_epoch": "B1", "decision": "AUTHORIZED", "evidence_id": "EV-E1", "execution_context": "E1", "applicable_boundary": "AUTH-BOUNDARY-1", "grant_id": "GRANT-003-E1", "subject_mode": "DIRECT"}},
+  "t1": {"result": "AUTHORIZED", "evidence": ["EV-E1"], "authority_state": {"subject": "S", "artifact": "A", "control_state": "E1", "identity_basis": "I1", "boundary_epoch": "B1", "decision": "AUTHORIZED", "evidence_id": "EV-E1", "execution_context": "E1", "applicable_boundary": "AUTH-BOUNDARY-1", "grant_id": "GRANT-003-E1", "consumption_state": "UNUSED", "subject_mode": "DIRECT"}},
   "t2": {"creates_authority": false, "mutations": [{"field": "execution_context", "before": "E1", "after": "E2"}]},
   "t3": {
     "facts": {

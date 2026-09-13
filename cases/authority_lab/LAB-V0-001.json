@@ -5,7 +5,7 @@
   "title": "Fresh unchanged positive control",
   "objective": "Confirm that a fully established unchanged current state can authorize at T3.",
   "authority_tuple": {"subject": "S", "artifact": "A", "control_state": "C1", "identity_basis": "I1", "boundary_epoch": "B1", "decision": "AUTHORIZED"},
-  "t1": {"result": "AUTHORIZED", "evidence": ["EV-A-B1"], "authority_state": {"subject": "S", "artifact": "A", "control_state": "C1", "identity_basis": "I1", "boundary_epoch": "B1", "decision": "AUTHORIZED", "evidence_id": "EV-A-B1", "execution_context": "E1", "applicable_boundary": "AUTH-BOUNDARY-1", "grant_id": "GRANT-001", "subject_mode": "DIRECT"}},
+  "t1": {"result": "AUTHORIZED", "evidence": ["EV-A-B1"], "authority_state": {"subject": "S", "artifact": "A", "control_state": "C1", "identity_basis": "I1", "boundary_epoch": "B1", "decision": "AUTHORIZED", "evidence_id": "EV-A-B1", "execution_context": "E1", "applicable_boundary": "AUTH-BOUNDARY-1", "grant_id": "GRANT-001", "consumption_state": "UNUSED", "subject_mode": "DIRECT"}},
   "t2": {"creates_authority": false, "mutations": []},
   "t3": {
     "facts": {

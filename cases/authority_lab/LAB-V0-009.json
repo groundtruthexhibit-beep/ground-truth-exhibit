@@ -5,7 +5,7 @@
   "title": "Ambiguous T3 commit and one-shot consumption",
   "objective": "Ensure an ambiguous prior commit cannot regenerate one-shot authority.",
   "authority_tuple": {"subject": "S", "artifact": "A", "control_state": "RETRY", "identity_basis": "I1", "boundary_epoch": "B1", "decision": "AUTHORIZED"},
-  "t1": {"result": "AUTHORIZED", "evidence": ["ONE-SHOT-U"], "authority_state": {"subject": "S", "artifact": "A", "control_state": "RETRY", "identity_basis": "I1", "boundary_epoch": "B1", "decision": "AUTHORIZED", "evidence_id": "ONE-SHOT-U", "execution_context": "E1", "applicable_boundary": "AUTH-BOUNDARY-1", "grant_id": "GRANT-009-ONE-SHOT", "subject_mode": "DIRECT"}},
+  "t1": {"result": "AUTHORIZED", "evidence": ["ONE-SHOT-U"], "authority_state": {"subject": "S", "artifact": "A", "control_state": "RETRY", "identity_basis": "I1", "boundary_epoch": "B1", "decision": "AUTHORIZED", "evidence_id": "ONE-SHOT-U", "execution_context": "E1", "applicable_boundary": "AUTH-BOUNDARY-1", "grant_id": "GRANT-009-ONE-SHOT", "consumption_state": "UNUSED", "subject_mode": "DIRECT"}},
   "t2": {"creates_authority": false, "mutations": [{"field": "commit_state", "before": "NOT_ATTEMPTED", "after": "UNKNOWN"}]},
   "t3": {
     "facts": {

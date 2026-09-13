@@ -34,6 +34,57 @@ def actual(payload: dict) -> AuthorityOutcome:
     return evaluate(OracleInput.from_fixture(payload)).outcome
 
 
+def reestablish_artifact(
+    payload: dict,
+    *,
+    artifact: str = "A2",
+    evidence_id: str = "EV-A2-B1",
+    grant_id: str | None = None,
+    preserve_grant_transition: bool = False,
+) -> dict:
+    """Build exact changed-artifact state without deriving authority from expectations."""
+    previous = deepcopy(payload["t1"]["authority_state"])
+    current_grant = grant_id if grant_id is not None else previous["grant_id"]
+    payload["authority_tuple"]["artifact"] = artifact
+    payload["t2"]["mutations"].append(
+        {"field": "artifact", "before": previous["artifact"], "after": artifact}
+    )
+    payload["t3"]["facts"]["artifact_identity"]["value"] = artifact
+    payload["t3"]["required_values"]["artifact_identity"] = artifact
+    payload["t3"]["facts"]["decision_binding"]["value"] = evidence_id
+    payload["t3"]["required_values"]["decision_binding"] = evidence_id
+    payload["t3"]["facts"]["consumption_binding"]["value"].update(
+        {"grant_id": current_grant, "artifact": artifact}
+    )
+    payload["t3"]["facts"]["delegation_binding"]["value"]["artifact"] = artifact
+    payload["t3"]["facts"]["closure_binding"]["value"].update(
+        {"source_artifact": artifact, "target_artifact": artifact}
+    )
+    current = deepcopy(previous)
+    current.update(
+        {
+            "artifact": artifact,
+            "evidence_id": evidence_id,
+            "grant_id": current_grant,
+            "consumption_state": payload["t3"]["facts"]["consumption_state"]["value"],
+        }
+    )
+    payload["t3"]["reestablishment"] = {
+        "state": "KNOWN",
+        "value": {"previous_evidence_id": previous["evidence_id"], "current": current},
+    }
+    if preserve_grant_transition:
+        payload["t3"]["grant_transition"] = {
+            "state": "KNOWN",
+            "value": {
+                "relationship": "AUTHORITY_PRESERVING",
+                "previous": previous,
+                "current": deepcopy(current),
+            },
+        }
+    return payload
+
+
 class AuthorityLabTests(unittest.TestCase):
     def assert_unavailable_with_reason(self, payload: dict, reason_code: str) -> None:
         result = evaluate(OracleInput.from_fixture(payload))
@@ -251,6 +302,7 @@ class AuthorityLabTests(unittest.TestCase):
                     "execution_context": "E2",
                     "applicable_boundary": "AUTH-BOUNDARY-1",
                     "grant_id": "GRANT-003-E2",
+                    "consumption_state": "UNUSED",
                     "subject_mode": "DIRECT",
                 },
             },
@@ -350,6 +402,137 @@ class AuthorityLabTests(unittest.TestCase):
             {"field": "execution_context", "before": "E1", "after": "E2"}
         )
         self.assert_unavailable_with_reason(payload, "T2_T3_HYBRID_STATE")
+
+    def test_old_grant_cannot_retarget_changed_artifact(self) -> None:
+        payload = reestablish_artifact(fixture("LAB-V0-001"))
+        self.assert_unavailable_with_reason(
+            payload, "GRANT_EFFECT_RELATIONSHIP_UNAVAILABLE"
+        )
+
+    def test_fresh_evidence_does_not_retarget_old_grant(self) -> None:
+        payload = reestablish_artifact(
+            fixture("LAB-V0-001"), evidence_id="FRESH-EVIDENCE-FOR-A2"
+        )
+        self.assert_unavailable_with_reason(
+            payload, "GRANT_EFFECT_RELATIONSHIP_UNAVAILABLE"
+        )
+
+    def test_required_values_cannot_launder_old_grant_for_new_effect(self) -> None:
+        payload = reestablish_artifact(fixture("LAB-V0-001"))
+        self.assertEqual("A2", payload["t3"]["required_values"]["artifact_identity"])
+        self.assert_unavailable_with_reason(
+            payload, "GRANT_EFFECT_RELATIONSHIP_UNAVAILABLE"
+        )
+
+    def test_full_state_reestablishment_does_not_retarget_old_grant(self) -> None:
+        payload = reestablish_artifact(fixture("LAB-V0-001"))
+        self.assertEqual(
+            "A2", payload["t3"]["reestablishment"]["value"]["current"]["artifact"]
+        )
+        self.assert_unavailable_with_reason(
+            payload, "GRANT_EFFECT_RELATIONSHIP_UNAVAILABLE"
+        )
+
+    def test_consumed_grant_cannot_reset_when_effect_changes(self) -> None:
+        payload = reestablish_artifact(fixture("LAB-V0-001"))
+        payload["t2"]["mutations"].extend(
+            [
+                {"field": "consumption", "before": "UNUSED", "after": "CONSUMED"},
+                {"field": "consumption", "before": "CONSUMED", "after": "UNUSED"},
+            ]
+        )
+        self.assert_unavailable_with_reason(
+            payload, "CONSUMPTION_CONTINUITY_UNAVAILABLE"
+        )
+
+    def test_restart_does_not_retarget_old_grant_to_new_effect(self) -> None:
+        payload = reestablish_artifact(fixture("LAB-V0-001"))
+        payload["t2"]["mutations"].append(
+            {"field": "execution_context", "before": "E1", "after": "E2"}
+        )
+        payload["t3"]["facts"]["execution_context"]["value"] = "E2"
+        payload["t3"]["required_values"]["execution_context"] = "E2"
+        payload["t3"]["facts"]["execution_control_binding"]["value"][
+            "execution_context"
+        ] = "E2"
+        payload["t3"]["reestablishment"]["value"]["current"][
+            "execution_context"
+        ] = "E2"
+        self.assert_unavailable_with_reason(
+            payload, "GRANT_EFFECT_RELATIONSHIP_UNAVAILABLE"
+        )
+
+    def test_delegation_cannot_retarget_old_grant(self) -> None:
+        payload = reestablish_artifact(
+            fixture("LAB-V0-010"), artifact="REPORT-Z", evidence_id="EV-REPORT-Z"
+        )
+        self.assert_unavailable_with_reason(
+            payload, "GRANT_EFFECT_RELATIONSHIP_UNAVAILABLE"
+        )
+
+    def test_exact_closure_cannot_retarget_old_grant(self) -> None:
+        payload = reestablish_artifact(fixture("LAB-V0-001"))
+        self.assertEqual(
+            {"relationship": "EXACT_EFFECT", "source_artifact": "A2", "target_artifact": "A2"},
+            payload["t3"]["facts"]["closure_binding"]["value"],
+        )
+        self.assert_unavailable_with_reason(
+            payload, "GRANT_EFFECT_RELATIONSHIP_UNAVAILABLE"
+        )
+
+    def test_unchanged_effect_with_exact_grant_remains_authorized(self) -> None:
+        self.assertIs(AuthorityOutcome.AUTHORIZED, actual(fixture("LAB-V0-001")))
+
+    def test_changed_effect_with_distinct_exact_grant_can_authorize(self) -> None:
+        payload = reestablish_artifact(
+            fixture("LAB-V0-001"), grant_id="GRANT-A2"
+        )
+        self.assertIs(AuthorityOutcome.AUTHORIZED, actual(payload))
+
+    def test_changed_effect_with_exact_grant_transition_can_authorize(self) -> None:
+        payload = reestablish_artifact(
+            fixture("LAB-V0-001"), preserve_grant_transition=True
+        )
+        self.assertIs(AuthorityOutcome.AUTHORIZED, actual(payload))
+
+    def test_grant_transition_must_match_exact_previous_and_current_states(self) -> None:
+        payload = reestablish_artifact(
+            fixture("LAB-V0-001"), preserve_grant_transition=True
+        )
+        payload["t3"]["grant_transition"]["value"]["previous"]["artifact"] = "OTHER"
+        self.assert_unavailable_with_reason(
+            payload, "GRANT_EFFECT_RELATIONSHIP_UNAVAILABLE"
+        )
+
+    def test_compound_transition_cannot_reset_consumption_across_epoch(self) -> None:
+        payload = reestablish_artifact(
+            fixture("LAB-V0-001"), preserve_grant_transition=True
+        )
+        payload["t2"]["mutations"].extend(
+            [
+                {"field": "boundary_epoch", "before": "B1", "after": "B2"},
+                {"field": "consumption", "before": "UNUSED", "after": "CONSUMED"},
+                {"field": "consumption", "before": "CONSUMED", "after": "UNUSED"},
+            ]
+        )
+        payload["authority_tuple"]["boundary_epoch"] = "B2"
+        payload["t3"]["facts"]["boundary_epoch"]["value"] = "B2"
+        payload["t3"]["required_values"]["boundary_epoch"] = "B2"
+        payload["t3"]["facts"]["boundary_epoch_binding"]["value"][
+            "boundary_epoch"
+        ] = "B2"
+        payload["t3"]["facts"]["consumption_binding"]["value"][
+            "boundary_epoch"
+        ] = "B2"
+        payload["t3"]["facts"]["delegation_binding"]["value"][
+            "boundary_epoch"
+        ] = "B2"
+        current = payload["t3"]["reestablishment"]["value"]["current"]
+        current["boundary_epoch"] = "B2"
+        payload["t3"]["grant_transition"]["value"]["current"] = deepcopy(current)
+        self.assert_unavailable_with_reason(
+            payload, "CONSUMPTION_CONTINUITY_UNAVAILABLE"
+        )
 
     def test_tuple_mismatch_is_unavailable(self) -> None:
         payload = fixture("LAB-V0-001")

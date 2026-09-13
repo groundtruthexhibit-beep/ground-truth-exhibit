@@ -5,7 +5,7 @@
   "title": "Credential hopping to a different principal",
   "objective": "Test an established principal substitution prohibited by the applicable contract.",
   "authority_tuple": {"subject": "P2", "artifact": "A", "control_state": "C2", "identity_basis": "CREDENTIAL-C2", "boundary_epoch": "B1", "decision": "AUTHORIZED"},
-  "t1": {"result": "AUTHORIZED", "evidence": ["EV-P1-C1"], "authority_state": {"subject": "P1", "artifact": "A", "control_state": "C1", "identity_basis": "CREDENTIAL-C1", "boundary_epoch": "B1", "decision": "AUTHORIZED", "evidence_id": "EV-P1-C1", "execution_context": "E1", "applicable_boundary": "AUTH-BOUNDARY-1", "grant_id": "GRANT-005-P1", "subject_mode": "DIRECT"}},
+  "t1": {"result": "AUTHORIZED", "evidence": ["EV-P1-C1"], "authority_state": {"subject": "P1", "artifact": "A", "control_state": "C1", "identity_basis": "CREDENTIAL-C1", "boundary_epoch": "B1", "decision": "AUTHORIZED", "evidence_id": "EV-P1-C1", "execution_context": "E1", "applicable_boundary": "AUTH-BOUNDARY-1", "grant_id": "GRANT-005-P1", "consumption_state": "UNUSED", "subject_mode": "DIRECT"}},
   "t2": {"creates_authority": false, "mutations": [{"field": "principal", "before": "P1", "after": "P2"}, {"field": "credential", "before": "C1", "after": "C2"}]},
   "t3": {
     "facts": {

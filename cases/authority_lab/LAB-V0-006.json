@@ -5,7 +5,7 @@
   "title": "Monitor remains in E1 while actor escapes",
   "objective": "Test locally valid monitoring after the acting lineage leaves monitor coverage.",
   "authority_tuple": {"subject": "S", "artifact": "A", "control_state": "E2", "identity_basis": "I1", "boundary_epoch": "B1", "decision": "AUTHORIZED"},
-  "t1": {"result": "AUTHORIZED", "evidence": ["MONITOR-E1-PASS"], "authority_state": {"subject": "S", "artifact": "A", "control_state": "E1", "identity_basis": "I1", "boundary_epoch": "B1", "decision": "AUTHORIZED", "evidence_id": "MONITOR-E1-PASS", "execution_context": "E1", "applicable_boundary": "AUTH-BOUNDARY-1", "grant_id": "GRANT-006-E1", "subject_mode": "DIRECT"}},
+  "t1": {"result": "AUTHORIZED", "evidence": ["MONITOR-E1-PASS"], "authority_state": {"subject": "S", "artifact": "A", "control_state": "E1", "identity_basis": "I1", "boundary_epoch": "B1", "decision": "AUTHORIZED", "evidence_id": "MONITOR-E1-PASS", "execution_context": "E1", "applicable_boundary": "AUTH-BOUNDARY-1", "grant_id": "GRANT-006-E1", "consumption_state": "UNUSED", "subject_mode": "DIRECT"}},
   "t2": {"creates_authority": false, "mutations": [{"field": "actor_context", "before": "E1", "after": "E2"}, {"field": "monitor_context", "before": "E1", "after": "E1"}]},
   "t3": {
     "facts": {

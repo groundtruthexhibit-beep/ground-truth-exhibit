@@ -111,6 +111,7 @@ class AuthorityStateBinding:
     execution_context: str
     applicable_boundary: str
     grant_id: str
+    consumption_state: str
     subject_mode: str
 
     @classmethod
@@ -120,6 +121,7 @@ class AuthorityStateBinding:
             "execution_context",
             "applicable_boundary",
             "grant_id",
+            "consumption_state",
             "subject_mode",
         }
         if set(value) != fields:
@@ -139,6 +141,9 @@ class AuthorityStateBinding:
                 value["applicable_boundary"], "authority_state.applicable_boundary"
             ),
             grant_id=_exact_string(value["grant_id"], "authority_state.grant_id"),
+            consumption_state=_exact_string(
+                value["consumption_state"], "authority_state.consumption_state"
+            ),
             subject_mode=_exact_string(value["subject_mode"], "authority_state.subject_mode"),
         )
 
@@ -159,6 +164,32 @@ class Reestablishment:
             previous_evidence_id=_exact_string(
                 value["previous_evidence_id"], "reestablishment.previous_evidence_id"
             ),
+            current=AuthorityStateBinding.from_mapping(current),
+        )
+
+
+@dataclass(frozen=True)
+class GrantTransition:
+    relationship: str
+    previous: AuthorityStateBinding
+    current: AuthorityStateBinding
+
+    @classmethod
+    def from_mapping(cls, value: Mapping[str, Any]) -> "GrantTransition":
+        if set(value) != {"relationship", "previous", "current"}:
+            raise ValueError(
+                "grant_transition must bind one exact previous authority state "
+                "to one exact current authority state"
+            )
+        previous = value["previous"]
+        current = value["current"]
+        if not isinstance(previous, Mapping) or not isinstance(current, Mapping):
+            raise ValueError("grant_transition previous and current must be objects")
+        return cls(
+            relationship=_exact_string(
+                value["relationship"], "grant_transition.relationship"
+            ),
+            previous=AuthorityStateBinding.from_mapping(previous),
             current=AuthorityStateBinding.from_mapping(current),
         )
 
@@ -222,6 +253,8 @@ class OracleInput:
     required_values: Mapping[str, Any]
     reestablishment_state: FactState
     reestablishment: Reestablishment | None
+    grant_transition_state: FactState
+    grant_transition: GrantTransition | None
     prohibition: Prohibition
     applicable_invariants: tuple[str, ...]
     authority_question: str
@@ -256,6 +289,14 @@ class OracleInput:
             if not isinstance(raw_reestablishment.value, Mapping):
                 raise ValueError("KNOWN reestablishment requires an object value")
             reestablishment = Reestablishment.from_mapping(raw_reestablishment.value)
+        raw_grant_transition = Fact.from_mapping(
+            t3.get("grant_transition", {"state": FactState.UNKNOWN.value})
+        )
+        grant_transition = None
+        if raw_grant_transition.state is FactState.KNOWN:
+            if not isinstance(raw_grant_transition.value, Mapping):
+                raise ValueError("KNOWN grant_transition requires an object value")
+            grant_transition = GrantTransition.from_mapping(raw_grant_transition.value)
         mutations = tuple(
             Mutation(
                 _exact_string(item["field"], "t2.mutations.field"),
@@ -277,6 +318,8 @@ class OracleInput:
             required_values=required_values,
             reestablishment_state=raw_reestablishment.state,
             reestablishment=reestablishment,
+            grant_transition_state=raw_grant_transition.state,
+            grant_transition=grant_transition,
             prohibition=Prohibition.from_mapping(t3["prohibition"]),
             applicable_invariants=invariants,
             authority_question=str(t3["authority_question"]),
