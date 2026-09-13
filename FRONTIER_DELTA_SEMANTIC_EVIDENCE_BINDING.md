@@ -52,11 +52,11 @@ The inquiry attacks the contract rather than assuming the answer. It does not tr
 
 The strongest existing text is `INV-EVD`: evidence is bound to the exact tuple and decision for which it was admitted; evidence is not authority; evidence from one tuple, state, boundary epoch, identity basis, or decision cannot be silently reused; and weaker evidence cannot be promoted into satisfying a stronger applicable decision contract.
 
-That last requirement is semantic, not merely referential. Binding evidence identifier `E` to decision identifier `D` does not establish that the proposition actually evidenced by `E` satisfies the proposition required by `D`. If an implementation treats identifier equality as semantic sufficiency, it has failed to enforce `INV-EVD`; it has not shown that the frozen contract permits the transition.
+That requirement blocks runtime promotion when the applicable decision contract actually requires `P` and evidence establishes only `P'`. Binding evidence identifier `E` to decision identifier `D` does not, in that case, establish that `E` satisfies `D`.
 
-This reading is also required by the outcome definitions. `AUTHORIZED` means the applicable boundary, bound tuple, and decision contract have been established and the decision succeeds. A decision contract cannot be established as satisfied by evidence that does not establish its required proposition.
+It does not follow that `INV-EVD` establishes the semantic fidelity of `D` itself to an authority objective expressed outside `D`. If `D` incorrectly formalizes required proposition `P` as proxy `P'`, evidence for `P'` is not weaker relative to the encoded contract: it satisfies exactly what `D` asks. All tuple, boundary, evidence, continuity, and consumption checks can therefore succeed while the external authority objective remains unsatisfied.
 
-The contract does not, however, prove semantic truth from first principles or guarantee that a human-written decision contract expresses a wise authority objective. Those are trust and model boundaries analyzed below.
+The frozen contract does not explicitly bind the encoded decision contract to the authority proposition it is intended to represent. Treating that missing fidelity relationship as already contained in `INV-EVD` would assume the conclusion under review. This is the candidate contract-level gap tested below.
 
 ## Semantic evidence model
 
@@ -76,11 +76,11 @@ For an exact T3 decision, it is insufficient to establish only:
 2. correct execution of the producer or verifier of `E`; and
 3. a stored association between `E` and `D`.
 
-The applicable decision contract must also establish that the proposition supported by `E` is semantically sufficient for the authority proposition required by `D` in the exact current context. Symbolically, the required relationship is not `E -> D` by identifier alone, but an established current relationship of the form:
+Objective-preserving authorization would require the proposition supported by `E` to be semantically sufficient for the authority proposition the decision contract is intended to represent in the exact current context. Symbolically, the required relationship is not `E -> D` by identifier alone, but an established current relationship of the form:
 
 `E establishes P'` and `D in C accepts P' as sufficient for P`.
 
-No universal logical calculus is implied. The applicable contract defines what sufficiency means and which evidence establishes it. If that required relationship cannot be established, the decision evaluation is unavailable. If it is established and fails an applicable condition, the decision is denied. If it is established, satisfies the contract, and all other exact T3 relations hold, authorization remains possible.
+No universal logical calculus is implied. When `D` correctly states that it requires `P`, an unestablished `P' -> P` relationship makes the required evaluation unavailable; an established failure yields denial; and established sufficiency preserves an authorization path. The hostile case is different: `D` itself encodes `P'` as the requirement while the actual authority objective remains `P`. The frozen checks can then see a complete evaluation even though the objective-to-contract mapping is unfaithful.
 
 ## Why authentic evidence can still be insufficient
 
@@ -112,15 +112,15 @@ Established facts:
 - no compromised cryptographic primitive is assumed;
 - no explicit prohibition has yet been established.
 
-At T1, a system associates the evidence for `P'` with a decision requiring `P` and emits a label named `AUTHORIZED`. At T3, it attempts release using that cached or derived result.
+At T1, the applicable encoded decision contract `D` incorrectly formalizes policy `X`: it treats passing suite `Y` as the complete release condition. Evidence for `P'` therefore satisfies `D`, which emits `AUTHORIZED`. The intended authority objective remains `P`. At T3, the system attempts release with unchanged current state and no missing frozen-contract fact.
 
 ### Attack result
 
-Solver or test success establishes only the proposition actually encoded and evaluated. Passing suite `Y` does not establish independent review and release permission under policy `X` unless the applicable current decision contract establishes that exact sufficiency relationship.
+Solver or test success establishes only the proposition actually encoded and evaluated. Passing suite `Y` does not establish independent review and release permission under policy `X`.
 
-If that relationship was never established, required evaluation under `D` is unavailable. `INV-EVD` prohibits promotion of weaker evidence into a stronger decision contract, and `INV-CONT` requires that the evidence-to-decision relationship remain established at use. The correct authority outcome is `UNAVAILABLE`, regardless of the misleading label produced at T1.
+Nevertheless, the encoded `D` requires only `P'`. There is no runtime relabeling of weak evidence into a stronger condition inside `D`; the stronger condition was lost when the authority objective was formalized. `INV-EVD` evaluates evidence against the encoded decision contract, and the other frozen invariants preserve exact identity, boundary, continuity, use, and closure without testing whether `D` faithfully represents `P`.
 
-The T1 label is not authority merely because a verifier emitted it. It is evidence about what that verifier computed.
+The frozen contract therefore permits `AUTHORIZED` in this construction while the stated authority objective makes release impermissible. This is a reproducible in-scope contract counterexample at the design level. It does not prove that every semantic mismatch authorizes, and it does not authorize a contract repair in this artifact.
 
 ## Flagship perfect-aliasing case
 
@@ -185,7 +185,7 @@ This result follows from verification-to-use continuity and continuing-grant val
 
 | Class | Proposition actually established | Invalid promotion | Engaged invariants | Classification |
 |---|---|---|---|---|
-| Verdict-preserving formalization | Solver verdict for encoded `F(P')` | `F(P')` faithfully represents `P` | `INV-EVD`, `INV-DISC`, `INV-CONT` | already represented by frozen contract; trust precondition; test gap |
+| Verdict-preserving formalization | Solver verdict for encoded `F(P')` | `F(P')` faithfully represents `P` | existing invariants do not establish objective-to-contract fidelity | candidate contract counterexample; trust precondition; test gap |
 | Perfect aliasing | Predictive agreement in `C1` | Probe measures required property in rival `C2` | `INV-EVD`, `INV-CONT`, `INV-DISC`, `INV-USE` | already represented by frozen contract; implementation obligation; trust precondition; test gap |
 | Test suite | Tests in suite `Y` pass | Functional correctness, safety, policy compliance, permission, or deployment authority | `INV-EVD`, `INV-CLO` | already represented by frozen contract; test gap |
 | Attestation overreach | Signed measurement or quoted state | Uncompromised hardware, semantic correctness, safety, or permission | `INV-EVD`, `INV-DISC` | already represented by frozen contract; trust precondition |
@@ -264,7 +264,9 @@ A requester cannot select, replace, route around, or bootstrap a favorable seman
 
 ### INV-EVD — Evidence binding and non-promotion
 
-`INV-EVD` directly blocks the central attack. Authentic evidence of `P'` cannot satisfy a decision contract requiring `P` unless the exact applicable semantic sufficiency relationship is established. Identifier binding without semantic sufficiency is incomplete evidence binding. Repetition, agreement, transformation, consensus, and cryptographic wrapping do not strengthen the proposition established.
+`INV-EVD` blocks authentic evidence of `P'` from satisfying an encoded decision contract that actually requires `P` unless the applicable sufficiency relationship is established. Identifier binding, repetition, agreement, transformation, consensus, and cryptographic wrapping do not strengthen the proposition established.
+
+`INV-EVD` does not, as currently written, establish that the encoded decision contract faithfully represents an authority objective defined outside that contract. When `D` itself substitutes `P'` for `P`, evidence of `P'` satisfies the encoded requirement without runtime evidence promotion. Treating objective-to-contract fidelity as implicit in `INV-EVD` would silently strengthen the frozen invariant.
 
 ### INV-USE — Consumption is not last-known-good
 
@@ -280,13 +282,16 @@ If verifier `V` establishes `P'`, the relationship from `P'` to `P` can be estab
 
 Ground Truth does not require an infinite chain of meta-verifiers. The applicable authority boundary defines a trust base: which contract, interpreter, schema, observer, and identity basis are admitted; which relationships must be evidenced; and where assumptions stop. The live applicability, identity, provenance, version, and boundary lineage of that trust base must be established at T3.
 
-Whether the selected trust base is ultimately truthful or normatively correct is not proven by the six-invariant contract. Compromise of the live applicable authority boundary, corrupt policy semantics, or an authority objective that deliberately accepts an inadequate proxy may be a trust failure, model limitation, or separate security objective rather than a contradiction in the authority-binding contract.
+The unresolved issue is one level earlier: the frozen contract does not expressly require evidence that the admitted decision contract faithfully represents the stated authority objective. A future design may place that mapping at a bounded human policy root, formal equivalence relation, or other explicitly trusted boundary without claiming infinite regress. Choosing that repair is outside this research artifact.
+
+Whether a selected trust base is ultimately truthful or normatively correct still remains a trust or model boundary. The counterexample here is narrower: the authority objective is held fixed as `P`, `D` incorrectly encodes `P'`, and the frozen contract has no explicit fidelity check between them.
 
 Classification:
 
-- Binding `E`, `P'`, `P`, `D`, and current context through the applicable contract is already represented by the frozen contract.
-- Recording and enforcing those relations is an implementation obligation.
-- Correctness of the admitted semantic root is a trust precondition.
+- Binding evidence to the proposition explicitly required inside `D` is already represented by the frozen contract.
+- Binding `D` to the external authority objective it is intended to formalize is a candidate contract counterexample.
+- Recording and enforcing either relationship is an implementation obligation once separately authorized.
+- Correctness of the admitted semantic root remains a trust precondition.
 - Truth from first principles and universal semantic grounding are model limitations or out of scope.
 
 ## Trust preconditions
@@ -366,7 +371,7 @@ This authority model does not establish:
 - that monitor silence proves absence of harmful behavior;
 - that simulations or predictions establish external reality;
 - that agreement proves semantic equivalence or independence;
-- protection against a deliberately underspecified decision contract that explicitly authorizes the inadequate proxy;
+- semantic truth beyond a separately established objective-to-contract fidelity boundary;
 - protection after a legitimately authorized effect exceeds the stated authority objective.
 
 Those are trust preconditions, model limitations, out-of-scope objectives, or reasons to improve the applicable decision contract. They do not create a new authority outcome.
@@ -385,13 +390,13 @@ The strongest attempted counterexample fixes all referential checks:
 - no established prohibition;
 - all explicit identifier and cryptographic checks pass.
 
-It then sets `E` to establish `P'` while `D` requires `P`, with no established relationship from `P'` to `P`.
+The first construction sets `E` to establish `P'` while encoded `D` explicitly requires `P`, with no established relationship from `P'` to `P`. Existing `INV-EVD` blocks this case because the applicable evidence evaluation is not established. It is not the surviving counterexample.
 
-This attempt does not satisfy all facts required by the frozen contract. The applicable evidence evaluation is not established, and weaker evidence is being promoted into a stronger decision contract. `INV-EVD` therefore blocks `AUTHORIZED`; `INV-CONT` blocks later use of an unestablished or expired relationship; `INV-CLO` blocks implicit semantic transformation where applicable.
+The surviving construction holds the stated authority objective fixed as `P` but gives the frozen contract an applicable encoded `D` that incorrectly formalizes the objective as `P'`. Evidence `E` authentically and freshly establishes `P'`. `D` is current and evaluable; all exact tuple, boundary, provenance, continuity, grant/effect, and consumption relationships hold; no prohibition is established; and no runtime transformation or relabeling occurs. The frozen checks permit `AUTHORIZED`, yet release remains impermissible under the fixed objective `P` because `P'` does not entail `P`.
 
-A different construction defines `D` itself to accept `P'` as sufficient while an external critic believes `P'` is inadequate. That can satisfy the contract, but it changes the stated authority objective or exposes an underspecified or unwise decision contract. It is a model limitation or policy defect, not a counterexample in which the frozen contract violates its own applicable objective.
+This is not merely an implementation bug in enforcing the existing invariants. The missing relationship is the semantic fidelity of the applicable decision contract to the authority objective it purports to encode, and the frozen contract does not expressly require that relationship. The counterexample therefore satisfies the stated strict standard.
 
-No case in the reviewed scope establishes every frozen requirement, receives `AUTHORIZED` under the contract, and still contradicts the same established authority objective.
+This finding does not determine the repair. A separate design review must decide whether the narrowest correction is a tightening of an existing invariant, an explicit decision-contract applicability rule, or another bounded mechanism. This artifact does not create a new tuple coordinate, invariant, outcome, or implementation authority.
 
 ## Public/private boundary
 
@@ -399,8 +404,8 @@ This artifact contains only abstract public research pressure. It includes no pr
 
 ## Final determination
 
-**NO REPRODUCIBLE IN-SCOPE CONTRACT COUNTEREXAMPLE FOUND**
+**REPRODUCIBLE IN-SCOPE CONTRACT COUNTEREXAMPLE FOUND**
 
-The frozen contract already requires evidence to be sufficient for the proposition demanded by the applicable decision contract; identifier authenticity alone is not enough. Semantic relationship uncertainty fails closed as `UNAVAILABLE`, an established failed applicable condition yields `DENIED`, and exact current semantic sufficiency preserves an `AUTHORIZED` path.
+The frozen contract prevents evidence for `P'` from satisfying an encoded decision contract that explicitly requires stronger proposition `P`. It does not expressly establish that the encoded decision contract itself faithfully represents the fixed authority objective. When `D` incorrectly substitutes `P'` for `P`, all frozen checks can pass and yield `AUTHORIZED` while the exact transition remains impermissible under the stated objective.
 
-This is failure to falsify under the reviewed scope, not proof of semantic truth, universal correctness, implementation correctness, certification, safety, implementation authority, or roadmap authority.
+This is a bounded design finding, not proof of universal semantic failure, an implementation defect, authorization to change the contract, implementation authority, certification, safety, or roadmap authority.
