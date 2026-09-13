@@ -1,0 +1,32 @@
+{
+  "schema_version": "authority-lab-v0",
+  "case_id": "LAB-V0-010",
+  "source_case_id": "GT-CASE-014",
+  "title": "Fresh explicitly bound delegated actor",
+  "objective": "Confirm that explicit current delegation can authorize without inherited authority.",
+  "authority_tuple": {"subject": "DELEGATE-D", "artifact": "A", "control_state": "DELEGATED-SCOPE-1", "identity_basis": "D-ID", "boundary_epoch": "B1", "decision": "AUTHORIZED"},
+  "t1": {"result": "AUTHORIZED", "evidence": ["DELEGATION-D-A-B1"]},
+  "t2": {"creates_authority": false, "mutations": [{"field": "acting_subject", "before": "S", "after": "DELEGATE-D"}]},
+  "t3": {
+    "facts": {
+      "subject_identity": {"state": "KNOWN", "value": "DELEGATE-D"},
+      "artifact_identity": {"state": "KNOWN", "value": "A"},
+      "control_state": {"state": "KNOWN", "value": "DELEGATED-SCOPE-1"},
+      "identity_basis": {"state": "KNOWN", "value": "D-ID"},
+      "boundary_epoch": {"state": "KNOWN", "value": "B1"},
+      "decision_binding": {"state": "KNOWN", "value": "DELEGATION-D-A-B1"},
+      "applicable_boundary": {"state": "KNOWN", "value": "AUTH-BOUNDARY-1"},
+      "delegation_binding": {"state": "KNOWN", "value": "S-TO-D-A"},
+      "closure_binding": {"state": "KNOWN", "value": "EXPLICIT"},
+      "consumption_state": {"state": "KNOWN", "value": "UNUSED"},
+      "freshness": {"state": "KNOWN", "value": "CURRENT"}
+    },
+    "required_facts": ["subject_identity", "artifact_identity", "control_state", "identity_basis", "boundary_epoch", "decision_binding", "applicable_boundary", "delegation_binding", "closure_binding", "consumption_state", "freshness"],
+    "prohibition": {"state": "KNOWN", "applies": false, "id": "none"},
+    "authority_question": "May explicitly bound delegate D commit exact artifact A?"
+  },
+  "applicable_invariants": ["INV-DISC", "INV-CLO", "INV-BND", "INV-CONT", "INV-EVD", "INV-USE"],
+  "expected_outcome": "AUTHORIZED",
+  "expected_reason": "Delegate, effect, evidence, boundary, epoch, and unused state are freshly established.",
+  "notes": "Positive control derived from GT-CASE-014; no implicit inheritance is used."
+}

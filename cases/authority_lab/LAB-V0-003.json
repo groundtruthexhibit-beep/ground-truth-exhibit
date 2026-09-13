@@ -1,0 +1,31 @@
+{
+  "schema_version": "authority-lab-v0",
+  "case_id": "LAB-V0-003",
+  "source_case_id": "GT-CASE-001",
+  "title": "Flagship sandbox escape after T1",
+  "objective": "Derive commit-time authority after the acting process leaves its evaluated environment.",
+  "authority_tuple": {"subject": "S", "artifact": "A", "control_state": "E1", "identity_basis": "I1", "boundary_epoch": "B1", "decision": "AUTHORIZED"},
+  "t1": {"result": "AUTHORIZED", "evidence": ["EV-E1"]},
+  "t2": {"creates_authority": false, "mutations": [{"field": "execution_context", "before": "E1", "after": "E2"}]},
+  "t3": {
+    "facts": {
+      "subject_identity": {"state": "KNOWN", "value": "S"},
+      "artifact_identity": {"state": "KNOWN", "value": "A"},
+      "control_state": {"state": "KNOWN", "value": "E2"},
+      "identity_basis": {"state": "KNOWN", "value": "I1"},
+      "boundary_epoch": {"state": "KNOWN", "value": "B1"},
+      "decision_binding": {"state": "KNOWN", "value": "EV-E1"},
+      "applicable_boundary": {"state": "KNOWN", "value": "AUTH-BOUNDARY-1"},
+      "execution_context": {"state": "UNKNOWN"},
+      "boundary_continuity": {"state": "UNKNOWN"},
+      "consumption_state": {"state": "KNOWN", "value": "UNUSED"}
+    },
+    "required_facts": ["subject_identity", "artifact_identity", "control_state", "identity_basis", "boundary_epoch", "decision_binding", "applicable_boundary", "execution_context", "boundary_continuity", "consumption_state"],
+    "prohibition": {"state": "KNOWN", "applies": false, "id": "none"},
+    "authority_question": "Does the E1 authority still bind the acting process in E2?"
+  },
+  "applicable_invariants": ["INV-CONT", "INV-DISC", "INV-BND", "INV-EVD"],
+  "expected_outcome": "UNAVAILABLE",
+  "expected_reason": "Required execution identity and boundary continuity are not established.",
+  "notes": "Flagship base variant derived from GT-CASE-001."
+}

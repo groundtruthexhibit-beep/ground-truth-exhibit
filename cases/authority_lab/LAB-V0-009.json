@@ -1,0 +1,30 @@
+{
+  "schema_version": "authority-lab-v0",
+  "case_id": "LAB-V0-009",
+  "source_case_id": "GT-CASE-021",
+  "title": "Ambiguous T3 commit and one-shot consumption",
+  "objective": "Ensure an ambiguous prior commit cannot regenerate one-shot authority.",
+  "authority_tuple": {"subject": "S", "artifact": "A", "control_state": "RETRY", "identity_basis": "I1", "boundary_epoch": "B1", "decision": "AUTHORIZED"},
+  "t1": {"result": "AUTHORIZED", "evidence": ["ONE-SHOT-U"]},
+  "t2": {"creates_authority": false, "mutations": [{"field": "commit_state", "before": "NOT_ATTEMPTED", "after": "UNKNOWN"}]},
+  "t3": {
+    "facts": {
+      "subject_identity": {"state": "KNOWN", "value": "S"},
+      "artifact_identity": {"state": "KNOWN", "value": "A"},
+      "control_state": {"state": "KNOWN", "value": "RETRY"},
+      "identity_basis": {"state": "KNOWN", "value": "I1"},
+      "boundary_epoch": {"state": "KNOWN", "value": "B1"},
+      "decision_binding": {"state": "KNOWN", "value": "ONE-SHOT-U"},
+      "applicable_boundary": {"state": "KNOWN", "value": "AUTH-BOUNDARY-1"},
+      "commit_state": {"state": "UNKNOWN"},
+      "consumption_state": {"state": "CONFLICTING", "values": ["UNUSED", "CONSUMED"]}
+    },
+    "required_facts": ["subject_identity", "artifact_identity", "control_state", "identity_basis", "boundary_epoch", "decision_binding", "applicable_boundary", "commit_state", "consumption_state"],
+    "prohibition": {"state": "KNOWN", "applies": false, "id": "none"},
+    "authority_question": "May the original one-shot authority be retried after an ambiguous commit?"
+  },
+  "applicable_invariants": ["INV-USE", "INV-CONT", "INV-EVD", "INV-BND"],
+  "expected_outcome": "UNAVAILABLE",
+  "expected_reason": "Commit and consumption state cannot be established.",
+  "notes": "Derived from GT-CASE-021."
+}

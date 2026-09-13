@@ -1,0 +1,30 @@
+{
+  "schema_version": "authority-lab-v0",
+  "case_id": "LAB-V0-002",
+  "source_case_id": "GT-CASE-002",
+  "title": "Privilege escalation during T2",
+  "objective": "Distinguish an established prohibited privilege change from missing state.",
+  "authority_tuple": {"subject": "S", "artifact": "A", "control_state": "P2", "identity_basis": "I1", "boundary_epoch": "B1", "decision": "AUTHORIZED"},
+  "t1": {"result": "AUTHORIZED", "evidence": ["EV-P1"]},
+  "t2": {"creates_authority": false, "mutations": [{"field": "privilege", "before": "P1", "after": "P2"}]},
+  "t3": {
+    "facts": {
+      "subject_identity": {"state": "KNOWN", "value": "S"},
+      "artifact_identity": {"state": "KNOWN", "value": "A"},
+      "control_state": {"state": "KNOWN", "value": "P2"},
+      "identity_basis": {"state": "KNOWN", "value": "I1"},
+      "boundary_epoch": {"state": "KNOWN", "value": "B1"},
+      "decision_binding": {"state": "KNOWN", "value": "EV-P1"},
+      "applicable_boundary": {"state": "KNOWN", "value": "AUTH-BOUNDARY-1"},
+      "privilege_state": {"state": "KNOWN", "value": "P2"},
+      "consumption_state": {"state": "KNOWN", "value": "UNUSED"}
+    },
+    "required_facts": ["subject_identity", "artifact_identity", "control_state", "identity_basis", "boundary_epoch", "decision_binding", "applicable_boundary", "privilege_state", "consumption_state"],
+    "prohibition": {"state": "KNOWN", "applies": true, "id": "PRIVILEGE_EXPANSION_PROHIBITED"},
+    "authority_question": "May S commit A while established privilege P2 is active?"
+  },
+  "applicable_invariants": ["INV-CONT", "INV-DISC", "INV-BND"],
+  "expected_outcome": "DENIED",
+  "expected_reason": "The exact tuple and boundary are established and privilege expansion is prohibited.",
+  "notes": "Derived from GT-CASE-002."
+}
