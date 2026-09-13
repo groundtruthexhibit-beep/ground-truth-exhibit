@@ -346,4 +346,3 @@ The main residual risk is operational: an implementation may omit an authority-r
 **NO REPRODUCIBLE IN-SCOPE CONTRACT COUNTEREXAMPLE FOUND**
 
 Within the reviewed scope, physical and oracle containment-state changes are expressible through the existing frozen tuple and six invariants. This is a failure to falsify under the reviewed scope, not proof of universal correctness, implementation correctness, containment security, alignment, or AI safety.
-
