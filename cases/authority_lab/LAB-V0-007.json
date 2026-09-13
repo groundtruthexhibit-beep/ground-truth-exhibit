@@ -1,0 +1,30 @@
+{
+  "schema_version": "authority-lab-v0",
+  "case_id": "LAB-V0-007",
+  "source_case_id": "GT-CASE-011",
+  "title": "Cached authorization after boundary epoch change",
+  "objective": "Test whether a historical cached decision can become current after epoch drift.",
+  "authority_tuple": {"subject": "S", "artifact": "A", "control_state": "C1", "identity_basis": "I1", "boundary_epoch": "B1", "decision": "AUTHORIZED"},
+  "t1": {"result": "AUTHORIZED", "evidence": ["CACHE-D1-B1"]},
+  "t2": {"creates_authority": false, "mutations": [{"field": "boundary_epoch", "before": "B1", "after": "B2"}]},
+  "t3": {
+    "facts": {
+      "subject_identity": {"state": "KNOWN", "value": "S"},
+      "artifact_identity": {"state": "KNOWN", "value": "A"},
+      "control_state": {"state": "KNOWN", "value": "C1"},
+      "identity_basis": {"state": "KNOWN", "value": "I1"},
+      "boundary_epoch": {"state": "CONFLICTING", "values": ["B1", "B2"]},
+      "decision_binding": {"state": "KNOWN", "value": "CACHE-D1-B1"},
+      "applicable_boundary": {"state": "KNOWN", "value": "AUTH-BOUNDARY-1"},
+      "freshness": {"state": "UNKNOWN"},
+      "consumption_state": {"state": "KNOWN", "value": "UNUSED"}
+    },
+    "required_facts": ["subject_identity", "artifact_identity", "control_state", "identity_basis", "boundary_epoch", "decision_binding", "applicable_boundary", "freshness", "consumption_state"],
+    "prohibition": {"state": "KNOWN", "applies": false, "id": "none"},
+    "authority_question": "May cached B1 authority be consumed after the possible B2 transition?"
+  },
+  "applicable_invariants": ["INV-CONT", "INV-EVD", "INV-USE", "INV-BND"],
+  "expected_outcome": "UNAVAILABLE",
+  "expected_reason": "Current epoch and decision freshness are not established.",
+  "notes": "Derived from GT-CASE-011 with boundary-epoch drift."
+}

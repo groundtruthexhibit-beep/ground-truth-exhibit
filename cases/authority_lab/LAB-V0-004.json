@@ -1,0 +1,30 @@
+{
+  "schema_version": "authority-lab-v0",
+  "case_id": "LAB-V0-004",
+  "source_case_id": "GT-CASE-004",
+  "title": "Connector endpoint substitution",
+  "objective": "Test stable connector naming with conflicting endpoint identity.",
+  "authority_tuple": {"subject": "S", "artifact": "A", "control_state": "C1", "identity_basis": "CONNECTOR-NAME", "boundary_epoch": "B1", "decision": "AUTHORIZED"},
+  "t1": {"result": "AUTHORIZED", "evidence": ["EV-X1"]},
+  "t2": {"creates_authority": false, "mutations": [{"field": "connector_endpoint", "before": "X1", "after": "X2"}]},
+  "t3": {
+    "facts": {
+      "subject_identity": {"state": "KNOWN", "value": "S"},
+      "artifact_identity": {"state": "KNOWN", "value": "A"},
+      "control_state": {"state": "KNOWN", "value": "C1"},
+      "identity_basis": {"state": "KNOWN", "value": "CONNECTOR-NAME"},
+      "boundary_epoch": {"state": "KNOWN", "value": "B1"},
+      "decision_binding": {"state": "KNOWN", "value": "EV-X1"},
+      "applicable_boundary": {"state": "KNOWN", "value": "AUTH-BOUNDARY-1"},
+      "tool_connector_identity": {"state": "CONFLICTING", "values": ["X1", "X2"]},
+      "consumption_state": {"state": "KNOWN", "value": "UNUSED"}
+    },
+    "required_facts": ["subject_identity", "artifact_identity", "control_state", "identity_basis", "boundary_epoch", "decision_binding", "applicable_boundary", "tool_connector_identity", "consumption_state"],
+    "prohibition": {"state": "KNOWN", "applies": false, "id": "none"},
+    "authority_question": "May the X1-bound decision be consumed through the connector now resolving to X2?"
+  },
+  "applicable_invariants": ["INV-DISC", "INV-CONT", "INV-EVD", "INV-BND"],
+  "expected_outcome": "UNAVAILABLE",
+  "expected_reason": "The required live connector identity conflicts.",
+  "notes": "Derived from GT-CASE-004."
+}

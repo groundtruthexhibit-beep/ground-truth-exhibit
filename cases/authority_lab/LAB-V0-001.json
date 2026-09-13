@@ -1,0 +1,32 @@
+{
+  "schema_version": "authority-lab-v0",
+  "case_id": "LAB-V0-001",
+  "source_case_id": "GT-CASE-009",
+  "title": "Fresh unchanged positive control",
+  "objective": "Confirm that a fully established unchanged current state can authorize at T3.",
+  "authority_tuple": {"subject": "S", "artifact": "A", "control_state": "C1", "identity_basis": "I1", "boundary_epoch": "B1", "decision": "AUTHORIZED"},
+  "t1": {"result": "AUTHORIZED", "evidence": ["EV-A-B1"]},
+  "t2": {"creates_authority": false, "mutations": []},
+  "t3": {
+    "facts": {
+      "subject_identity": {"state": "KNOWN", "value": "S"},
+      "artifact_identity": {"state": "KNOWN", "value": "A"},
+      "control_state": {"state": "KNOWN", "value": "C1"},
+      "identity_basis": {"state": "KNOWN", "value": "I1"},
+      "boundary_epoch": {"state": "KNOWN", "value": "B1"},
+      "decision_binding": {"state": "KNOWN", "value": "EV-A-B1"},
+      "applicable_boundary": {"state": "KNOWN", "value": "AUTH-BOUNDARY-1"},
+      "evidence_binding": {"state": "KNOWN", "value": "CURRENT"},
+      "execution_context": {"state": "KNOWN", "value": "E1"},
+      "freshness": {"state": "KNOWN", "value": "CURRENT"},
+      "consumption_state": {"state": "KNOWN", "value": "UNUSED"}
+    },
+    "required_facts": ["subject_identity", "artifact_identity", "control_state", "identity_basis", "boundary_epoch", "decision_binding", "applicable_boundary", "evidence_binding", "execution_context", "freshness", "consumption_state"],
+    "prohibition": {"state": "KNOWN", "applies": false, "id": "none"},
+    "authority_question": "May S commit exact artifact A in unchanged E1 at B1?"
+  },
+  "applicable_invariants": ["INV-CONT", "INV-DISC", "INV-BND", "INV-EVD", "INV-USE"],
+  "expected_outcome": "AUTHORIZED",
+  "expected_reason": "All required current facts remain established and the transition is permitted.",
+  "notes": "Positive control projection of GT-CASE-009; no implementation authority is implied."
+}

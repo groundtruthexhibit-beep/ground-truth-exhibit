@@ -1,0 +1,31 @@
+{
+  "schema_version": "authority-lab-v0",
+  "case_id": "LAB-V0-012",
+  "source_case_id": "GT-CASE-029",
+  "title": "Derived report cannot inherit source authority",
+  "objective": "Ensure transformation and signing do not transfer authority to a derived artifact.",
+  "authority_tuple": {"subject": "TRANSFORMER-Y", "artifact": "REPORT-Z", "control_state": "DERIVED", "identity_basis": "Z-DIGEST", "boundary_epoch": "B1", "decision": "AUTHORIZED"},
+  "t1": {"result": "AUTHORIZED", "evidence": ["SOURCE-X"]},
+  "t2": {"creates_authority": false, "mutations": [{"field": "artifact", "before": "SOURCE-X", "after": "REPORT-Z"}]},
+  "t3": {
+    "facts": {
+      "subject_identity": {"state": "KNOWN", "value": "TRANSFORMER-Y"},
+      "artifact_identity": {"state": "KNOWN", "value": "REPORT-Z"},
+      "control_state": {"state": "KNOWN", "value": "DERIVED"},
+      "identity_basis": {"state": "KNOWN", "value": "Z-DIGEST"},
+      "boundary_epoch": {"state": "KNOWN", "value": "B1"},
+      "decision_binding": {"state": "KNOWN", "value": "SOURCE-X-ONLY"},
+      "applicable_boundary": {"state": "KNOWN", "value": "AUTH-BOUNDARY-1"},
+      "derived_authority_binding": {"state": "UNKNOWN"},
+      "provenance": {"state": "KNOWN", "value": "Z-TRANSFORMED-FROM-X"},
+      "consumption_state": {"state": "KNOWN", "value": "UNUSED"}
+    },
+    "required_facts": ["subject_identity", "artifact_identity", "control_state", "identity_basis", "boundary_epoch", "decision_binding", "applicable_boundary", "derived_authority_binding", "provenance", "consumption_state"],
+    "prohibition": {"state": "KNOWN", "applies": false, "id": "none"},
+    "authority_question": "May derived report Z inherit authority from source artifact X?"
+  },
+  "applicable_invariants": ["INV-CLO", "INV-EVD", "INV-DISC", "INV-CONT"],
+  "expected_outcome": "UNAVAILABLE",
+  "expected_reason": "Z has known provenance but no established distinct authority binding.",
+  "notes": "Derived from GT-CASE-029."
+}

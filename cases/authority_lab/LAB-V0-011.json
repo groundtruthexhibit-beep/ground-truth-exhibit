@@ -1,0 +1,31 @@
+{
+  "schema_version": "authority-lab-v0",
+  "case_id": "LAB-V0-011",
+  "source_case_id": "GT-CASE-016",
+  "title": "Aggregate result lacks distinct authority binding",
+  "objective": "Ensure constituent judgments do not automatically authorize an aggregate artifact.",
+  "authority_tuple": {"subject": "AGGREGATOR-G", "artifact": "AGGREGATE-G", "control_state": "QUORUM-3", "identity_basis": "G-ID", "boundary_epoch": "B1", "decision": "AUTHORIZED"},
+  "t1": {"result": "AUTHORIZED", "evidence": ["M-JUDGMENT", "R-JUDGMENT", "Q-JUDGMENT"]},
+  "t2": {"creates_authority": false, "mutations": [{"field": "artifact", "before": "CONSTITUENT-JUDGMENTS", "after": "AGGREGATE-G"}]},
+  "t3": {
+    "facts": {
+      "subject_identity": {"state": "KNOWN", "value": "AGGREGATOR-G"},
+      "artifact_identity": {"state": "KNOWN", "value": "AGGREGATE-G"},
+      "control_state": {"state": "KNOWN", "value": "QUORUM-3"},
+      "identity_basis": {"state": "KNOWN", "value": "G-ID"},
+      "boundary_epoch": {"state": "KNOWN", "value": "B1"},
+      "decision_binding": {"state": "KNOWN", "value": "CONSTITUENT-ONLY"},
+      "applicable_boundary": {"state": "KNOWN", "value": "AUTH-BOUNDARY-1"},
+      "aggregate_authority_binding": {"state": "UNKNOWN"},
+      "closure_binding": {"state": "UNKNOWN"},
+      "consumption_state": {"state": "KNOWN", "value": "UNUSED"}
+    },
+    "required_facts": ["subject_identity", "artifact_identity", "control_state", "identity_basis", "boundary_epoch", "decision_binding", "applicable_boundary", "aggregate_authority_binding", "closure_binding", "consumption_state"],
+    "prohibition": {"state": "KNOWN", "applies": false, "id": "none"},
+    "authority_question": "May aggregate G authorize A merely because its constituents were valid?"
+  },
+  "applicable_invariants": ["INV-CLO", "INV-EVD", "INV-BND", "INV-DISC"],
+  "expected_outcome": "UNAVAILABLE",
+  "expected_reason": "The aggregate artifact and closure relationship lack distinct authority binding.",
+  "notes": "Derived from GT-CASE-016."
+}
