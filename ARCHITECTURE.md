@@ -13,11 +13,13 @@ Proposal
    ↓
 Evidence collection
    ↓
-Verification
+T1 — evaluation: AUTHORIZED | DENIED | UNAVAILABLE
+   ↓ only if T1 is AUTHORIZED
+T2 — non-authoritative preparation
    ↓
-Authority decision
-   ↓
-Authorized state transition
+T3 — commit-time authority establishment at the irreversible boundary
+   ↓ only if current AUTHORIZED remains established
+Exact authority-consuming transition
 ```
 
 A useful shorthand is:
@@ -26,7 +28,7 @@ A useful shorthand is:
 Evidence → Verification → Authority
 ```
 
-The ordering is not intended to imply that evidence alone grants authority. Verification determines whether the evidence satisfies the applicable authority contract.
+The ordering is not intended to imply that evidence alone grants authority. Verification determines whether the evidence satisfies the applicable authority contract. A T1 `AUTHORIZED` result is necessary but not sufficient for T3. T2 preparation does not publish, apply, transfer, spend, actuate, expose, or otherwise make an effect authoritative. Immediately before and at T3, the exact applicable tuple, boundary, evidence relationship, authority-relevant state, and consumption eligibility required by the applicable contract must remain established. If a required fact cannot be established, the result is `UNAVAILABLE`. If the applicable boundary and tuple are established and an established condition prohibits the transition, the result is `DENIED`. Only current `AUTHORIZED` at the applicable irreversible boundary permits the exact authority-consuming transition.
 
 ## Separation of concerns
 
@@ -36,7 +38,7 @@ What a model, agent, program, or operator can do.
 
 ### Evidence
 
-What can be independently observed, measured, reproduced, or validated about a proposed action or state.
+Information that can be observed, measured, reproduced, or validated about a proposed action or state. Where independence matters to an applicable contract, causal, provenance, control, and authority independence must be established rather than inferred from multiplicity. Evidence remains evidence; it does not issue authority.
 
 ### Authority
 
@@ -46,7 +48,7 @@ Ground Truth deliberately keeps these concepts separate.
 
 ## Authority outcomes
 
-The authority plane is designed around outcomes equivalent to:
+The authority plane uses exactly these authority outcomes:
 
 - `AUTHORIZED`
 - `DENIED`
@@ -54,7 +56,13 @@ The authority plane is designed around outcomes equivalent to:
 
 `UNAVAILABLE` is not silently converted into success.
 
-`DENIED` is an affirmative authority decision that the applicable conditions were not satisfied. `UNAVAILABLE` means a required identity, invariant, proof, or evidence binding could not be established. Both result in no authorized state transition; uncertainty does not degrade into permission.
+`AUTHORIZED`: The applicable boundary, exact tuple, and every authority-relevant condition required by the applicable contract are established, and the contract permits the exact requested authority-consuming transition.
+
+`DENIED`: The applicable boundary and exact tuple are established, and an established applicable condition prohibits the requested transition.
+
+`UNAVAILABLE`: A fact required to establish the applicable boundary, exact tuple, authority-relevant state, continuity, evidence relationship, freshness, consumption state, or decision cannot be established.
+
+All outcomes preserve the separation between a decision and execution. `DENIED` and `UNAVAILABLE` result in no authority-consuming transition; uncertainty does not degrade into permission.
 
 ## Lifecycle discipline
 

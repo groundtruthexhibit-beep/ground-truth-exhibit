@@ -1,5 +1,7 @@
 # Frozen Candidate Next-Layer Authority-Binding Security Contract
 
+> **Historical status:** This document is a historical candidate-contract record. It predates the merged public [Layer 2 commit-time authority review](LAYER2_COMMIT_TIME_AUTHORITY_REVIEW.md) and is retained as design-review history only. It is not the current Layer 2 contract. It does not establish present authority, current continuity, implementation authority, roadmap authority, or authority for another tuple or boundary epoch. Historical candidate validity must not be inferred from its continued presence in the repository.
+
 This document freezes a candidate security contract for a future Ground Truth authority-binding layer.
 
 It is design-only. It does not authorize implementation, a later phase, production use, or any authority transition.
@@ -158,4 +160,4 @@ It does not modify Alpha completion state.
 
 It does not authorize production deployment, certification, regulatory compliance, formal verification, or universal security claims.
 
-Any future implementation requires a separate explicit human authority decision after independent review of this frozen candidate contract.
+Any future implementation requires a separate explicit human authority decision after a separately authorized review of this frozen candidate contract that establishes any required independence.

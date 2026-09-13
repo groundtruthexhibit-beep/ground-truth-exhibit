@@ -1,5 +1,7 @@
 # Hostile Review Catalog
 
+> **Historical status:** This catalog records hostile reviews of the earlier candidate authority-binding contract. That campaign is historical relative to the merged public [Layer 2 commit-time authority review](LAYER2_COMMIT_TIME_AUTHORITY_REVIEW.md). The catalog remains review evidence; it is not the current authority contract and does not establish present authority or implementation authorization.
+
 ## Status
 
 This document is a public design-review catalog for the frozen candidate next-layer authority-binding contract.
@@ -123,7 +125,7 @@ The frozen six-invariant design survived the assigned review within its declared
 
 ### Objective
 
-Determine whether independently valid authority decisions can compose into an unauthorized aggregate outcome.
+Determine whether separately valid authority decisions can compose into an unauthorized aggregate outcome.
 
 ### Attack styles
 
@@ -145,7 +147,7 @@ Determine whether independently valid authority decisions can compose into an un
 
 ### Strongest near-counterexample
 
-Two independently issued decisions attempt to consume the same scarce pre-state concurrently. If both external effects commit as though each had exclusive authority, the implementation has failed to preserve live-state linearization. The semantic blocker is already represented by `INV-CONT` and `INV-USE`.
+Two separately issued decisions attempt to consume the same scarce pre-state concurrently. If both external effects commit as though each had exclusive authority, the implementation has failed to preserve live-state linearization. The semantic blocker is already represented by `INV-CONT` and `INV-USE`.
 
 ### Principal invariants engaged
 
@@ -301,7 +303,7 @@ No.
 
 ### Verdict
 
-Absence of a consumption record is not proof of non-consumption. Absence of an observed effect is not proof that the effect never happened. Ambiguous commit state fails unavailable.
+Absence of a consumption record is not proof of non-consumption. Absence of an observed effect is not proof that the effect never happened. Ambiguous commit state yields UNAVAILABLE and fails closed.
 
 ---
 
@@ -382,7 +384,7 @@ Restart and re-entry do not restore authority merely because historical bytes or
 
 ### Objective
 
-Attack authority transfer between independently governed domains. A conceptual translation was modeled as `F_A→B(T_A, H) = T_B`, where `H` binds the source and destination domains, tuples, identities, evidence compatibility, epochs, ordering, revocation/use state, and relinquish/accept semantics required by the transfer contract.
+Attack authority transfer between separately governed domains. A conceptual translation was modeled as `F_A→B(T_A, H) = T_B`, where `H` binds the source and destination domains, tuples, identities, evidence compatibility, epochs, ordering, revocation/use state, and relinquish/accept semantics required by the transfer contract.
 
 ### Safe exclusive states
 
@@ -1170,7 +1172,7 @@ Logical checks pass, but the system cannot durably fence consumption before an e
 
 ## Cumulative design-review result
 
-Reviews #3 through #14 attacked the frozen candidate authority-binding contract from multiple independent and compound directions.
+Reviews #3 through #14 attacked the frozen candidate authority-binding contract from multiple distinct and compound directions.
 
 Within the stated security objective and trust boundary:
 
@@ -1203,7 +1205,7 @@ Future review becomes materially useful when the contract, implementation, trust
 
 ### Compromised live applicable authority boundary
 
-If the live authority boundary itself is compromised, the current contract does not prove that the compromised boundary will behave correctly.
+If the live authority boundary itself is compromised, the reviewed candidate contract does not prove that the compromised boundary will behave correctly.
 
 ### Identity-basis collision, second-preimage, or corruption failure
 

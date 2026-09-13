@@ -35,7 +35,11 @@ Evidence from one decision or transition must not be silently reused to authoriz
 
 ## Independent verification
 
-Agreement among multiple systems is useful only when their evidence is meaningfully independent. Numerical agreement alone does not prove independence.
+Multiplicity does not establish independence. Agreement among multiple systems may be useful evidence, but numerical or repeated agreement does not prove independence.
+
+Vote count, model diversity, vendor diversity, process count, signatures, endpoint diversity, or repeated agreement do not establish causal, provenance, control, or authority independence by themselves. Where required, independence must be established under the applicable evidence and authority contract.
+
+Consensus is not evidence of independence.
 
 ## Alpha evidence posture
 

@@ -2,7 +2,7 @@
 
 [Overview](README.md) · [Architecture](ARCHITECTURE.md) · [Security model](SECURITY_MODEL.md) · [Evidence model](EVIDENCE_MODEL.md) · [Disclosure boundary](DISCLOSURE_BOUNDARY.md)
 
-Ground Truth Alpha is formally complete within its authorized lifecycle boundary.
+Ground Truth Alpha is complete within its recorded authorized lifecycle boundary.
 
 The terminal authority identity is:
 
@@ -15,7 +15,7 @@ At that terminal boundary:
 - implementation authority is closed;
 - no next phase is authorized;
 - merge authority remains human-controlled;
-- the completed Alpha evidence remains part of the authority chain;
+- the completed Alpha evidence remains part of the historical evidence record; it does not establish current authority for another tuple, boundary epoch, decision, artifact, subject, phase, or authority-consuming transition;
 - no later phase is implied.
 
 ## What Alpha completion means

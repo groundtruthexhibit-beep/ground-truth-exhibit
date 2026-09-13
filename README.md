@@ -10,19 +10,25 @@ Autonomous systems can reason, plan, call tools, write code, and act. Ground Tru
 
 ## Core model
 
-**Capability ≠ Evidence ≠ Authority**
+**Capability ≠ Evidence ≠ Authority ≠ Execution**
 
 ```mermaid
-flowchart LR
+flowchart TD
     P[Proposal] --> E[Evidence]
     E --> V[Verification]
-    V --> A{Authority decision}
-    A -->|Authorized| S[Authorized state transition]
-    A -->|Denied| D[No transition]
-    A -->|Unavailable| U[No transition / fail closed]
+    V --> T1{T1 evaluation}
+    T1 -->|AUTHORIZED| T2[T2 non-authoritative preparation]
+    T1 -->|DENIED| D[No transition]
+    T1 -->|UNAVAILABLE| U[No transition / fail closed]
+    T2 --> T3{T3 commit-time authority establishment}
+    T3 -->|current AUTHORIZED| S[Exact authority-consuming transition]
+    T3 -->|DENIED| D
+    T3 -->|UNAVAILABLE| U
 ```
 
-A model, agent, service, or operator may propose an action and supply evidence. Neither the proposal nor the evidence confers authority. Authority follows only from an explicit decision at the applicable verification boundary. Models and agents cannot confer authority on themselves.
+A model, agent, service, or operator may propose an action and supply evidence. Neither the proposal nor the evidence confers authority. Models and agents cannot confer authority on themselves.
+
+T1 is evaluation, T2 is non-authoritative preparation, and T3 is the irreversible authority-consuming boundary. A T1 `AUTHORIZED` result is necessary but not sufficient for T3, and T2 preparation does not authorize or execute the effect. Immediately before and at T3, the exact applicable tuple, boundary, evidence relationship, authority-relevant state, and consumption eligibility required by the applicable contract must remain established. If a required fact cannot be established, the result is `UNAVAILABLE`. If the applicable boundary and tuple are established and an established condition prohibits the transition, the result is `DENIED`. Only current `AUTHORIZED` at the applicable irreversible boundary permits the exact authority-consuming transition.
 
 ## Why this exists
 
@@ -59,7 +65,7 @@ It is not the private engineering repository and is not a source-code mirror of 
 - Green CI is evidence, not authority.
 - Review consensus is evidence, not authority.
 - Authority changes require an explicitly permitted transition.
-- Ambiguity fails closed or unavailable.
+- Ambiguity yields UNAVAILABLE and fails closed.
 - New artifacts require new evidence.
 - Models and agents cannot vote themselves into authority.
 
@@ -71,6 +77,10 @@ It is not the private engineering repository and is not a source-code mirror of 
 - [Alpha completion](ALPHA_COMPLETION.md)
 - [Disclosure boundary](DISCLOSURE_BOUNDARY.md)
 - [Publication manifest](PUBLICATION_MANIFEST.md)
+- [Historical candidate authority-binding contract](CANDIDATE_AUTHORITY_BINDING_CONTRACT.md) — historical design record; file presence does not establish current authority.
+- [Historical hostile-review catalog](HOSTILE_REVIEW_CATALOG.md) — historical review evidence for the earlier candidate contract; file presence does not establish current authority.
+- [Layer 2 commit-time authority review](LAYER2_COMMIT_TIME_AUTHORITY_REVIEW.md) — current public Layer 2 analysis.
+- [Research pressure map](RESEARCH_PRESSURE_MAP.md) — current public research-pressure analysis; research is evidence, not authority.
 
 ## Current boundary
 
