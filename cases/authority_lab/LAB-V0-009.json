@@ -5,7 +5,7 @@
   "title": "Ambiguous T3 commit and one-shot consumption",
   "objective": "Ensure an ambiguous prior commit cannot regenerate one-shot authority.",
   "authority_tuple": {"subject": "S", "artifact": "A", "control_state": "RETRY", "identity_basis": "I1", "boundary_epoch": "B1", "decision": "AUTHORIZED"},
-  "t1": {"result": "AUTHORIZED", "evidence": ["ONE-SHOT-U"]},
+  "t1": {"result": "AUTHORIZED", "evidence": ["ONE-SHOT-U"], "authority_state": {"subject": "S", "artifact": "A", "control_state": "RETRY", "identity_basis": "I1", "boundary_epoch": "B1", "decision": "AUTHORIZED", "evidence_id": "ONE-SHOT-U", "execution_context": "E1", "applicable_boundary": "AUTH-BOUNDARY-1", "grant_id": "GRANT-009-ONE-SHOT", "subject_mode": "DIRECT"}},
   "t2": {"creates_authority": false, "mutations": [{"field": "commit_state", "before": "NOT_ATTEMPTED", "after": "UNKNOWN"}]},
   "t3": {
     "facts": {
@@ -20,7 +20,12 @@
       "execution_context": {"state": "KNOWN", "value": "E1"},
       "freshness": {"state": "KNOWN", "value": "CURRENT"},
       "commit_state": {"state": "UNKNOWN"},
-      "consumption_state": {"state": "CONFLICTING", "values": ["UNUSED", "CONSUMED"]}
+      "consumption_state": {"state": "CONFLICTING", "values": ["UNUSED", "CONSUMED"]},
+      "boundary_epoch_binding": {"state": "KNOWN", "value": {"applicable_boundary": "AUTH-BOUNDARY-1", "boundary_epoch": "B1"}},
+      "execution_control_binding": {"state": "KNOWN", "value": {"execution_context": "E1", "control_state": "RETRY"}},
+      "consumption_binding": {"state": "KNOWN", "value": {"grant_id": "GRANT-009-ONE-SHOT", "subject": "S", "artifact": "A", "boundary_epoch": "B1"}},
+      "delegation_binding": {"state": "KNOWN", "value": {"relationship": "DIRECT", "subject": "S", "artifact": "A", "control_state": "RETRY", "boundary_epoch": "B1", "applicable_boundary": "AUTH-BOUNDARY-1"}},
+      "closure_binding": {"state": "KNOWN", "value": {"relationship": "EXACT_EFFECT", "source_artifact": "A", "target_artifact": "A"}}
     },
     "required_facts": ["subject_identity", "artifact_identity", "control_state", "identity_basis", "boundary_epoch", "decision_binding", "applicable_boundary", "commit_state", "consumption_state"],
     "required_values": {"subject_identity": "S", "artifact_identity": "A", "control_state": "RETRY", "identity_basis": "I1", "boundary_epoch": "B1", "decision_binding": "ONE-SHOT-U", "applicable_boundary": "AUTH-BOUNDARY-1", "evidence_binding": "CURRENT", "execution_context": "E1", "freshness": "CURRENT", "consumption_state": "UNUSED", "commit_state": "NOT_COMMITTED"},

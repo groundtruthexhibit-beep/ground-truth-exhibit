@@ -5,7 +5,7 @@
   "title": "Fresh explicitly bound delegated actor",
   "objective": "Confirm that explicit current delegation can authorize without inherited authority.",
   "authority_tuple": {"subject": "DELEGATE-D", "artifact": "A", "control_state": "DELEGATED-SCOPE-1", "identity_basis": "D-ID", "boundary_epoch": "B1", "decision": "AUTHORIZED"},
-  "t1": {"result": "AUTHORIZED", "evidence": ["DELEGATION-D-A-B1"]},
+  "t1": {"result": "AUTHORIZED", "evidence": ["DELEGATION-D-A-B1"], "authority_state": {"subject": "DELEGATE-D", "artifact": "A", "control_state": "DELEGATED-SCOPE-1", "identity_basis": "D-ID", "boundary_epoch": "B1", "decision": "AUTHORIZED", "evidence_id": "DELEGATION-D-A-B1", "execution_context": "E1", "applicable_boundary": "AUTH-BOUNDARY-1", "grant_id": "GRANT-010-DELEGATED", "subject_mode": "DELEGATED"}},
   "t2": {"creates_authority": false, "mutations": [{"field": "acting_subject", "before": "S", "after": "DELEGATE-D"}]},
   "t3": {
     "facts": {
@@ -18,13 +18,16 @@
       "applicable_boundary": {"state": "KNOWN", "value": "AUTH-BOUNDARY-1"},
       "evidence_binding": {"state": "KNOWN", "value": "CURRENT"},
       "execution_context": {"state": "KNOWN", "value": "E1"},
-      "delegation_binding": {"state": "KNOWN", "value": "S-TO-D-A"},
-      "closure_binding": {"state": "KNOWN", "value": "EXPLICIT"},
+      "delegation_binding": {"state": "KNOWN", "value": {"relationship": "EXACT_DELEGATION", "delegator": "S", "delegate": "DELEGATE-D", "artifact": "A", "control_state": "DELEGATED-SCOPE-1", "boundary_epoch": "B1", "applicable_boundary": "AUTH-BOUNDARY-1"}},
+      "closure_binding": {"state": "KNOWN", "value": {"relationship": "EXACT_EFFECT", "source_artifact": "A", "target_artifact": "A"}},
       "consumption_state": {"state": "KNOWN", "value": "UNUSED"},
-      "freshness": {"state": "KNOWN", "value": "CURRENT"}
+      "freshness": {"state": "KNOWN", "value": "CURRENT"},
+      "boundary_epoch_binding": {"state": "KNOWN", "value": {"applicable_boundary": "AUTH-BOUNDARY-1", "boundary_epoch": "B1"}},
+      "execution_control_binding": {"state": "KNOWN", "value": {"execution_context": "E1", "control_state": "DELEGATED-SCOPE-1"}},
+      "consumption_binding": {"state": "KNOWN", "value": {"grant_id": "GRANT-010-DELEGATED", "subject": "DELEGATE-D", "artifact": "A", "boundary_epoch": "B1"}}
     },
     "required_facts": ["subject_identity", "artifact_identity", "control_state", "identity_basis", "boundary_epoch", "decision_binding", "applicable_boundary", "delegation_binding", "closure_binding", "consumption_state", "freshness"],
-    "required_values": {"subject_identity": "DELEGATE-D", "artifact_identity": "A", "control_state": "DELEGATED-SCOPE-1", "identity_basis": "D-ID", "boundary_epoch": "B1", "decision_binding": "DELEGATION-D-A-B1", "applicable_boundary": "AUTH-BOUNDARY-1", "evidence_binding": "CURRENT", "execution_context": "E1", "freshness": "CURRENT", "consumption_state": "UNUSED", "delegation_binding": "S-TO-D-A", "closure_binding": "EXPLICIT"},
+    "required_values": {"subject_identity": "DELEGATE-D", "artifact_identity": "A", "control_state": "DELEGATED-SCOPE-1", "identity_basis": "D-ID", "boundary_epoch": "B1", "decision_binding": "DELEGATION-D-A-B1", "applicable_boundary": "AUTH-BOUNDARY-1", "evidence_binding": "CURRENT", "execution_context": "E1", "freshness": "CURRENT", "consumption_state": "UNUSED", "delegation_binding": {"relationship": "EXACT_DELEGATION", "delegator": "S", "delegate": "DELEGATE-D", "artifact": "A", "control_state": "DELEGATED-SCOPE-1", "boundary_epoch": "B1", "applicable_boundary": "AUTH-BOUNDARY-1"}, "closure_binding": {"relationship": "EXACT_EFFECT", "source_artifact": "A", "target_artifact": "A"}},
     "prohibition": {"state": "KNOWN", "applies": false, "id": "none"},
     "authority_question": "May explicitly bound delegate D commit exact artifact A?"
   },

@@ -14,9 +14,11 @@ Run the bounded v0 set:
 python -m authority_lab run-all cases/authority_lab
 ```
 
-The oracle uses only explicit fixture state and public contract semantics. It fixes the actual authority outcome before reading the expected outcome. `PASS` means only fixture/oracle agreement. It does not mean secure, safe, production-ready, certified, formally verified, or universally correct. `CASE_MISMATCH` is valuable: it can expose a fixture defect, oracle defect, ambiguous specification, or candidate contract counterexample. Neither term is an authority outcome.
+The oracle uses only explicit fixture state and public contract semantics. T1 records the exact evaluated authority state, while T3 must establish exact evidence-to-artifact, boundary-to-epoch, execution-to-control-state, consumption-to-grant/effect, and any applicable delegation or closure relationships. `required_values` remains case input and cannot redefine those oracle-owned relationships. A changed authority state requires a distinct, lineage-linked re-establishment; T2 remains non-authoritative.
 
-Authority Lab v0 assumes fixture-provided observation state as its input model. `KNOWN` means the fixture supplies one value; it does not prove that a real external observer established that value. The identity, integrity, freshness, and independence of a real-world observation provider remain a `TRUST_PRECONDITION` outside this bounded lab. Authority Lab v0 does not establish production observation trust.
+The oracle fixes the actual authority outcome before reading the expected outcome. `PASS` means only fixture/oracle agreement. It does not mean secure, safe, production-ready, certified, formally verified, or universally correct. `CASE_MISMATCH` is valuable: it can expose a fixture defect, oracle defect, ambiguous specification, or candidate contract counterexample. Neither term is an authority outcome.
+
+Authority Lab v0 assumes fixture-provided observation facts and relationships as its input model. `KNOWN` means the fixture supplies one value; it does not prove that a real external observer established that value. Real-world observer identity, integrity, provenance, freshness, independence, and resistance to self-attestation remain `TRUST_PRECONDITION`s outside this bounded lab. Authority Lab v0 does not establish production observation trust.
 
 External engineers are encouraged to submit minimal reproducible break cases with exact facts, contract interpretation, allegedly bypassed invariants, and deterministic reproduction steps. Contributor expectations never control the oracle and create no authority.
 

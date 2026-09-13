@@ -54,7 +54,26 @@ MANDATORY_T3_FACTS = (
     "execution_context",
     "freshness",
     "consumption_state",
+    "boundary_epoch_binding",
+    "execution_control_binding",
+    "consumption_binding",
+    "delegation_binding",
+    "closure_binding",
 )
+
+RELATIONAL_T3_FACTS = (
+    "boundary_epoch_binding",
+    "execution_control_binding",
+    "consumption_binding",
+    "delegation_binding",
+    "closure_binding",
+)
+
+
+def _exact_string(value: Any, field: str) -> str:
+    if not isinstance(value, str):
+        raise ValueError(f"{field} must be a string")
+    return value
 
 
 @dataclass(frozen=True)
@@ -71,12 +90,76 @@ class AuthorityTuple:
         if set(value) != set(TUPLE_FIELDS):
             raise ValueError("authority_tuple must contain exactly the six public fields")
         return cls(
-            subject=str(value["subject"]),
-            artifact=str(value["artifact"]),
-            control_state=str(value["control_state"]),
-            identity_basis=str(value["identity_basis"]),
-            boundary_epoch=str(value["boundary_epoch"]),
+            subject=_exact_string(value["subject"], "authority_tuple.subject"),
+            artifact=_exact_string(value["artifact"], "authority_tuple.artifact"),
+            control_state=_exact_string(value["control_state"], "authority_tuple.control_state"),
+            identity_basis=_exact_string(value["identity_basis"], "authority_tuple.identity_basis"),
+            boundary_epoch=_exact_string(value["boundary_epoch"], "authority_tuple.boundary_epoch"),
             decision=AuthorityOutcome(value["decision"]),
+        )
+
+
+@dataclass(frozen=True)
+class AuthorityStateBinding:
+    subject: str
+    artifact: str
+    control_state: str
+    identity_basis: str
+    boundary_epoch: str
+    decision: AuthorityOutcome
+    evidence_id: str
+    execution_context: str
+    applicable_boundary: str
+    grant_id: str
+    subject_mode: str
+
+    @classmethod
+    def from_mapping(cls, value: Mapping[str, Any]) -> "AuthorityStateBinding":
+        fields = set(TUPLE_FIELDS) | {
+            "evidence_id",
+            "execution_context",
+            "applicable_boundary",
+            "grant_id",
+            "subject_mode",
+        }
+        if set(value) != fields:
+            raise ValueError("authority_state must contain exactly the relational binding fields")
+        return cls(
+            subject=_exact_string(value["subject"], "authority_state.subject"),
+            artifact=_exact_string(value["artifact"], "authority_state.artifact"),
+            control_state=_exact_string(value["control_state"], "authority_state.control_state"),
+            identity_basis=_exact_string(value["identity_basis"], "authority_state.identity_basis"),
+            boundary_epoch=_exact_string(value["boundary_epoch"], "authority_state.boundary_epoch"),
+            decision=AuthorityOutcome(value["decision"]),
+            evidence_id=_exact_string(value["evidence_id"], "authority_state.evidence_id"),
+            execution_context=_exact_string(
+                value["execution_context"], "authority_state.execution_context"
+            ),
+            applicable_boundary=_exact_string(
+                value["applicable_boundary"], "authority_state.applicable_boundary"
+            ),
+            grant_id=_exact_string(value["grant_id"], "authority_state.grant_id"),
+            subject_mode=_exact_string(value["subject_mode"], "authority_state.subject_mode"),
+        )
+
+
+@dataclass(frozen=True)
+class Reestablishment:
+    previous_evidence_id: str
+    current: AuthorityStateBinding
+
+    @classmethod
+    def from_mapping(cls, value: Mapping[str, Any]) -> "Reestablishment":
+        if set(value) != {"previous_evidence_id", "current"}:
+            raise ValueError("reestablishment must bind previous_evidence_id to current state")
+        current = value["current"]
+        if not isinstance(current, Mapping):
+            raise ValueError("reestablishment.current must be an object")
+        return cls(
+            previous_evidence_id=_exact_string(
+                value["previous_evidence_id"], "reestablishment.previous_evidence_id"
+            ),
+            current=AuthorityStateBinding.from_mapping(current),
         )
 
 
@@ -131,11 +214,14 @@ class OracleInput:
     authority_tuple: AuthorityTuple
     t1_result: AuthorityOutcome
     t1_evidence: tuple[str, ...]
+    t1_authority_state: AuthorityStateBinding
     t2_creates_authority: bool
     t2_mutations: tuple[Mutation, ...]
     facts: Mapping[str, Fact]
     required_facts: tuple[str, ...]
     required_values: Mapping[str, Any]
+    reestablishment_state: FactState
+    reestablishment: Reestablishment | None
     prohibition: Prohibition
     applicable_invariants: tuple[str, ...]
     authority_question: str
@@ -159,20 +245,38 @@ class OracleInput:
             raise ValueError("required_facts must not contain duplicates")
         facts = {name: Fact.from_mapping(raw) for name, raw in t3["facts"].items()}
         required_values = dict(t3.get("required_values", {}))
+        evidence = tuple(t1["evidence"])
+        if not all(isinstance(item, str) for item in evidence):
+            raise ValueError("t1.evidence identifiers must be strings")
+        raw_reestablishment = Fact.from_mapping(
+            t3.get("reestablishment", {"state": FactState.UNKNOWN.value})
+        )
+        reestablishment = None
+        if raw_reestablishment.state is FactState.KNOWN:
+            if not isinstance(raw_reestablishment.value, Mapping):
+                raise ValueError("KNOWN reestablishment requires an object value")
+            reestablishment = Reestablishment.from_mapping(raw_reestablishment.value)
         mutations = tuple(
-            Mutation(str(item["field"]), item.get("before"), item.get("after"))
+            Mutation(
+                _exact_string(item["field"], "t2.mutations.field"),
+                item.get("before"),
+                item.get("after"),
+            )
             for item in t2["mutations"]
         )
         return cls(
             case_id=str(fixture["case_id"]),
             authority_tuple=AuthorityTuple.from_mapping(fixture["authority_tuple"]),
             t1_result=AuthorityOutcome(t1["result"]),
-            t1_evidence=tuple(str(item) for item in t1["evidence"]),
+            t1_evidence=evidence,
+            t1_authority_state=AuthorityStateBinding.from_mapping(t1["authority_state"]),
             t2_creates_authority=creates_authority,
             t2_mutations=mutations,
             facts=facts,
             required_facts=required_facts,
             required_values=required_values,
+            reestablishment_state=raw_reestablishment.state,
+            reestablishment=reestablishment,
             prohibition=Prohibition.from_mapping(t3["prohibition"]),
             applicable_invariants=invariants,
             authority_question=str(t3["authority_question"]),

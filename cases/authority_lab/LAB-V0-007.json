@@ -5,7 +5,7 @@
   "title": "Cached authorization after boundary epoch change",
   "objective": "Test whether a historical cached decision can become current after epoch drift.",
   "authority_tuple": {"subject": "S", "artifact": "A", "control_state": "C1", "identity_basis": "I1", "boundary_epoch": "B1", "decision": "AUTHORIZED"},
-  "t1": {"result": "AUTHORIZED", "evidence": ["CACHE-D1-B1"]},
+  "t1": {"result": "AUTHORIZED", "evidence": ["CACHE-D1-B1"], "authority_state": {"subject": "S", "artifact": "A", "control_state": "C1", "identity_basis": "I1", "boundary_epoch": "B1", "decision": "AUTHORIZED", "evidence_id": "CACHE-D1-B1", "execution_context": "E1", "applicable_boundary": "AUTH-BOUNDARY-1", "grant_id": "GRANT-007-B1", "subject_mode": "DIRECT"}},
   "t2": {"creates_authority": false, "mutations": [{"field": "boundary_epoch", "before": "B1", "after": "B2"}]},
   "t3": {
     "facts": {
@@ -19,7 +19,12 @@
       "evidence_binding": {"state": "KNOWN", "value": "CURRENT"},
       "execution_context": {"state": "KNOWN", "value": "E1"},
       "freshness": {"state": "UNKNOWN"},
-      "consumption_state": {"state": "KNOWN", "value": "UNUSED"}
+      "consumption_state": {"state": "KNOWN", "value": "UNUSED"},
+      "boundary_epoch_binding": {"state": "KNOWN", "value": {"applicable_boundary": "AUTH-BOUNDARY-1", "boundary_epoch": "B1"}},
+      "execution_control_binding": {"state": "KNOWN", "value": {"execution_context": "E1", "control_state": "C1"}},
+      "consumption_binding": {"state": "KNOWN", "value": {"grant_id": "GRANT-007-B1", "subject": "S", "artifact": "A", "boundary_epoch": "B1"}},
+      "delegation_binding": {"state": "KNOWN", "value": {"relationship": "DIRECT", "subject": "S", "artifact": "A", "control_state": "C1", "boundary_epoch": "B1", "applicable_boundary": "AUTH-BOUNDARY-1"}},
+      "closure_binding": {"state": "KNOWN", "value": {"relationship": "EXACT_EFFECT", "source_artifact": "A", "target_artifact": "A"}}
     },
     "required_facts": ["subject_identity", "artifact_identity", "control_state", "identity_basis", "boundary_epoch", "decision_binding", "applicable_boundary", "freshness", "consumption_state"],
     "required_values": {"subject_identity": "S", "artifact_identity": "A", "control_state": "C1", "identity_basis": "I1", "boundary_epoch": "B1", "decision_binding": "CACHE-D1-B1", "applicable_boundary": "AUTH-BOUNDARY-1", "evidence_binding": "CURRENT", "execution_context": "E1", "freshness": "CURRENT", "consumption_state": "UNUSED"},

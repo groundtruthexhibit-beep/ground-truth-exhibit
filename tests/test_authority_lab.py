@@ -15,6 +15,7 @@ from authority_lab.model import (
     INVARIANTS,
     MANDATORY_T3_FACTS,
     OracleInput,
+    RELATIONAL_T3_FACTS,
     TUPLE_FIELDS,
 )
 from authority_lab.oracle import evaluate
@@ -116,23 +117,24 @@ class AuthorityLabTests(unittest.TestCase):
     def test_wrong_decision_binding_cannot_authorize(self) -> None:
         payload = fixture("LAB-V0-001")
         payload["t3"]["facts"]["decision_binding"]["value"] = "OTHER"
-        self.assert_unavailable_with_reason(payload, "DECISION_EVIDENCE_BINDING_MISMATCH")
+        self.assert_unavailable_with_reason(payload, "REQUIRED_VALUE_MISMATCH")
 
     def test_unrelated_delegation_binding_cannot_authorize(self) -> None:
         payload = fixture("LAB-V0-010")
         payload["t3"]["facts"]["delegation_binding"]["value"] = "UNRELATED"
-        self.assert_unavailable_with_reason(payload, "REQUIRED_VALUE_MISMATCH")
+        self.assert_unavailable_with_reason(payload, "DELEGATION_RELATIONSHIP_UNAVAILABLE")
 
     def test_implicit_closure_cannot_authorize(self) -> None:
         payload = fixture("LAB-V0-010")
         payload["t3"]["facts"]["closure_binding"]["value"] = "IMPLICIT"
-        self.assert_unavailable_with_reason(payload, "REQUIRED_VALUE_MISMATCH")
+        self.assert_unavailable_with_reason(payload, "CLOSURE_RELATIONSHIP_UNAVAILABLE")
 
     def test_fixture_cannot_remove_any_mandatory_t3_fact(self) -> None:
         for field in MANDATORY_T3_FACTS:
             with self.subTest(field=field):
                 payload = fixture("LAB-V0-001")
-                payload["t3"]["required_facts"].remove(field)
+                if field in payload["t3"]["required_facts"]:
+                    payload["t3"]["required_facts"].remove(field)
                 payload["t3"]["facts"][field] = {"state": "UNKNOWN"}
                 self.assert_unavailable_with_reason(payload, "REQUIRED_FACT_UNAVAILABLE")
 
@@ -158,7 +160,9 @@ class AuthorityLabTests(unittest.TestCase):
             with self.subTest(path=path.name):
                 payload = load_fixture(path)
                 self.assertTrue(
-                    set(MANDATORY_T3_FACTS).issubset(payload["t3"]["required_values"])
+                    (set(MANDATORY_T3_FACTS) - set(RELATIONAL_T3_FACTS)).issubset(
+                        payload["t3"]["required_values"]
+                    )
                 )
                 self.assertTrue(
                     set(payload["t3"]["required_facts"]).issubset(
@@ -214,6 +218,10 @@ class AuthorityLabTests(unittest.TestCase):
         denied["t3"]["facts"]["boundary_continuity"] = {"state": "KNOWN", "value": "ESTABLISHED"}
         denied["t3"]["required_values"]["control_state"] = "E2"
         denied["t3"]["required_values"]["execution_context"] = "E2"
+        denied["t3"]["facts"]["execution_control_binding"] = {
+            "state": "KNOWN",
+            "value": {"execution_context": "E2", "control_state": "E2"},
+        }
         denied["t3"]["prohibition"] = {
             "state": "KNOWN",
             "applies": True,
@@ -223,6 +231,30 @@ class AuthorityLabTests(unittest.TestCase):
 
         authorized = deepcopy(denied)
         authorized["t3"]["prohibition"] = {"state": "KNOWN", "applies": False, "id": "none"}
+        authorized["t3"]["facts"]["decision_binding"]["value"] = "EV-E2"
+        authorized["t3"]["required_values"]["decision_binding"] = "EV-E2"
+        authorized["t3"]["facts"]["consumption_binding"]["value"]["grant_id"] = (
+            "GRANT-003-E2"
+        )
+        authorized["t3"]["reestablishment"] = {
+            "state": "KNOWN",
+            "value": {
+                "previous_evidence_id": "EV-E1",
+                "current": {
+                    "subject": "S",
+                    "artifact": "A",
+                    "control_state": "E2",
+                    "identity_basis": "I1",
+                    "boundary_epoch": "B1",
+                    "decision": "AUTHORIZED",
+                    "evidence_id": "EV-E2",
+                    "execution_context": "E2",
+                    "applicable_boundary": "AUTH-BOUNDARY-1",
+                    "grant_id": "GRANT-003-E2",
+                    "subject_mode": "DIRECT",
+                },
+            },
+        }
         self.assertIs(AuthorityOutcome.AUTHORIZED, actual(authorized))
 
     def test_exact_tuple_and_invariant_sets_are_frozen(self) -> None:
@@ -234,7 +266,90 @@ class AuthorityLabTests(unittest.TestCase):
             ("INV-CONT", "INV-DISC", "INV-BND", "INV-EVD", "INV-USE", "INV-CLO"),
             INVARIANTS,
         )
-        self.assertEqual(11, len(MANDATORY_T3_FACTS))
+        self.assertEqual(16, len(MANDATORY_T3_FACTS))
+
+    def test_artifact_rebinding_cannot_reuse_old_evidence(self) -> None:
+        payload = fixture("LAB-V0-001")
+        payload["authority_tuple"]["artifact"] = "A2"
+        payload["t3"]["facts"]["artifact_identity"]["value"] = "A2"
+        payload["t3"]["required_values"]["artifact_identity"] = "A2"
+        self.assert_unavailable_with_reason(payload, "T1_T3_RELATIONSHIP_UNAVAILABLE")
+
+    def test_execution_hybrid_cannot_be_laundered_by_required_values(self) -> None:
+        payload = fixture("LAB-V0-001")
+        payload["t2"]["mutations"].append(
+            {"field": "execution_context", "before": "E1", "after": "E2"}
+        )
+        payload["t3"]["facts"]["execution_context"]["value"] = "E2"
+        payload["t3"]["required_values"]["execution_context"] = "E2"
+        payload["t3"]["facts"]["execution_control_binding"]["value"][
+            "execution_context"
+        ] = "E2"
+        self.assert_unavailable_with_reason(payload, "T1_T3_RELATIONSHIP_UNAVAILABLE")
+
+    def test_derived_artifact_cannot_inherit_generic_closure(self) -> None:
+        payload = fixture("LAB-V0-010")
+        payload["authority_tuple"]["artifact"] = "REPORT-Z"
+        payload["t3"]["facts"]["artifact_identity"]["value"] = "REPORT-Z"
+        payload["t3"]["required_values"]["artifact_identity"] = "REPORT-Z"
+        self.assert_unavailable_with_reason(payload, "T1_T3_RELATIONSHIP_UNAVAILABLE")
+
+    def test_generic_explicit_token_is_not_relational_closure(self) -> None:
+        payload = fixture("LAB-V0-010")
+        payload["t3"]["facts"]["closure_binding"]["value"] = "EXPLICIT"
+        payload["t3"]["required_values"]["closure_binding"] = "EXPLICIT"
+        self.assert_unavailable_with_reason(payload, "CLOSURE_RELATIONSHIP_UNAVAILABLE")
+
+    def test_boundary_must_be_relationally_bound_to_epoch(self) -> None:
+        payload = fixture("LAB-V0-001")
+        payload["t3"]["facts"]["applicable_boundary"]["value"] = "AUTH-BOUNDARY-2"
+        payload["t3"]["required_values"]["applicable_boundary"] = "AUTH-BOUNDARY-2"
+        self.assert_unavailable_with_reason(
+            payload, "BOUNDARY_EPOCH_RELATIONSHIP_UNAVAILABLE"
+        )
+
+    def test_delegation_must_bind_exact_subject_and_artifact(self) -> None:
+        payload = fixture("LAB-V0-010")
+        payload["t3"]["facts"]["delegation_binding"]["value"]["delegate"] = "OTHER"
+        payload["t3"]["required_values"]["delegation_binding"]["delegate"] = "OTHER"
+        self.assert_unavailable_with_reason(payload, "DELEGATION_RELATIONSHIP_UNAVAILABLE")
+
+    def test_control_state_cannot_form_hybrid_with_old_execution_context(self) -> None:
+        payload = fixture("LAB-V0-001")
+        payload["authority_tuple"]["control_state"] = "C2"
+        payload["t3"]["facts"]["control_state"]["value"] = "C2"
+        payload["t3"]["required_values"]["control_state"] = "C2"
+        payload["t3"]["facts"]["execution_control_binding"]["value"]["control_state"] = (
+            "C2"
+        )
+        self.assert_unavailable_with_reason(payload, "T1_T3_RELATIONSHIP_UNAVAILABLE")
+
+    def test_empty_required_identity_is_unavailable(self) -> None:
+        payload = fixture("LAB-V0-001")
+        payload["authority_tuple"]["subject"] = ""
+        payload["t3"]["facts"]["subject_identity"]["value"] = ""
+        payload["t3"]["required_values"]["subject_identity"] = ""
+        self.assert_unavailable_with_reason(payload, "INVALID_IDENTITY_VALUE")
+
+    def test_identity_comparison_does_not_trim_or_normalize(self) -> None:
+        payload = fixture("LAB-V0-001")
+        payload["authority_tuple"]["subject"] = " S"
+        payload["t3"]["facts"]["subject_identity"]["value"] = " S"
+        payload["t3"]["required_values"]["subject_identity"] = " S"
+        self.assert_unavailable_with_reason(payload, "T1_T3_RELATIONSHIP_UNAVAILABLE")
+
+    def test_identity_numbers_are_not_coerced_to_strings(self) -> None:
+        payload = fixture("LAB-V0-001")
+        payload["authority_tuple"]["subject"] = 7
+        with self.assertRaises(ValueError):
+            OracleInput.from_fixture(payload)
+
+    def test_t2_mutation_chain_cannot_disappear_at_t3(self) -> None:
+        payload = fixture("LAB-V0-001")
+        payload["t2"]["mutations"].append(
+            {"field": "execution_context", "before": "E1", "after": "E2"}
+        )
+        self.assert_unavailable_with_reason(payload, "T2_T3_HYBRID_STATE")
 
     def test_tuple_mismatch_is_unavailable(self) -> None:
         payload = fixture("LAB-V0-001")

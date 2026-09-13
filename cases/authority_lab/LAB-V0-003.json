@@ -5,7 +5,7 @@
   "title": "Flagship sandbox escape after T1",
   "objective": "Derive commit-time authority after the acting process leaves its evaluated environment.",
   "authority_tuple": {"subject": "S", "artifact": "A", "control_state": "E1", "identity_basis": "I1", "boundary_epoch": "B1", "decision": "AUTHORIZED"},
-  "t1": {"result": "AUTHORIZED", "evidence": ["EV-E1"]},
+  "t1": {"result": "AUTHORIZED", "evidence": ["EV-E1"], "authority_state": {"subject": "S", "artifact": "A", "control_state": "E1", "identity_basis": "I1", "boundary_epoch": "B1", "decision": "AUTHORIZED", "evidence_id": "EV-E1", "execution_context": "E1", "applicable_boundary": "AUTH-BOUNDARY-1", "grant_id": "GRANT-003-E1", "subject_mode": "DIRECT"}},
   "t2": {"creates_authority": false, "mutations": [{"field": "execution_context", "before": "E1", "after": "E2"}]},
   "t3": {
     "facts": {
@@ -20,7 +20,12 @@
       "execution_context": {"state": "UNKNOWN"},
       "freshness": {"state": "KNOWN", "value": "CURRENT"},
       "boundary_continuity": {"state": "UNKNOWN"},
-      "consumption_state": {"state": "KNOWN", "value": "UNUSED"}
+      "consumption_state": {"state": "KNOWN", "value": "UNUSED"},
+      "boundary_epoch_binding": {"state": "KNOWN", "value": {"applicable_boundary": "AUTH-BOUNDARY-1", "boundary_epoch": "B1"}},
+      "execution_control_binding": {"state": "UNKNOWN"},
+      "consumption_binding": {"state": "KNOWN", "value": {"grant_id": "GRANT-003-E1", "subject": "S", "artifact": "A", "boundary_epoch": "B1"}},
+      "delegation_binding": {"state": "KNOWN", "value": {"relationship": "DIRECT", "subject": "S", "artifact": "A", "control_state": "E2", "boundary_epoch": "B1", "applicable_boundary": "AUTH-BOUNDARY-1"}},
+      "closure_binding": {"state": "KNOWN", "value": {"relationship": "EXACT_EFFECT", "source_artifact": "A", "target_artifact": "A"}}
     },
     "required_facts": ["subject_identity", "artifact_identity", "control_state", "identity_basis", "boundary_epoch", "decision_binding", "applicable_boundary", "execution_context", "boundary_continuity", "consumption_state"],
     "required_values": {"subject_identity": "S", "artifact_identity": "A", "control_state": "E1", "identity_basis": "I1", "boundary_epoch": "B1", "decision_binding": "EV-E1", "applicable_boundary": "AUTH-BOUNDARY-1", "evidence_binding": "CURRENT", "execution_context": "E1", "freshness": "CURRENT", "consumption_state": "UNUSED", "boundary_continuity": "ESTABLISHED"},
