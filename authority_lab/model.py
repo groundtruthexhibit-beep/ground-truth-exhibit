@@ -171,12 +171,13 @@ class Reestablishment:
 @dataclass(frozen=True)
 class GrantTransition:
     relationship: str
+    grant_path: tuple[str, ...]
     previous: AuthorityStateBinding
     current: AuthorityStateBinding
 
     @classmethod
     def from_mapping(cls, value: Mapping[str, Any]) -> "GrantTransition":
-        if set(value) != {"relationship", "previous", "current"}:
+        if set(value) != {"relationship", "grant_path", "previous", "current"}:
             raise ValueError(
                 "grant_transition must bind one exact previous authority state "
                 "to one exact current authority state"
@@ -185,10 +186,19 @@ class GrantTransition:
         current = value["current"]
         if not isinstance(previous, Mapping) or not isinstance(current, Mapping):
             raise ValueError("grant_transition previous and current must be objects")
+        raw_path = value["grant_path"]
+        if not isinstance(raw_path, (list, tuple)) or len(raw_path) < 2:
+            raise ValueError("grant_transition.grant_path must contain at least two grants")
+        grant_path = tuple(
+            _exact_string(item, "grant_transition.grant_path") for item in raw_path
+        )
+        if any(item == "" for item in grant_path):
+            raise ValueError("grant_transition.grant_path grants must be non-empty")
         return cls(
             relationship=_exact_string(
                 value["relationship"], "grant_transition.relationship"
             ),
+            grant_path=grant_path,
             previous=AuthorityStateBinding.from_mapping(previous),
             current=AuthorityStateBinding.from_mapping(current),
         )

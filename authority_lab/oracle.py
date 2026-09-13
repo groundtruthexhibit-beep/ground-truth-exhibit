@@ -49,7 +49,21 @@ CANONICAL_MUTATION_STATE_FIELDS = {
     "boundary_epoch": ("boundary_epoch",),
     "execution_context": ("execution_context",),
     "applicable_boundary": ("applicable_boundary",),
+    "decision": ("decision",),
+    "evidence_id": ("evidence_id", "decision_binding"),
+    "grant_id": ("grant_id",),
+    "subject_mode": ("subject_mode",),
     "consumption_state": ("consumption", "consumption_state"),
+}
+
+RELATIONAL_MUTATION_FACTS = {
+    "evidence_binding": ("evidence_binding",),
+    "freshness": ("freshness",),
+    "boundary_epoch_binding": ("boundary_epoch_binding",),
+    "execution_control_binding": ("execution_control_binding",),
+    "consumption_binding": ("consumption_binding",),
+    "delegation_binding": ("delegation_binding",),
+    "closure_binding": ("closure_binding",),
 }
 
 GRANT_SCOPE_FIELDS = (
@@ -89,6 +103,13 @@ def _relation_matches(value: Any, expected: Mapping[str, Any]) -> bool:
 
 
 def _state_differences(case: OracleInput, state: AuthorityStateBinding) -> tuple[str, ...]:
+    consumption = case.facts["consumption_binding"].value
+    current_grant = consumption.get("grant_id") if isinstance(consumption, Mapping) else None
+    current_subject_mode = (
+        case.reestablishment.current.subject_mode
+        if case.reestablishment is not None
+        else case.t1_authority_state.subject_mode
+    )
     current = {
         "subject": case.authority_tuple.subject,
         "artifact": case.authority_tuple.artifact,
@@ -99,7 +120,9 @@ def _state_differences(case: OracleInput, state: AuthorityStateBinding) -> tuple
         "evidence_id": case.facts["decision_binding"].value,
         "execution_context": case.facts["execution_context"].value,
         "applicable_boundary": case.facts["applicable_boundary"].value,
+        "grant_id": current_grant,
         "consumption_state": case.facts["consumption_state"].value,
+        "subject_mode": current_subject_mode,
     }
     return tuple(name for name, value in current.items() if value != getattr(state, name))
 
@@ -107,6 +130,17 @@ def _state_differences(case: OracleInput, state: AuthorityStateBinding) -> tuple
 def _current_state_value(case: OracleInput, field: str) -> Any:
     if field in {"subject", "artifact", "control_state", "identity_basis", "boundary_epoch"}:
         return getattr(case.authority_tuple, field)
+    if field == "decision":
+        return case.authority_tuple.decision
+    if field == "evidence_id":
+        return case.facts["decision_binding"].value
+    if field == "grant_id":
+        consumption = case.facts["consumption_binding"].value
+        return consumption.get("grant_id") if isinstance(consumption, Mapping) else None
+    if field == "subject_mode":
+        if case.reestablishment is not None:
+            return case.reestablishment.current.subject_mode
+        return case.t1_authority_state.subject_mode
     return case.facts[field].value
 
 
@@ -127,7 +161,36 @@ def _mutation_chain_mismatches(case: OracleInput) -> tuple[str, ...]:
         else:
             if value != _current_state_value(case, field):
                 mismatches.append(field)
+    for fact_name, mutation_fields in RELATIONAL_MUTATION_FACTS.items():
+        mutations = tuple(
+            mutation for mutation in case.t2_mutations if mutation.field in mutation_fields
+        )
+        if not mutations:
+            continue
+        value = mutations[0].before
+        for mutation in mutations:
+            if mutation.before != value:
+                mismatches.append(fact_name)
+                break
+            value = mutation.after
+        else:
+            if value != case.facts[fact_name].value:
+                mismatches.append(fact_name)
     return tuple(dict.fromkeys(mismatches))
+
+
+def _grant_mutations(case: OracleInput) -> tuple[Any, ...]:
+    return tuple(
+        mutation for mutation in case.t2_mutations if mutation.field == "grant_id"
+    )
+
+
+def _grant_path(case: OracleInput) -> tuple[str, ...]:
+    mutations = _grant_mutations(case)
+    if not mutations:
+        current = _current_state_value(case, "grant_id")
+        return (case.t1_authority_state.grant_id, current)
+    return (case.t1_authority_state.grant_id, *(mutation.after for mutation in mutations))
 
 
 def _consumption_regenerated(case: OracleInput) -> bool:
@@ -416,14 +479,15 @@ def evaluate(case: OracleInput) -> OracleResult:
         )
 
     differences = _state_differences(case, t1_state)
+    grant_mutations = _grant_mutations(case)
     active_state = t1_state
-    if differences:
+    if differences or grant_mutations:
         if case.reestablishment_state is not FactState.KNOWN or case.reestablishment is None:
             return _unavailable(
                 case,
                 "T1_T3_RELATIONSHIP_UNAVAILABLE",
                 "MODEL_LIMITATION: changed authority state lacks explicit current re-establishment.",
-                differences,
+                differences or ("grant_id",),
             )
         reestablishment = case.reestablishment
         if reestablishment.previous_evidence_id != t1_state.evidence_id:
@@ -469,21 +533,35 @@ def evaluate(case: OracleInput) -> OracleResult:
         getattr(t1_state, field) != getattr(active_state, field)
         for field in GRANT_SCOPE_FIELDS
     )
-    if grant_scope_changed and active_state.grant_id == t1_state.grant_id:
-        transition = case.grant_transition
-        if (
-            case.grant_transition_state is not FactState.KNOWN
-            or transition is None
-            or transition.relationship != "AUTHORITY_PRESERVING"
-            or transition.previous != t1_state
-            or transition.current != active_state
-        ):
-            return _unavailable(
-                case,
-                "GRANT_EFFECT_RELATIONSHIP_UNAVAILABLE",
-                "MODEL_LIMITATION: the prior grant cannot be retargeted to changed exact authority scope without an explicit authority-preserving transition.",
-                ("grant_transition",),
-            )
+    grant_returns_to_prior_identity = bool(grant_mutations) and (
+        active_state.grant_id == t1_state.grant_id
+    )
+    transition = case.grant_transition
+    transition_valid = (
+        case.grant_transition_state is FactState.KNOWN
+        and transition is not None
+        and transition.relationship == "AUTHORITY_PRESERVING"
+        and transition.grant_path == _grant_path(case)
+        and transition.previous == t1_state
+        and transition.current == active_state
+    )
+    if transition is not None and not transition_valid:
+        return _unavailable(
+            case,
+            "GRANT_TRANSITION_RELATIONSHIP_UNAVAILABLE",
+            "MODEL_LIMITATION: the declared grant transition does not bind the exact observed grant path and authority states.",
+            ("grant_transition",),
+        )
+    if (
+        (grant_scope_changed and active_state.grant_id == t1_state.grant_id)
+        or grant_returns_to_prior_identity
+    ) and not transition_valid:
+        return _unavailable(
+            case,
+            "GRANT_EFFECT_RELATIONSHIP_UNAVAILABLE",
+            "MODEL_LIMITATION: the prior grant cannot be retargeted to changed exact authority scope without an explicit authority-preserving transition.",
+            ("grant_transition",),
+        )
 
     expected_execution_relation = {
         "execution_context": case.facts["execution_context"].value,

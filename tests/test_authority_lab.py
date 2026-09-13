@@ -49,6 +49,14 @@ def reestablish_artifact(
     payload["t2"]["mutations"].append(
         {"field": "artifact", "before": previous["artifact"], "after": artifact}
     )
+    if current_grant != previous["grant_id"]:
+        payload["t2"]["mutations"].append(
+            {
+                "field": "grant_id",
+                "before": previous["grant_id"],
+                "after": current_grant,
+            }
+        )
     payload["t3"]["facts"]["artifact_identity"]["value"] = artifact
     payload["t3"]["required_values"]["artifact_identity"] = artifact
     payload["t3"]["facts"]["decision_binding"]["value"] = evidence_id
@@ -78,6 +86,49 @@ def reestablish_artifact(
             "state": "KNOWN",
             "value": {
                 "relationship": "AUTHORITY_PRESERVING",
+                "grant_path": [
+                    previous["grant_id"],
+                    *(
+                        mutation["after"]
+                        for mutation in payload["t2"]["mutations"]
+                        if mutation["field"] == "grant_id"
+                    ),
+                ]
+                if current_grant != previous["grant_id"]
+                else [previous["grant_id"], previous["grant_id"]],
+                "previous": previous,
+                "current": deepcopy(current),
+            },
+        }
+    return payload
+
+
+def reestablish_grant(
+    payload: dict,
+    *,
+    grant_id: str = "G2",
+    evidence_id: str = "EV-G2",
+    include_transition: bool = False,
+) -> dict:
+    previous = deepcopy(payload["t1"]["authority_state"])
+    payload["t2"]["mutations"].append(
+        {"field": "grant_id", "before": previous["grant_id"], "after": grant_id}
+    )
+    payload["t3"]["facts"]["decision_binding"]["value"] = evidence_id
+    payload["t3"]["required_values"]["decision_binding"] = evidence_id
+    payload["t3"]["facts"]["consumption_binding"]["value"]["grant_id"] = grant_id
+    current = deepcopy(previous)
+    current.update({"grant_id": grant_id, "evidence_id": evidence_id})
+    payload["t3"]["reestablishment"] = {
+        "state": "KNOWN",
+        "value": {"previous_evidence_id": previous["evidence_id"], "current": current},
+    }
+    if include_transition:
+        payload["t3"]["grant_transition"] = {
+            "state": "KNOWN",
+            "value": {
+                "relationship": "AUTHORITY_PRESERVING",
+                "grant_path": [previous["grant_id"], grant_id],
                 "previous": previous,
                 "current": deepcopy(current),
             },
@@ -286,6 +337,13 @@ class AuthorityLabTests(unittest.TestCase):
         authorized["t3"]["required_values"]["decision_binding"] = "EV-E2"
         authorized["t3"]["facts"]["consumption_binding"]["value"]["grant_id"] = (
             "GRANT-003-E2"
+        )
+        authorized["t2"]["mutations"].append(
+            {
+                "field": "grant_id",
+                "before": "GRANT-003-E1",
+                "after": "GRANT-003-E2",
+            }
         )
         authorized["t3"]["reestablishment"] = {
             "state": "KNOWN",
@@ -501,7 +559,7 @@ class AuthorityLabTests(unittest.TestCase):
         )
         payload["t3"]["grant_transition"]["value"]["previous"]["artifact"] = "OTHER"
         self.assert_unavailable_with_reason(
-            payload, "GRANT_EFFECT_RELATIONSHIP_UNAVAILABLE"
+            payload, "GRANT_TRANSITION_RELATIONSHIP_UNAVAILABLE"
         )
 
     def test_compound_transition_cannot_reset_consumption_across_epoch(self) -> None:
@@ -533,6 +591,115 @@ class AuthorityLabTests(unittest.TestCase):
         self.assert_unavailable_with_reason(
             payload, "CONSUMPTION_CONTINUITY_UNAVAILABLE"
         )
+
+    def test_disappearing_grant_mutation_is_unavailable(self) -> None:
+        payload = fixture("LAB-V0-001")
+        payload["t2"]["mutations"].append(
+            {"field": "grant_id", "before": "GRANT-001", "after": "G2"}
+        )
+        self.assert_unavailable_with_reason(payload, "T2_T3_HYBRID_STATE")
+
+    def test_persisting_grant_mutation_with_current_authority_can_authorize(self) -> None:
+        payload = reestablish_grant(fixture("LAB-V0-001"))
+        self.assertIs(AuthorityOutcome.AUTHORIZED, actual(payload))
+
+    def test_grant_mutation_cannot_resolve_to_unrecorded_third_grant(self) -> None:
+        payload = reestablish_grant(fixture("LAB-V0-001"))
+        payload["t3"]["facts"]["consumption_binding"]["value"]["grant_id"] = "G3"
+        payload["t3"]["reestablishment"]["value"]["current"]["grant_id"] = "G3"
+        self.assert_unavailable_with_reason(payload, "T2_T3_HYBRID_STATE")
+
+    def test_disappearing_grant_mutation_after_restart_is_unavailable(self) -> None:
+        payload = fixture("LAB-V0-001")
+        payload["t2"]["mutations"].extend(
+            [
+                {"field": "grant_id", "before": "GRANT-001", "after": "G2"},
+                {"field": "execution_context", "before": "E1", "after": "E2"},
+            ]
+        )
+        payload["t3"]["facts"]["execution_context"]["value"] = "E2"
+        payload["t3"]["required_values"]["execution_context"] = "E2"
+        payload["t3"]["facts"]["execution_control_binding"]["value"][
+            "execution_context"
+        ] = "E2"
+        self.assert_unavailable_with_reason(payload, "T2_T3_HYBRID_STATE")
+
+    def test_grant_and_artifact_mutations_require_both_current_bindings(self) -> None:
+        payload = reestablish_artifact(
+            fixture("LAB-V0-001"), grant_id="G2", evidence_id="EV-A2-G2"
+        )
+        self.assertIs(AuthorityOutcome.AUTHORIZED, actual(payload))
+        payload["t3"]["facts"]["consumption_binding"]["value"]["grant_id"] = "G3"
+        payload["t3"]["reestablishment"]["value"]["current"]["grant_id"] = "G3"
+        self.assert_unavailable_with_reason(payload, "T2_T3_HYBRID_STATE")
+
+    def test_grant_mutation_cannot_hide_consumption(self) -> None:
+        payload = reestablish_grant(fixture("LAB-V0-001"))
+        payload["t2"]["mutations"].append(
+            {"field": "consumption", "before": "UNUSED", "after": "CONSUMED"}
+        )
+        self.assert_unavailable_with_reason(payload, "T2_T3_HYBRID_STATE")
+
+    def test_exact_grant_transition_can_establish_g1_to_g2(self) -> None:
+        payload = reestablish_grant(
+            fixture("LAB-V0-001"), include_transition=True
+        )
+        self.assertIs(AuthorityOutcome.AUTHORIZED, actual(payload))
+
+    def test_exact_grant_transition_can_establish_explicit_return_path(self) -> None:
+        payload = reestablish_grant(
+            fixture("LAB-V0-001"), grant_id="GRANT-001", evidence_id="EV-G1-RETURN"
+        )
+        payload["t2"]["mutations"] = [
+            {"field": "grant_id", "before": "GRANT-001", "after": "G2"},
+            {"field": "grant_id", "before": "G2", "after": "GRANT-001"},
+        ]
+        previous = deepcopy(payload["t1"]["authority_state"])
+        current = deepcopy(payload["t3"]["reestablishment"]["value"]["current"])
+        payload["t3"]["grant_transition"] = {
+            "state": "KNOWN",
+            "value": {
+                "relationship": "AUTHORITY_PRESERVING",
+                "grant_path": ["GRANT-001", "G2", "GRANT-001"],
+                "previous": previous,
+                "current": current,
+            },
+        }
+        self.assertIs(AuthorityOutcome.AUTHORIZED, actual(payload))
+
+    def test_disappearing_decision_binding_mutation_is_unavailable(self) -> None:
+        payload = fixture("LAB-V0-001")
+        payload["t2"]["mutations"].append(
+            {"field": "decision_binding", "before": "EV-A-B1", "after": "EV-OTHER"}
+        )
+        self.assert_unavailable_with_reason(payload, "T2_T3_HYBRID_STATE")
+
+    def test_disappearing_delegation_mutation_is_unavailable(self) -> None:
+        payload = fixture("LAB-V0-010")
+        before = deepcopy(payload["t3"]["facts"]["delegation_binding"]["value"])
+        after = deepcopy(before)
+        after["delegate"] = "OTHER"
+        payload["t2"]["mutations"].append(
+            {"field": "delegation_binding", "before": before, "after": after}
+        )
+        self.assert_unavailable_with_reason(payload, "T2_T3_HYBRID_STATE")
+
+    def test_disappearing_subject_mode_mutation_is_unavailable(self) -> None:
+        payload = fixture("LAB-V0-001")
+        payload["t2"]["mutations"].append(
+            {"field": "subject_mode", "before": "DIRECT", "after": "DELEGATED"}
+        )
+        self.assert_unavailable_with_reason(payload, "T2_T3_HYBRID_STATE")
+
+    def test_disappearing_closure_mutation_is_unavailable(self) -> None:
+        payload = fixture("LAB-V0-001")
+        before = deepcopy(payload["t3"]["facts"]["closure_binding"]["value"])
+        after = deepcopy(before)
+        after["target_artifact"] = "OTHER"
+        payload["t2"]["mutations"].append(
+            {"field": "closure_binding", "before": before, "after": after}
+        )
+        self.assert_unavailable_with_reason(payload, "T2_T3_HYBRID_STATE")
 
     def test_tuple_mismatch_is_unavailable(self) -> None:
         payload = fixture("LAB-V0-001")
