@@ -102,6 +102,7 @@ Observed verifier proposition:
 
 Established facts:
 
+- the fixed real authority objective requires `P` to be established before release;
 - artifact identity is exact;
 - evidence is authentic and fresh;
 - verifier identity and execution are established;
@@ -112,15 +113,21 @@ Established facts:
 - no compromised cryptographic primitive is assumed;
 - no explicit prohibition has yet been established.
 
-At T1, the applicable encoded decision contract `D` incorrectly formalizes policy `X`: it treats passing suite `Y` as the complete release condition. Evidence for `P'` therefore satisfies `D`, which emits `AUTHORIZED`. The intended authority objective remains `P`. At T3, the system attempts release with unchanged current state and no missing frozen-contract fact.
+At T1, the applicable encoded decision contract `D` incorrectly formalizes policy `X`: it treats passing suite `Y` as the complete release condition. Evidence for `P'` therefore satisfies `D`, which emits `AUTHORIZED`. The intended authority objective remains fixed as `P`.
+
+At T3, the exact subject, artifact, encoded `control_state`, `identity_basis`, `boundary_epoch`, and encoded decision are established. Evidence for `P'` is authentic, fresh, provenance-exact, and produced by correct verifier execution. There is no stale state, replay, grant reuse, consumption ambiguity, or applicable encoded prohibition. Every fact and relationship required by the frozen contract as represented in `D` is established.
+
+Independently, `P` is not established at T3: there is no evidence of independent review and current release permission under policy `X`, and no admitted relationship makes `P'` sufficient for `P`. Under the fixed real authority objective, that missing required proposition makes release unavailable and T3 must not be crossed. Because `D` omitted `P`, the frozen evaluation does not request that missing fact and still returns `AUTHORIZED`.
+
+A stronger variant fixes `P` as explicitly false: authoritative evidence establishes that independent review did not occur, or that current release permission is absent or revoked. The real authority objective then has an established failed condition or applicable prohibition and requires `DENIED`. If encoded `D` contains only `P'` and does not represent that condition, its own complete evaluation can still return `AUTHORIZED`.
 
 ### Attack result
 
-Solver or test success establishes only the proposition actually encoded and evaluated. Passing suite `Y` does not establish independent review and release permission under policy `X`.
+Solver or test success establishes only the proposition actually encoded and evaluated. Passing suite `Y` does not establish independent review and release permission under policy `X`. In the primary trace, `P` is concretely unavailable rather than merely different from `P'`; in the stronger trace, `P` is concretely false.
 
 Nevertheless, the encoded `D` requires only `P'`. There is no runtime relabeling of weak evidence into a stronger condition inside `D`; the stronger condition was lost when the authority objective was formalized. `INV-EVD` evaluates evidence against the encoded decision contract, and the other frozen invariants preserve exact identity, boundary, continuity, use, and closure without testing whether `D` faithfully represents `P`.
 
-The frozen contract therefore permits `AUTHORIZED` in this construction while the stated authority objective makes release impermissible. This is a reproducible in-scope contract counterexample at the design level. It does not prove that every semantic mismatch authorizes, and it does not authorize a contract repair in this artifact.
+The frozen contract therefore permits `AUTHORIZED` in these constructions while the same fixed authority objective requires `UNAVAILABLE` in the primary trace and `DENIED` in the stronger trace. The counterexample does not rest only on non-entailment: the required objective proposition is actually unestablished or false. This is a reproducible in-scope contract counterexample at the design level. It does not prove that every semantic mismatch authorizes, and it does not authorize a contract repair in this artifact.
 
 ## Flagship perfect-aliasing case
 
@@ -392,7 +399,11 @@ The strongest attempted counterexample fixes all referential checks:
 
 The first construction sets `E` to establish `P'` while encoded `D` explicitly requires `P`, with no established relationship from `P'` to `P`. Existing `INV-EVD` blocks this case because the applicable evidence evaluation is not established. It is not the surviving counterexample.
 
-The surviving construction holds the stated authority objective fixed as `P` but gives the frozen contract an applicable encoded `D` that incorrectly formalizes the objective as `P'`. Evidence `E` authentically and freshly establishes `P'`. `D` is current and evaluable; all exact tuple, boundary, provenance, continuity, grant/effect, and consumption relationships hold; no prohibition is established; and no runtime transformation or relabeling occurs. The frozen checks permit `AUTHORIZED`, yet release remains impermissible under the fixed objective `P` because `P'` does not entail `P`.
+The surviving construction holds the stated authority objective fixed as `P` and requires `P` to be established before release, but gives the frozen contract an applicable encoded `D` that incorrectly formalizes the objective as `P'`. Evidence `E` authentically and freshly establishes `P'`. `D` is current and evaluable; all exact tuple, boundary, provenance, continuity, grant/effect, and consumption relationships required by the encoded contract hold; no encoded prohibition is established; and no runtime transformation or relabeling occurs.
+
+In the primary trace, `P` is actually unavailable at T3: no independent review-and-permission evidence exists and no admitted relationship establishes `P` from `P'`. The fixed authority objective therefore requires `UNAVAILABLE` and forbids crossing T3. Encoded `D` nevertheless returns `AUTHORIZED` because it omitted `P` and completely evaluates its substituted requirement `P'`.
+
+In the stronger trace, authoritative evidence establishes `¬P`: independent review did not occur or current permission is absent or revoked. The fixed authority objective therefore requires `DENIED`. Encoded `D` can still return `AUTHORIZED` because the failed condition or prohibition is absent from its incorrect formalization. This variant is not needed for the primary counterexample, but demonstrates that the gap survives even when objective failure is explicit rather than unavailable.
 
 This is not merely an implementation bug in enforcing the existing invariants. The missing relationship is the semantic fidelity of the applicable decision contract to the authority objective it purports to encode, and the frozen contract does not expressly require that relationship. The counterexample therefore satisfies the stated strict standard.
 
@@ -406,6 +417,6 @@ This artifact contains only abstract public research pressure. It includes no pr
 
 **REPRODUCIBLE IN-SCOPE CONTRACT COUNTEREXAMPLE FOUND**
 
-The frozen contract prevents evidence for `P'` from satisfying an encoded decision contract that explicitly requires stronger proposition `P`. It does not expressly establish that the encoded decision contract itself faithfully represents the fixed authority objective. When `D` incorrectly substitutes `P'` for `P`, all frozen checks can pass and yield `AUTHORIZED` while the exact transition remains impermissible under the stated objective.
+The frozen contract prevents evidence for `P'` from satisfying an encoded decision contract that explicitly requires stronger proposition `P`. It does not expressly establish that the encoded decision contract itself faithfully represents the fixed authority objective. In the primary trace, the objective requires `P`, `P` is actually unavailable at T3, and the objective forbids release; in the stronger trace, `P` is explicitly false and the objective denies release. When `D` incorrectly substitutes `P'` for `P`, all frozen encoded checks can nevertheless pass and yield `AUTHORIZED`.
 
 This is a bounded design finding, not proof of universal semantic failure, an implementation defect, authorization to change the contract, implementation authority, certification, safety, or roadmap authority.
