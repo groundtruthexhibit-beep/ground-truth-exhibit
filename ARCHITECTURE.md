@@ -28,7 +28,7 @@ A useful shorthand is:
 Evidence → Verification → Authority
 ```
 
-The ordering is not intended to imply that evidence alone grants authority. Verification determines whether the evidence satisfies the applicable authority contract. A T1 `AUTHORIZED` result is necessary but not sufficient for T3. T2 preparation does not publish, apply, transfer, spend, actuate, expose, or otherwise make an effect authoritative. Immediately before and at T3, the exact applicable tuple, boundary, evidence relationship, authority-relevant state, and consumption eligibility required by the applicable contract must remain established. If a required fact cannot be established, the result is `UNAVAILABLE`. If the applicable boundary and tuple are established and an established condition prohibits the transition, the result is `DENIED`. Only current `AUTHORIZED` at the applicable irreversible boundary permits the exact authority-consuming transition.
+The ordering is not intended to imply that evidence alone grants authority. Before verification may use an encoded decision contract, an exact current authoritative `objective_binding` must establish that the applicable authority objective admits that exact contract for the applicable scope and context. Verification then determines whether evidence satisfies the admitted contract. The contract, requester, verifier, evidence producer, model, agent, signature, provenance record, or consensus cannot establish that binding merely through its own assertion, output, identity, or agreement. A T1 `AUTHORIZED` result is necessary but not sufficient for T3. T2 preparation does not publish, apply, transfer, spend, actuate, expose, or otherwise make an effect authoritative. Immediately before and at T3, the exact applicable tuple, boundary, objective binding, evidence relationship, authority-relevant state, and consumption eligibility required by the applicable contract must remain established. If a required fact cannot be established, the result is `UNAVAILABLE`. If the applicable boundary and tuple are established and an established condition prohibits the transition, the result is `DENIED`. Only current `AUTHORIZED` at the applicable irreversible boundary permits the exact authority-consuming transition.
 
 ## Separation of concerns
 
@@ -56,11 +56,11 @@ The authority plane uses exactly these authority outcomes:
 
 `UNAVAILABLE` is not silently converted into success.
 
-`AUTHORIZED`: The applicable boundary, exact tuple, and every authority-relevant condition required by the applicable contract are established, and the contract permits the exact requested authority-consuming transition.
+`AUTHORIZED`: The applicable boundary, exact tuple, exact current authoritative objective binding, and every authority-relevant condition required by the admitted contract are established, and the contract permits the exact requested authority-consuming transition.
 
-`DENIED`: The applicable boundary and exact tuple are established, and an established applicable condition prohibits the requested transition.
+`DENIED`: The applicable boundary and exact tuple are established, and an established applicable condition—including objective-binding invalidity, revocation, supersession, rejection, or prohibition—prohibits the requested transition.
 
-`UNAVAILABLE`: A fact required to establish the applicable boundary, exact tuple, authority-relevant state, continuity, evidence relationship, freshness, consumption state, or decision cannot be established.
+`UNAVAILABLE`: A fact required to establish the applicable boundary, exact tuple, objective binding, authority-relevant state, continuity, evidence relationship, freshness, consumption state, or decision cannot be established.
 
 All outcomes preserve the separation between a decision and execution. `DENIED` and `UNAVAILABLE` result in no authority-consuming transition; uncertainty does not degrade into permission.
 
