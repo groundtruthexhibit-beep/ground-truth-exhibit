@@ -149,7 +149,7 @@
     "creates_authority": false,
     "mutations": [
       {
-        "field": "privilege",
+        "field": "control_state",
         "before": "P1",
         "after": "P2"
       },

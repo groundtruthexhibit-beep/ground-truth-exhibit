@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from enum import Enum
+from types import MappingProxyType
 from typing import Any, Mapping
 
 
@@ -22,6 +24,21 @@ class FactState(str, Enum):
 class HarnessStatus(str, Enum):
     PASS = "PASS"
     CASE_MISMATCH = "CASE_MISMATCH"
+
+
+class MutationTargetKind(str, Enum):
+    STATE = "STATE"
+    RELATION = "RELATION"
+    BINDING = "BINDING"
+    FACT = "FACT"
+
+
+@dataclass(frozen=True)
+class MutationSpec:
+    canonical_field: str
+    target_kind: MutationTargetKind
+    target: str
+    legacy_aliases: tuple[str, ...] = ()
 
 
 INVARIANTS = (
@@ -116,6 +133,22 @@ def _exact_generation(value: Any, field: str) -> int:
 def _require_exact_fields(value: Mapping[str, Any], fields: set[str], field: str) -> None:
     if set(value) != fields:
         raise ValueError(f"{field} must contain exactly {sorted(fields)}")
+
+
+def exact_value_equal(left: Any, right: Any) -> bool:
+    """Compare fixture values without Python bool/int or container coercion."""
+    if type(left) is not type(right):
+        return False
+    if isinstance(left, Mapping):
+        return set(left) == set(right) and all(
+            exact_value_equal(left[key], right[key]) for key in left
+        )
+    if isinstance(left, (list, tuple)):
+        return len(left) == len(right) and all(
+            exact_value_equal(left_item, right_item)
+            for left_item, right_item in zip(left, right)
+        )
+    return bool(left == right)
 
 
 @dataclass(frozen=True)
@@ -875,11 +908,208 @@ class Prohibition:
         return cls(state=state, applies=applies, identifier=str(value.get("id", "unspecified")))
 
 
+_MUTATION_FIELD_PATTERN = re.compile(r"[a-z][a-z0-9_]*", re.ASCII)
+
+MUTATION_SPECS = (
+    MutationSpec("subject", MutationTargetKind.STATE, "subject", ("principal",)),
+    MutationSpec("artifact", MutationTargetKind.STATE, "artifact"),
+    MutationSpec("control_state", MutationTargetKind.STATE, "control_state", ("privilege",)),
+    MutationSpec("identity_basis", MutationTargetKind.STATE, "identity_basis"),
+    MutationSpec("boundary_epoch", MutationTargetKind.STATE, "boundary_epoch"),
+    MutationSpec("decision", MutationTargetKind.STATE, "decision"),
+    MutationSpec("applicable_boundary", MutationTargetKind.STATE, "applicable_boundary"),
+    MutationSpec(
+        "consumption_state", MutationTargetKind.STATE, "consumption_state", ("consumption",)
+    ),
+    MutationSpec("decision_binding", MutationTargetKind.STATE, "evidence_id"),
+    MutationSpec("evidence_id", MutationTargetKind.STATE, "evidence_id"),
+    MutationSpec(
+        "execution_context", MutationTargetKind.STATE, "execution_context", ("actor_context",)
+    ),
+    MutationSpec("grant_id", MutationTargetKind.STATE, "grant_id"),
+    MutationSpec("subject_mode", MutationTargetKind.STATE, "subject_mode"),
+    MutationSpec("boundary_epoch_binding", MutationTargetKind.RELATION, "boundary_epoch_binding"),
+    MutationSpec("closure_binding", MutationTargetKind.RELATION, "closure_binding"),
+    MutationSpec("consumption_binding", MutationTargetKind.RELATION, "consumption_binding"),
+    MutationSpec("delegation_binding", MutationTargetKind.RELATION, "delegation_binding"),
+    MutationSpec("evidence_binding", MutationTargetKind.RELATION, "evidence_binding"),
+    MutationSpec(
+        "execution_control_binding", MutationTargetKind.RELATION, "execution_control_binding"
+    ),
+    MutationSpec("freshness", MutationTargetKind.RELATION, "freshness"),
+    MutationSpec("authority_root", MutationTargetKind.BINDING, "authority_root"),
+    MutationSpec("binding_lifecycle", MutationTargetKind.BINDING, "binding_lifecycle"),
+    MutationSpec("binding_ordering", MutationTargetKind.BINDING, "binding_ordering"),
+    MutationSpec(
+        "binding_source_authority", MutationTargetKind.BINDING, "binding_source_authority"
+    ),
+    MutationSpec(
+        "contract_transformation_binding",
+        MutationTargetKind.BINDING,
+        "contract_transformation_binding",
+    ),
+    MutationSpec(
+        "decision_contract_identity",
+        MutationTargetKind.BINDING,
+        "decision_contract_identity",
+    ),
+    MutationSpec("objective_binding", MutationTargetKind.BINDING, "objective_binding"),
+    MutationSpec("objective_identity", MutationTargetKind.BINDING, "objective_identity"),
+    MutationSpec("commit_state", MutationTargetKind.FACT, "commit_state"),
+    MutationSpec(
+        "credential_identity", MutationTargetKind.FACT, "credential_identity", ("credential",)
+    ),
+    MutationSpec(
+        "tool_connector_identity",
+        MutationTargetKind.FACT,
+        "tool_connector_identity",
+        ("connector_endpoint",),
+    ),
+)
+
+
+def _build_mutation_registry() -> Mapping[str, MutationSpec]:
+    registry: dict[str, MutationSpec] = {}
+    for spec in MUTATION_SPECS:
+        for field in (spec.canonical_field, *spec.legacy_aliases):
+            if field in registry:
+                raise RuntimeError(f"duplicate mutation registry field: {field}")
+            registry[field] = spec
+    return MappingProxyType(registry)
+
+
+MUTATION_REGISTRY = _build_mutation_registry()
+MUTATION_CANONICAL_FIELDS = tuple(spec.canonical_field for spec in MUTATION_SPECS)
+MUTATION_LEGACY_ALIASES = MappingProxyType(
+    {
+        alias: spec.canonical_field
+        for spec in MUTATION_SPECS
+        for alias in spec.legacy_aliases
+    }
+)
+
+
+def _validate_relation_mutation_value(spec: MutationSpec, value: Mapping[str, Any], field: str) -> None:
+    exact_fields = {
+        "boundary_epoch_binding": {"applicable_boundary", "boundary_epoch"},
+        "execution_control_binding": {"execution_context", "control_state"},
+        "consumption_binding": {"grant_id", "subject", "artifact", "boundary_epoch"},
+        "closure_binding": {"relationship", "source_artifact", "target_artifact"},
+    }
+    if spec.target == "delegation_binding":
+        relationship = value.get("relationship")
+        if relationship == "DIRECT":
+            fields = {
+                "relationship",
+                "subject",
+                "artifact",
+                "control_state",
+                "boundary_epoch",
+                "applicable_boundary",
+            }
+        elif relationship == "EXACT_DELEGATION":
+            fields = {
+                "relationship",
+                "delegator",
+                "delegate",
+                "artifact",
+                "control_state",
+                "boundary_epoch",
+                "applicable_boundary",
+            }
+        else:
+            raise ValueError(f"{field}.relationship is unsupported")
+    else:
+        fields = exact_fields[spec.target]
+    _require_exact_fields(value, fields, field)
+    for name in fields:
+        _exact_nonempty_string(value[name], f"{field}.{name}")
+
+
+def _validate_mutation_value(spec: MutationSpec, value: Any, field: str) -> None:
+    if spec.target_kind in {MutationTargetKind.STATE, MutationTargetKind.FACT}:
+        _exact_string(value, field)
+        if spec.target == "decision":
+            AuthorityOutcome(value)
+        return
+    if (
+        spec.target_kind is MutationTargetKind.RELATION
+        and spec.target in {"evidence_binding", "freshness"}
+    ):
+        _exact_string(value, field)
+        return
+    if isinstance(value, str):
+        if value not in {FactState.UNKNOWN.value, FactState.CONFLICTING.value}:
+            raise ValueError(f"{field} relation marker must be UNKNOWN or CONFLICTING")
+        return
+    if spec.target_kind is MutationTargetKind.RELATION:
+        if not isinstance(value, Mapping):
+            raise ValueError(f"{field} must be an object or fact-state marker")
+        _validate_relation_mutation_value(spec, value, field)
+        return
+    if spec.target in {
+        "objective_binding",
+        "binding_source_authority",
+        "binding_lifecycle",
+        "contract_transformation_binding",
+    }:
+        if not isinstance(value, (list, tuple)) or not value:
+            raise ValueError(f"{field} must be a non-empty array or fact-state marker")
+        if not all(isinstance(item, Mapping) for item in value):
+            raise ValueError(f"{field} entries must be objects")
+        parsers = {
+            "objective_binding": ObjectiveBinding.from_mapping,
+            "binding_source_authority": BindingSourceAuthority.from_mapping,
+            "binding_lifecycle": BindingLifecycle.from_mapping,
+            "contract_transformation_binding": ContractTransformation.from_mapping,
+        }
+        for item in value:
+            parsers[spec.target](item)
+        return
+    if not isinstance(value, Mapping):
+        raise ValueError(f"{field} must be an object or fact-state marker")
+    parsers = {
+        "objective_identity": ObjectiveIdentity.from_mapping,
+        "decision_contract_identity": DecisionContractIdentity.from_mapping,
+        "authority_root": AuthorityRoot.from_mapping,
+        "binding_ordering": BindingOrdering.from_mapping,
+    }
+    parsers[spec.target](value)
+
+
 @dataclass(frozen=True)
 class Mutation:
     field: str
     before: Any
     after: Any
+    canonical_field: str | None
+    target_kind: MutationTargetKind | None
+    target: str | None
+
+    @classmethod
+    def from_mapping(cls, value: Mapping[str, Any]) -> "Mutation":
+        if not isinstance(value, Mapping):
+            raise ValueError("t2.mutations entries must be objects")
+        _require_exact_fields(value, {"field", "before", "after"}, "t2.mutations entry")
+        field = _exact_string(value["field"], "t2.mutations.field")
+        if _MUTATION_FIELD_PATTERN.fullmatch(field) is None:
+            raise ValueError("t2.mutations.field must be exact ASCII lower snake case")
+        before = value["before"]
+        after = value["after"]
+        if exact_value_equal(before, after):
+            raise ValueError("t2.mutations must describe a change")
+        spec = MUTATION_REGISTRY.get(field)
+        if spec is not None:
+            _validate_mutation_value(spec, before, f"t2.mutations.{field}.before")
+            _validate_mutation_value(spec, after, f"t2.mutations.{field}.after")
+        return cls(
+            field=field,
+            before=before,
+            after=after,
+            canonical_field=spec.canonical_field if spec is not None else None,
+            target_kind=spec.target_kind if spec is not None else None,
+            target=spec.target if spec is not None else None,
+        )
 
 
 @dataclass(frozen=True)
@@ -952,14 +1182,10 @@ class OracleInput:
             if not isinstance(raw_grant_transition.value, Mapping):
                 raise ValueError("KNOWN grant_transition requires an object value")
             grant_transition = GrantTransition.from_mapping(raw_grant_transition.value)
-        mutations = tuple(
-            Mutation(
-                _exact_string(item["field"], "t2.mutations.field"),
-                item.get("before"),
-                item.get("after"),
-            )
-            for item in t2["mutations"]
-        )
+        raw_mutations = t2["mutations"]
+        if not isinstance(raw_mutations, (list, tuple)):
+            raise ValueError("t2.mutations must be an array")
+        mutations = tuple(Mutation.from_mapping(item) for item in raw_mutations)
         return cls(
             schema_version=schema_version,
             case_id=str(fixture["case_id"]),

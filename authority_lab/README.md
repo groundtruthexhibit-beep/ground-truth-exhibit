@@ -8,7 +8,7 @@ Run one fixture:
 python -m authority_lab run cases/authority_lab/LAB-V0-003.json
 ```
 
-Run the bounded v0 set:
+Run the bounded v1 set:
 
 ```text
 python -m authority_lab run-all cases/authority_lab
@@ -18,9 +18,11 @@ The oracle uses only explicit fixture state and public contract semantics. Schem
 
 At T1 the binding is provisionally admitted from explicit binding facts. T2 remains non-authoritative and records ordered mutations. At T3 the oracle re-establishes current admission; cached T1 admission does not survive a relevant change. Missing, unknown, conflicting, wrong-scope, or unordered admission state yields `UNAVAILABLE`. Exact current authoritative rejection, invalidity, revocation, supersession, or prohibition yields `DENIED`. `AUTHORIZED` remains possible only after binding admission and every existing evidence, tuple, boundary, grant, consumption, delegation, closure, and commit-time requirement succeeds.
 
+T2 mutation fields resolve through one immutable closed registry. Every exact canonical name and retained legacy alias maps to an evaluator-owned state, relation, objective-binding relation, or closed auxiliary fact. A structurally valid unregistered name is retained in the trace but returns `UNAVAILABLE` with `UNKNOWN_MUTATION_FIELD` before an authority conclusion. Case, whitespace, punctuation, namespaced, and non-ASCII variants are malformed input; the parser does not trim, case-fold, Unicode-normalize, strip namespaces, or infer aliases. No parsed mutation is display-only authority state.
+
 The v1 contract and parser preserve exactly six tuple coordinates, six invariant identifiers, and three authority outcomes. Legacy `authority-lab-v0` inputs may be loaded for fail-closed diagnostics but can never return `AUTHORIZED`; unknown schema versions are rejected.
 
-T1 records the exact evaluated authority state, grant, effect, and consumption state, while T3 must establish exact evidence-to-artifact, boundary-to-epoch, execution-to-control-state, consumption-to-grant/effect, and any applicable delegation or closure relationships. `required_values` remains case input and cannot redefine oracle-owned relationships. A changed authority state requires a distinct, lineage-linked re-establishment.
+T1 records the exact evaluated authority state, grant, effect, and consumption state, while T3 must establish exact evidence-to-artifact, boundary-to-epoch, execution-to-control-state, consumption-to-grant/effect, and any applicable delegation or closure relationships. `required_values` remains case input and cannot redefine oracle-owned relationships. A state, relational, or auxiliary-fact mutation requires a distinct, lineage-linked re-establishment even when an ordered mutation chain returns to its T1 value.
 
 Re-establishing current state does not retarget an old grant. When exact authority scope changes, T3 must bind a distinct grant to the new effect or supply an `AUTHORITY_PRESERVING` grant transition whose exact grant path and previous/current authority states match the observed transitions and re-established state. An explicit T2 grant-identity change cannot disappear at T3; returning to a prior identity requires the exact intermediate grant path and current re-establishment. Missing grant/effect or mutation continuity yields `UNAVAILABLE`; it is not converted to `DENIED`. Consumption remains bound to the exact grant/effect and cannot be reset by state change, restart, or recovery.
 

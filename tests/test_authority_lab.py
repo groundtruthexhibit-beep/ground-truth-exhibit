@@ -14,11 +14,22 @@ from authority_lab.model import (
     HarnessStatus,
     INVARIANTS,
     MANDATORY_T3_FACTS,
+    MUTATION_CANONICAL_FIELDS,
+    MUTATION_LEGACY_ALIASES,
+    MUTATION_REGISTRY,
+    MUTATION_SPECS,
+    MutationTargetKind,
     OracleInput,
     RELATIONAL_T3_FACTS,
     TUPLE_FIELDS,
 )
-from authority_lab.oracle import evaluate
+from authority_lab.oracle import (
+    BINDING_MUTATION_TARGETS,
+    FACT_MUTATION_TARGETS,
+    RELATIONAL_MUTATION_TARGETS,
+    STATE_MUTATION_TARGETS,
+    evaluate,
+)
 from authority_lab.runner import discover, format_trace, load_fixture, run_fixture, run_path
 
 
@@ -186,9 +197,9 @@ class AuthorityLabTests(unittest.TestCase):
         self.assertIs(AuthorityOutcome.UNAVAILABLE, result.outcome)
         self.assertIn(reason_code, {reason.code for reason in result.reasons})
 
-    def test_v1_contains_thirty_two_deterministic_fixtures(self) -> None:
+    def test_v1_contains_forty_eight_deterministic_fixtures(self) -> None:
         paths = discover(CASES)
-        self.assertEqual(32, len(paths))
+        self.assertEqual(48, len(paths))
         self.assertEqual(paths, discover(CASES))
 
     def test_every_v0_fixture_matches_its_expected_outcome(self) -> None:
@@ -1066,6 +1077,336 @@ class AuthorityLabTests(unittest.TestCase):
         self.assertEqual(0, completed.returncode, completed.stderr)
         self.assertIn("CASE: LAB-V0-003", completed.stdout)
         self.assertIn("HARNESS_STATUS:\nPASS", completed.stdout)
+
+    def test_mutation_registry_canonical_vocabulary_is_exact(self) -> None:
+        self.assertEqual(
+            (
+                "subject",
+                "artifact",
+                "control_state",
+                "identity_basis",
+                "boundary_epoch",
+                "decision",
+                "applicable_boundary",
+                "consumption_state",
+                "decision_binding",
+                "evidence_id",
+                "execution_context",
+                "grant_id",
+                "subject_mode",
+                "boundary_epoch_binding",
+                "closure_binding",
+                "consumption_binding",
+                "delegation_binding",
+                "evidence_binding",
+                "execution_control_binding",
+                "freshness",
+                "authority_root",
+                "binding_lifecycle",
+                "binding_ordering",
+                "binding_source_authority",
+                "contract_transformation_binding",
+                "decision_contract_identity",
+                "objective_binding",
+                "objective_identity",
+                "commit_state",
+                "credential_identity",
+                "tool_connector_identity",
+            ),
+            MUTATION_CANONICAL_FIELDS,
+        )
+
+    def test_mutation_registry_legacy_aliases_are_exact(self) -> None:
+        self.assertEqual(
+            {
+                "principal": "subject",
+                "privilege": "control_state",
+                "consumption": "consumption_state",
+                "actor_context": "execution_context",
+                "credential": "credential_identity",
+                "connector_endpoint": "tool_connector_identity",
+            },
+            dict(MUTATION_LEGACY_ALIASES),
+        )
+
+    def test_mutation_registry_is_immutable(self) -> None:
+        with self.assertRaises(TypeError):
+            MUTATION_REGISTRY["execution_host"] = MUTATION_SPECS[0]  # type: ignore[index]
+        with self.assertRaises(TypeError):
+            MUTATION_LEGACY_ALIASES["host"] = "control_state"  # type: ignore[index]
+
+    def test_every_registry_spec_has_an_evaluator_target(self) -> None:
+        target_sets = {
+            MutationTargetKind.STATE: set(STATE_MUTATION_TARGETS),
+            MutationTargetKind.RELATION: set(RELATIONAL_MUTATION_TARGETS),
+            MutationTargetKind.BINDING: set(BINDING_MUTATION_TARGETS),
+            MutationTargetKind.FACT: set(FACT_MUTATION_TARGETS),
+        }
+        for spec in MUTATION_SPECS:
+            with self.subTest(field=spec.canonical_field):
+                self.assertIn(spec.target, target_sets[spec.target_kind])
+                self.assertIs(spec, MUTATION_REGISTRY[spec.canonical_field])
+                for alias in spec.legacy_aliases:
+                    self.assertIs(spec, MUTATION_REGISTRY[alias])
+
+    def test_original_execution_host_counterexample_is_unavailable(self) -> None:
+        payload = fixture("LAB-V1-032")
+        payload["t2"]["mutations"].append(
+            {
+                "field": "execution_host",
+                "before": "SANDBOX-S1",
+                "after": "HOST-S2",
+            }
+        )
+        self.assert_unavailable_with_reason(payload, "UNKNOWN_MUTATION_FIELD")
+
+    def test_all_fourteen_demonstrated_unregistered_mutations_fail_closed(self) -> None:
+        counterexamples = (
+            ("execution_host", "SANDBOX-S1", "HOST-S2"),
+            ("process_identity", "PROCESS-P1", "CHILD-P2"),
+            ("acting_agent", "AGENT-A", "AGENT-B"),
+            ("tool_identity", "TOOL-X", "TOOL-Y"),
+            ("connector_identity", "CONNECTOR-X", "CONNECTOR-Y"),
+            ("credential_context", "CRED-A", "CRED-B"),
+            ("trust_domain", "DOMAIN-A", "DOMAIN-B"),
+            ("tenant_account", "TENANT-A", "TENANT-B"),
+            ("network_boundary", "PRIVATE-NET", "EXTERNAL-NET"),
+            ("process_instance", "INSTANCE-1", "INSTANCE-2"),
+            ("authority_state_representation", "RAW", "SUMMARY"),
+            ("authority_consumer", "AGENT-A", "AGENT-B"),
+            ("relay_actor", "AUTHORIZED-A", "UNAUTHORIZED-B"),
+            ("execution_principal", "PRINCIPAL-A", "PRINCIPAL-B"),
+        )
+        for field, before, after in counterexamples:
+            with self.subTest(field=field):
+                payload = fixture("LAB-V1-032")
+                payload["t2"]["mutations"].append(
+                    {"field": field, "before": before, "after": after}
+                )
+                self.assert_unavailable_with_reason(payload, "UNKNOWN_MUTATION_FIELD")
+
+    def test_unknown_mutation_precedes_otherwise_established_denial(self) -> None:
+        payload = fixture("LAB-V1-032")
+        payload["t2"]["mutations"].append(
+            {"field": "execution_host", "before": "S1", "after": "S2"}
+        )
+        payload["t3"]["prohibition"] = {
+            "state": "KNOWN",
+            "applies": True,
+            "id": "APPARENT_PROHIBITION",
+        }
+        self.assert_unavailable_with_reason(payload, "UNKNOWN_MUTATION_FIELD")
+
+    def test_structurally_valid_unknown_names_are_unavailable(self) -> None:
+        for field in (
+            "executionhost",
+            "wrapper_execution_host",
+            "runtime_execution_host",
+            "execution_host_v2",
+            "host",
+            "acting_subject",
+            "acknowledgment",
+            "monitor_context",
+        ):
+            with self.subTest(field=field):
+                payload = fixture("LAB-V1-032")
+                payload["t2"]["mutations"].append(
+                    {"field": field, "before": "BEFORE", "after": "AFTER"}
+                )
+                self.assert_unavailable_with_reason(payload, "UNKNOWN_MUTATION_FIELD")
+
+    def test_malformed_mutation_names_remain_input_failures(self) -> None:
+        for field in (
+            "Execution_Host",
+            " execution_host",
+            "execution_host ",
+            "execution-host",
+            "runtime.execution_host",
+            "wrapper.execution_host",
+            "executiοn_host",
+            "execution_\u200bhost",
+        ):
+            with self.subTest(field=field):
+                payload = fixture("LAB-V1-032")
+                payload["t2"]["mutations"].append(
+                    {"field": field, "before": "BEFORE", "after": "AFTER"}
+                )
+                with self.assertRaises(ValueError):
+                    OracleInput.from_fixture(payload)
+
+    def test_malformed_mutation_structures_remain_input_failures(self) -> None:
+        malformed = (
+            {"field": "control_state", "before": "C1"},
+            {"field": "control_state", "before": "C1", "after": "C2", "extra": True},
+            {"field": {"wrapped": "control_state"}, "before": "C1", "after": "C2"},
+            {"wrapper": {"field": "control_state", "before": "C1", "after": "C2"}},
+        )
+        for mutation in malformed:
+            with self.subTest(mutation=mutation):
+                payload = fixture("LAB-V1-032")
+                payload["t2"]["mutations"] = [mutation]
+                with self.assertRaises(ValueError):
+                    OracleInput.from_fixture(payload)
+
+    def test_malformed_typed_mutation_values_remain_input_failures(self) -> None:
+        for mutation in (
+            {"field": "control_state", "before": 1, "after": "C2"},
+            {"field": "boundary_epoch_binding", "before": [], "after": {}},
+            {"field": "objective_binding", "before": {}, "after": {}},
+        ):
+            with self.subTest(mutation=mutation):
+                payload = fixture("LAB-V1-032")
+                payload["t2"]["mutations"] = [mutation]
+                with self.assertRaises(ValueError):
+                    OracleInput.from_fixture(payload)
+
+    def test_noop_mutation_is_an_input_failure(self) -> None:
+        payload = fixture("LAB-V1-032")
+        payload["t2"]["mutations"].append(
+            {"field": "control_state", "before": "C1", "after": "C1"}
+        )
+        with self.assertRaises(ValueError):
+            OracleInput.from_fixture(payload)
+
+    def test_retained_legacy_aliases_resolve_to_checked_targets(self) -> None:
+        aliases = (
+            ("principal", "S", "S2", "subject"),
+            ("privilege", "C1", "C2", "control_state"),
+            ("consumption", "UNUSED", "CONSUMED", "consumption_state"),
+            ("actor_context", "E1", "E2", "execution_context"),
+            ("credential", "CREDENTIAL-1", "CREDENTIAL-2", "credential_identity"),
+            ("connector_endpoint", "CONNECTOR-1", "CONNECTOR-2", "tool_connector_identity"),
+        )
+        for field, before, after, target in aliases:
+            with self.subTest(field=field):
+                payload = fixture("LAB-V1-032")
+                payload["t2"]["mutations"].append(
+                    {"field": field, "before": before, "after": after}
+                )
+                oracle_input = OracleInput.from_fixture(payload)
+                self.assertEqual(target, oracle_input.t2_mutations[0].target)
+                self.assertIsNotNone(oracle_input.t2_mutations[0].canonical_field)
+                self.assertIs(AuthorityOutcome.UNAVAILABLE, evaluate(oracle_input).outcome)
+
+    def test_duplicate_same_transition_is_unavailable(self) -> None:
+        payload = fixture("LAB-V1-032")
+        payload["t2"]["mutations"].extend(
+            [
+                {"field": "control_state", "before": "C1", "after": "C2"},
+                {"field": "control_state", "before": "C1", "after": "C2"},
+            ]
+        )
+        self.assert_unavailable_with_reason(payload, "T2_T3_HYBRID_STATE")
+
+    def test_duplicate_conflicting_transition_is_unavailable(self) -> None:
+        payload = fixture("LAB-V1-032")
+        payload["t2"]["mutations"].extend(
+            [
+                {"field": "control_state", "before": "C1", "after": "C2"},
+                {"field": "control_state", "before": "C1", "after": "C3"},
+            ]
+        )
+        self.assert_unavailable_with_reason(payload, "T2_T3_HYBRID_STATE")
+
+    def test_reversed_transition_order_is_unavailable(self) -> None:
+        payload = fixture("LAB-V1-032")
+        payload["t2"]["mutations"].extend(
+            [
+                {"field": "control_state", "before": "C2", "after": "C3"},
+                {"field": "control_state", "before": "C1", "after": "C2"},
+            ]
+        )
+        self.assert_unavailable_with_reason(payload, "T2_T3_HYBRID_STATE")
+
+    def test_canonical_and_alias_conflict_share_one_chain(self) -> None:
+        payload = fixture("LAB-V1-032")
+        payload["t2"]["mutations"].extend(
+            [
+                {"field": "control_state", "before": "C1", "after": "C2"},
+                {"field": "privilege", "before": "C1", "after": "C3"},
+            ]
+        )
+        self.assert_unavailable_with_reason(payload, "T2_T3_HYBRID_STATE")
+
+    def test_canonical_and_unknown_combination_is_unavailable_as_unknown(self) -> None:
+        payload = fixture("LAB-V1-032")
+        payload["t2"]["mutations"].extend(
+            [
+                {"field": "control_state", "before": "C1", "after": "C2"},
+                {"field": "execution_host", "before": "S1", "after": "S2"},
+            ]
+        )
+        self.assert_unavailable_with_reason(payload, "UNKNOWN_MUTATION_FIELD")
+
+    def test_round_trip_state_transition_requires_fresh_reestablishment(self) -> None:
+        payload = fixture("LAB-V1-032")
+        payload["t2"]["mutations"].extend(
+            [
+                {"field": "control_state", "before": "C1", "after": "C2"},
+                {"field": "control_state", "before": "C2", "after": "C1"},
+            ]
+        )
+        self.assert_unavailable_with_reason(payload, "T1_T3_RELATIONSHIP_UNAVAILABLE")
+
+    def test_hostile_mutation_fixture_matrix_matches_independent_expectations(self) -> None:
+        expected = {
+            **{f"LAB-V1-{number:03d}": AuthorityOutcome.UNAVAILABLE for number in range(33, 46)},
+            "LAB-V1-046": AuthorityOutcome.DENIED,
+            "LAB-V1-047": AuthorityOutcome.UNAVAILABLE,
+            "LAB-V1-048": AuthorityOutcome.AUTHORIZED,
+        }
+        for case_id, outcome in expected.items():
+            with self.subTest(case_id=case_id):
+                result = run_path(CASES / f"{case_id}.json")
+                self.assertIs(HarnessStatus.PASS, result.status)
+                self.assertIs(outcome, result.actual.outcome)
+
+    def test_prohibited_cross_boundary_transition_is_denied(self) -> None:
+        result = evaluate(OracleInput.from_fixture(fixture("LAB-V1-046")))
+        self.assertIs(AuthorityOutcome.DENIED, result.outcome)
+        self.assertIn("ESTABLISHED_PROHIBITION", {reason.code for reason in result.reasons})
+
+    def test_fresh_cross_boundary_reestablishment_is_authorized(self) -> None:
+        result = evaluate(OracleInput.from_fixture(fixture("LAB-V1-048")))
+        self.assertIs(AuthorityOutcome.AUTHORIZED, result.outcome)
+        self.assertIn("CURRENT_AUTHORITY_ESTABLISHED", {reason.code for reason in result.reasons})
+
+    def test_stale_cross_boundary_reestablishment_is_unavailable(self) -> None:
+        payload = fixture("LAB-V1-048")
+        payload["t3"]["reestablishment"]["value"]["current"]["evidence_id"] = "EV-A-B1"
+        self.assert_unavailable_with_reason(payload, "REESTABLISHMENT_EVIDENCE_REUSED")
+
+    def test_unknown_value_comparison_is_type_exact(self) -> None:
+        payload = fixture("LAB-V1-032")
+        payload["t2"]["mutations"].append(
+            {"field": "unknown_numeric_context", "before": 1, "after": True}
+        )
+        self.assert_unavailable_with_reason(payload, "UNKNOWN_MUTATION_FIELD")
+
+    def test_boundary_laundering_fixtures_remain_unavailable(self) -> None:
+        for case_id in (
+            "LAB-V1-036",
+            "LAB-V1-042",
+            "LAB-V1-043",
+        ):
+            with self.subTest(case_id=case_id):
+                self.assertIs(AuthorityOutcome.UNAVAILABLE, actual(fixture(case_id)))
+
+    def test_unknown_mutation_expectation_cannot_control_oracle(self) -> None:
+        payload = fixture("LAB-V1-033")
+        payload["expected_outcome"] = "AUTHORIZED"
+        result = run_fixture(payload)
+        self.assertIs(AuthorityOutcome.UNAVAILABLE, result.actual.outcome)
+        self.assertIs(HarnessStatus.CASE_MISMATCH, result.status)
+
+    def test_trace_exposes_mutation_resolution(self) -> None:
+        unknown_trace = format_trace(run_path(CASES / "LAB-V1-033.json"))
+        alias_trace = format_trace(run_path(CASES / "LAB-V1-044.json"))
+        self.assertIn("execution_host [UNKNOWN]", unknown_trace)
+        self.assertIn(
+            "actor_context [canonical=execution_context; target=STATE:execution_context]",
+            alias_trace,
+        )
 
     def test_fixture_files_are_valid_json_objects(self) -> None:
         for path in discover(CASES):

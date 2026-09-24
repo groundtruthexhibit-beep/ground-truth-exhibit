@@ -12,12 +12,15 @@ from .model import (
     FactState,
     INVARIANTS,
     MANDATORY_T3_FACTS,
+    MUTATION_SPECS,
+    MutationTargetKind,
     OBJECTIVE_BINDING_FACTS,
     ObjectiveBindingFacts,
     OracleInput,
     OracleResult,
     RELATIONAL_T3_FACTS,
     Reason,
+    exact_value_equal,
 )
 
 
@@ -35,39 +38,20 @@ AUTHORITY_PERMITTING_VALUES = {
     "freshness": "CURRENT",
 }
 
-STATE_MUTATION_FIELDS = {
-    "subject": ("subject",),
-    "artifact": ("artifact",),
-    "identity_basis": ("identity_basis",),
-    "boundary_epoch": ("boundary_epoch",),
-    "applicable_boundary": ("applicable_boundary",),
-    "consumption_state": ("consumption", "consumption_state"),
-}
-
-CANONICAL_MUTATION_STATE_FIELDS = {
-    "subject": ("subject",),
-    "artifact": ("artifact",),
-    "control_state": ("control_state",),
-    "identity_basis": ("identity_basis",),
-    "boundary_epoch": ("boundary_epoch",),
-    "execution_context": ("execution_context",),
-    "applicable_boundary": ("applicable_boundary",),
-    "decision": ("decision",),
-    "evidence_id": ("evidence_id", "decision_binding"),
-    "grant_id": ("grant_id",),
-    "subject_mode": ("subject_mode",),
-    "consumption_state": ("consumption", "consumption_state"),
-}
-
-RELATIONAL_MUTATION_FACTS = {
-    "evidence_binding": ("evidence_binding",),
-    "freshness": ("freshness",),
-    "boundary_epoch_binding": ("boundary_epoch_binding",),
-    "execution_control_binding": ("execution_control_binding",),
-    "consumption_binding": ("consumption_binding",),
-    "delegation_binding": ("delegation_binding",),
-    "closure_binding": ("closure_binding",),
-}
+STATE_MUTATION_TARGETS = tuple(
+    dict.fromkeys(
+        spec.target for spec in MUTATION_SPECS if spec.target_kind is MutationTargetKind.STATE
+    )
+)
+RELATIONAL_MUTATION_TARGETS = tuple(
+    spec.target for spec in MUTATION_SPECS if spec.target_kind is MutationTargetKind.RELATION
+)
+FACT_MUTATION_TARGETS = tuple(
+    spec.target for spec in MUTATION_SPECS if spec.target_kind is MutationTargetKind.FACT
+)
+BINDING_MUTATION_TARGETS = tuple(
+    spec.target for spec in MUTATION_SPECS if spec.target_kind is MutationTargetKind.BINDING
+)
 
 GRANT_SCOPE_FIELDS = (
     "subject",
@@ -413,20 +397,20 @@ def _admit_objective_contract(
 
 def _binding_mutation_mismatches(case: OracleInput) -> tuple[str, ...]:
     mismatches: list[str] = []
-    for name in (*OBJECTIVE_BINDING_FACTS, "contract_transformation_binding"):
+    for name in BINDING_MUTATION_TARGETS:
         before_fact = case.t1_binding_facts.raw[name]
         after_fact = case.t3_binding_facts.raw[name]
         before = before_fact.value if before_fact.state is FactState.KNOWN else before_fact.state.value
         after = after_fact.value if after_fact.state is FactState.KNOWN else after_fact.state.value
-        mutations = tuple(mutation for mutation in case.t2_mutations if mutation.field == name)
+        mutations = _mutations_for(case, MutationTargetKind.BINDING, name)
         value = before
         for mutation in mutations:
-            if mutation.before != value:
+            if not exact_value_equal(mutation.before, value):
                 mismatches.append(name)
                 break
             value = mutation.after
         else:
-            if value != after:
+            if not exact_value_equal(value, after):
                 mismatches.append(name)
     return tuple(dict.fromkeys(mismatches))
 
@@ -545,45 +529,74 @@ def _current_state_value(case: OracleInput, field: str) -> Any:
     return case.facts[field].value
 
 
+def _mutations_for(
+    case: OracleInput, kind: MutationTargetKind, target: str
+) -> tuple[Any, ...]:
+    return tuple(
+        mutation
+        for mutation in case.t2_mutations
+        if mutation.target_kind is kind and mutation.target == target
+    )
+
+
 def _mutation_chain_mismatches(case: OracleInput) -> tuple[str, ...]:
     mismatches: list[str] = []
-    for field, mutation_fields in CANONICAL_MUTATION_STATE_FIELDS.items():
-        mutations = tuple(
-            mutation for mutation in case.t2_mutations if mutation.field in mutation_fields
-        )
+    for field in STATE_MUTATION_TARGETS:
+        mutations = _mutations_for(case, MutationTargetKind.STATE, field)
         if not mutations:
             continue
         value = getattr(case.t1_authority_state, field)
         for mutation in mutations:
-            if mutation.before != value:
+            if not exact_value_equal(mutation.before, value):
                 mismatches.append(field)
                 break
             value = mutation.after
         else:
-            if value != _current_state_value(case, field):
+            if not exact_value_equal(value, _current_state_value(case, field)):
                 mismatches.append(field)
-    for fact_name, mutation_fields in RELATIONAL_MUTATION_FACTS.items():
-        mutations = tuple(
-            mutation for mutation in case.t2_mutations if mutation.field in mutation_fields
-        )
+    for fact_name in RELATIONAL_MUTATION_TARGETS:
+        mutations = _mutations_for(case, MutationTargetKind.RELATION, fact_name)
         if not mutations:
             continue
         value = mutations[0].before
         for mutation in mutations:
-            if mutation.before != value:
+            if not exact_value_equal(mutation.before, value):
                 mismatches.append(fact_name)
                 break
             value = mutation.after
         else:
-            if value != case.facts[fact_name].value:
+            fact = case.facts.get(fact_name)
+            observed = (
+                fact.value
+                if fact is not None and fact.state is FactState.KNOWN
+                else fact.state.value if fact is not None else FactState.UNKNOWN.value
+            )
+            if not exact_value_equal(value, observed):
+                mismatches.append(fact_name)
+    for fact_name in FACT_MUTATION_TARGETS:
+        mutations = _mutations_for(case, MutationTargetKind.FACT, fact_name)
+        if not mutations:
+            continue
+        value = mutations[0].before
+        for mutation in mutations:
+            if not exact_value_equal(mutation.before, value):
+                mismatches.append(fact_name)
+                break
+            value = mutation.after
+        else:
+            fact = case.facts.get(fact_name)
+            observed = (
+                fact.value
+                if fact is not None and fact.state is FactState.KNOWN
+                else fact.state.value if fact is not None else FactState.UNKNOWN.value
+            )
+            if not exact_value_equal(value, observed):
                 mismatches.append(fact_name)
     return tuple(dict.fromkeys(mismatches))
 
 
 def _grant_mutations(case: OracleInput) -> tuple[Any, ...]:
-    return tuple(
-        mutation for mutation in case.t2_mutations if mutation.field == "grant_id"
-    )
+    return _mutations_for(case, MutationTargetKind.STATE, "grant_id")
 
 
 def _grant_path(case: OracleInput) -> tuple[str, ...]:
@@ -596,9 +609,7 @@ def _grant_path(case: OracleInput) -> tuple[str, ...]:
 
 def _consumption_regenerated(case: OracleInput) -> bool:
     consumed = case.t1_authority_state.consumption_state == "CONSUMED"
-    for mutation in case.t2_mutations:
-        if mutation.field not in {"consumption", "consumption_state"}:
-            continue
+    for mutation in _mutations_for(case, MutationTargetKind.STATE, "consumption_state"):
         if mutation.after == "CONSUMED":
             consumed = True
         elif consumed and mutation.after == "UNUSED":
@@ -606,12 +617,11 @@ def _consumption_regenerated(case: OracleInput) -> bool:
     return False
 
 
-def _has_exact_mutation(
-    case: OracleInput, fields: tuple[str, ...], before: Any, after: Any
-) -> bool:
+def _has_exact_mutation(case: OracleInput, target: str, before: Any, after: Any) -> bool:
     return any(
-        mutation.field in fields and mutation.before == before and mutation.after == after
-        for mutation in case.t2_mutations
+        exact_value_equal(mutation.before, before)
+        and exact_value_equal(mutation.after, after)
+        for mutation in _mutations_for(case, MutationTargetKind.STATE, target)
     )
 
 
@@ -619,10 +629,17 @@ def _changes_are_represented(
     case: OracleInput, before: AuthorityStateBinding, after: AuthorityStateBinding
 ) -> tuple[str, ...]:
     missing: list[str] = []
-    for state_field, mutation_fields in STATE_MUTATION_FIELDS.items():
+    for state_field in (
+        "subject",
+        "artifact",
+        "identity_basis",
+        "boundary_epoch",
+        "applicable_boundary",
+        "consumption_state",
+    ):
         old = getattr(before, state_field)
         new = getattr(after, state_field)
-        if old != new and not _has_exact_mutation(case, mutation_fields, old, new):
+        if old != new and not _has_exact_mutation(case, state_field, old, new):
             missing.append(state_field)
     context_or_control_changed = (
         before.execution_context != after.execution_context
@@ -631,13 +648,13 @@ def _changes_are_represented(
     if context_or_control_changed and not (
         _has_exact_mutation(
             case,
-            ("execution_context",),
+            "execution_context",
             before.execution_context,
             after.execution_context,
         )
         or _has_exact_mutation(
             case,
-            ("control_state",),
+            "control_state",
             before.control_state,
             after.control_state,
         )
@@ -689,6 +706,20 @@ def evaluate(case: OracleInput) -> OracleResult:
             "LEGACY_SCHEMA_UNAVAILABLE",
             "Authority Lab v0 has no objective-binding admission and cannot authorize.",
             ("schema_version", "objective_binding"),
+        )
+
+    unknown_mutation_fields = tuple(
+        sorted(
+            {mutation.field for mutation in case.t2_mutations if mutation.target is None},
+            key=lambda value: value.encode("utf-8"),
+        )
+    )
+    if unknown_mutation_fields:
+        return _unavailable(
+            case,
+            "UNKNOWN_MUTATION_FIELD",
+            "One or more structurally valid mutation fields have no admitted authority semantics.",
+            unknown_mutation_fields,
         )
 
     t3_binding_result = _admit_objective_contract(
@@ -916,14 +947,25 @@ def evaluate(case: OracleInput) -> OracleResult:
 
     differences = _state_differences(case, t1_state)
     grant_mutations = _grant_mutations(case)
+    continuity_mutations = tuple(
+        mutation
+        for mutation in case.t2_mutations
+        if mutation.target_kind
+        in {
+            MutationTargetKind.STATE,
+            MutationTargetKind.RELATION,
+            MutationTargetKind.FACT,
+        }
+    )
     active_state = t1_state
-    if differences or grant_mutations:
+    if differences or continuity_mutations:
         if case.reestablishment_state is not FactState.KNOWN or case.reestablishment is None:
             return _unavailable(
                 case,
                 "T1_T3_RELATIONSHIP_UNAVAILABLE",
                 "MODEL_LIMITATION: changed authority state lacks explicit current re-establishment.",
-                differences or ("grant_id",),
+                differences
+                or tuple(dict.fromkeys(mutation.target for mutation in continuity_mutations)),
             )
         reestablishment = case.reestablishment
         if reestablishment.previous_evidence_id != t1_state.evidence_id:

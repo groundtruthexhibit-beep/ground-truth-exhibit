@@ -149,7 +149,7 @@
     "creates_authority": false,
     "mutations": [
       {
-        "field": "connector_endpoint",
+        "field": "tool_connector_identity",
         "before": "X1",
         "after": "X2"
       }

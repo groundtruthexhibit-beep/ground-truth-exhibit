@@ -94,7 +94,15 @@ def format_trace(result: RunResult) -> str:
         )
     )
     for mutation in case.t2_mutations:
-        lines.append(f"{mutation.field}: {mutation.before} -> {mutation.after}")
+        resolution = (
+            f"canonical={mutation.canonical_field}; target={mutation.target_kind.value}:"
+            f"{mutation.target}"
+            if mutation.target is not None and mutation.target_kind is not None
+            else "UNKNOWN"
+        )
+        lines.append(
+            f"{mutation.field} [{resolution}]: {mutation.before} -> {mutation.after}"
+        )
     lines.extend(("", "T3"))
     required_facts = tuple(
         dict.fromkeys(

@@ -149,14 +149,9 @@
     "creates_authority": false,
     "mutations": [
       {
-        "field": "actor_context",
+        "field": "execution_context",
         "before": "E1",
         "after": "E2"
-      },
-      {
-        "field": "monitor_context",
-        "before": "E1",
-        "after": "E1"
       },
       {
         "field": "objective_binding",

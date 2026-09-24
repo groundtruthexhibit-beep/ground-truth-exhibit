@@ -147,13 +147,7 @@
   },
   "t2": {
     "creates_authority": false,
-    "mutations": [
-      {
-        "field": "acting_subject",
-        "before": "S",
-        "after": "DELEGATE-D"
-      }
-    ]
+    "mutations": []
   },
   "t3": {
     "facts": {

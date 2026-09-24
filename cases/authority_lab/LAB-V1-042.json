@@ -1,13 +1,13 @@
 {
   "schema_version": "authority-lab-v1",
-  "case_id": "LAB-V0-008",
-  "source_case_id": "GT-CASE-020",
-  "title": "Lost acknowledgment with known one-shot consumption",
-  "objective": "Distinguish established consumption from ambiguous consumption after lost acknowledgment.",
+  "case_id": "LAB-V1-042",
+  "source_case_id": "PR-15-OBJECTIVE-BINDING",
+  "title": "Summarized authority state cannot inherit raw-state authority",
+  "objective": "PR #15 A: exact current authoritative admission and all existing requirements succeed.",
   "authority_tuple": {
     "subject": "S",
     "artifact": "A",
-    "control_state": "RETRY",
+    "control_state": "C1",
     "identity_basis": "I1",
     "boundary_epoch": "B1",
     "decision": "AUTHORIZED"
@@ -15,19 +15,19 @@
   "t1": {
     "result": "AUTHORIZED",
     "evidence": [
-      "ONE-SHOT-U"
+      "EV-A-B1"
     ],
     "authority_state": {
       "subject": "S",
       "artifact": "A",
-      "control_state": "RETRY",
+      "control_state": "C1",
       "identity_basis": "I1",
       "boundary_epoch": "B1",
       "decision": "AUTHORIZED",
-      "evidence_id": "ONE-SHOT-U",
+      "evidence_id": "EV-A-B1",
       "execution_context": "E1",
       "applicable_boundary": "AUTH-BOUNDARY-1",
-      "grant_id": "GRANT-008-ONE-SHOT",
+      "grant_id": "GRANT-001",
       "consumption_state": "UNUSED",
       "subject_mode": "DIRECT"
     },
@@ -35,16 +35,16 @@
       "objective_identity": {
         "state": "KNOWN",
         "value": {
-          "objective_id": "OBJECTIVE-LAB-V0-008",
+          "objective_id": "OBJECTIVE-LAB-V1-032",
           "objective_generation": 1,
-          "policy_id": "POLICY-LAB-V0-008",
+          "policy_id": "POLICY-LAB-V1-032",
           "policy_version": "1"
         }
       },
       "decision_contract_identity": {
         "state": "KNOWN",
         "value": {
-          "contract_id": "CONTRACT-LAB-V0-008",
+          "contract_id": "CONTRACT-LAB-V1-032",
           "contract_version": "1",
           "schema_id": "AUTHORITY-CONTRACT-SCHEMA-1",
           "derived_from": "NONE"
@@ -65,25 +65,25 @@
         "state": "KNOWN",
         "value": [
           {
-            "binding_id": "BINDING-LAB-V0-008",
+            "binding_id": "BINDING-LAB-V1-032",
             "disposition": "ADMIT",
-            "objective_id": "OBJECTIVE-LAB-V0-008",
+            "objective_id": "OBJECTIVE-LAB-V1-032",
             "objective_generation": 1,
-            "contract_id": "CONTRACT-LAB-V0-008",
+            "contract_id": "CONTRACT-LAB-V1-032",
             "contract_version": "1",
             "schema_id": "AUTHORITY-CONTRACT-SCHEMA-1",
             "source_id": "ROOT-AUTH-BOUNDARY-1",
             "authority_generation": 1,
             "binding_generation": 1,
             "lineage": "LINEAGE-AUTH-BOUNDARY-1",
-            "policy_id": "POLICY-LAB-V0-008",
+            "policy_id": "POLICY-LAB-V1-032",
             "policy_version": "1",
             "producer_kind": "AUTHORITY_ROOT",
             "producer_id": "ROOT-AUTH-BOUNDARY-1",
             "scope": {
               "subject": "S",
               "artifact": "A",
-              "control_state": "RETRY",
+              "control_state": "C1",
               "identity_basis": "I1",
               "boundary_epoch": "B1",
               "decision": "AUTHORIZED",
@@ -108,7 +108,7 @@
             "scope": {
               "subject": "S",
               "artifact": "A",
-              "control_state": "RETRY",
+              "control_state": "C1",
               "identity_basis": "I1",
               "boundary_epoch": "B1",
               "decision": "AUTHORIZED",
@@ -121,10 +121,10 @@
         "state": "KNOWN",
         "value": [
           {
-            "binding_id": "BINDING-LAB-V0-008",
+            "binding_id": "BINDING-LAB-V1-032",
             "binding_generation": 1,
             "state": "ACTIVE",
-            "event_id": "EVENT-LAB-V0-008-1",
+            "event_id": "EVENT-LAB-V1-032-1",
             "event_order": 1,
             "source_id": "ROOT-AUTH-BOUNDARY-1",
             "authority_generation": 1,
@@ -138,7 +138,7 @@
           "ordering_source_id": "ORDER-AUTH-BOUNDARY-1",
           "lineage": "LINEAGE-AUTH-BOUNDARY-1",
           "authority_generation": 1,
-          "head_binding_id": "BINDING-LAB-V0-008",
+          "head_binding_id": "BINDING-LAB-V1-032",
           "head_binding_generation": 1,
           "head_event_order": 1
         }
@@ -149,9 +149,9 @@
     "creates_authority": false,
     "mutations": [
       {
-        "field": "consumption",
-        "before": "UNUSED",
-        "after": "CONSUMED"
+        "field": "artifact",
+        "before": "A",
+        "after": "AUTHORITY-SUMMARY-A"
       }
     ]
   },
@@ -167,7 +167,7 @@
       },
       "control_state": {
         "state": "KNOWN",
-        "value": "RETRY"
+        "value": "C1"
       },
       "identity_basis": {
         "state": "KNOWN",
@@ -179,7 +179,7 @@
       },
       "decision_binding": {
         "state": "KNOWN",
-        "value": "ONE-SHOT-U"
+        "value": "EV-A-B1"
       },
       "applicable_boundary": {
         "state": "KNOWN",
@@ -197,13 +197,9 @@
         "state": "KNOWN",
         "value": "CURRENT"
       },
-      "commit_state": {
-        "state": "KNOWN",
-        "value": "COMMITTED"
-      },
       "consumption_state": {
         "state": "KNOWN",
-        "value": "CONSUMED"
+        "value": "UNUSED"
       },
       "boundary_epoch_binding": {
         "state": "KNOWN",
@@ -216,13 +212,13 @@
         "state": "KNOWN",
         "value": {
           "execution_context": "E1",
-          "control_state": "RETRY"
+          "control_state": "C1"
         }
       },
       "consumption_binding": {
         "state": "KNOWN",
         "value": {
-          "grant_id": "GRANT-008-ONE-SHOT",
+          "grant_id": "GRANT-001",
           "subject": "S",
           "artifact": "A",
           "boundary_epoch": "B1"
@@ -234,7 +230,7 @@
           "relationship": "DIRECT",
           "subject": "S",
           "artifact": "A",
-          "control_state": "RETRY",
+          "control_state": "C1",
           "boundary_epoch": "B1",
           "applicable_boundary": "AUTH-BOUNDARY-1"
         }
@@ -250,16 +246,16 @@
       "objective_identity": {
         "state": "KNOWN",
         "value": {
-          "objective_id": "OBJECTIVE-LAB-V0-008",
+          "objective_id": "OBJECTIVE-LAB-V1-032",
           "objective_generation": 1,
-          "policy_id": "POLICY-LAB-V0-008",
+          "policy_id": "POLICY-LAB-V1-032",
           "policy_version": "1"
         }
       },
       "decision_contract_identity": {
         "state": "KNOWN",
         "value": {
-          "contract_id": "CONTRACT-LAB-V0-008",
+          "contract_id": "CONTRACT-LAB-V1-032",
           "contract_version": "1",
           "schema_id": "AUTHORITY-CONTRACT-SCHEMA-1",
           "derived_from": "NONE"
@@ -280,25 +276,25 @@
         "state": "KNOWN",
         "value": [
           {
-            "binding_id": "BINDING-LAB-V0-008",
+            "binding_id": "BINDING-LAB-V1-032",
             "disposition": "ADMIT",
-            "objective_id": "OBJECTIVE-LAB-V0-008",
+            "objective_id": "OBJECTIVE-LAB-V1-032",
             "objective_generation": 1,
-            "contract_id": "CONTRACT-LAB-V0-008",
+            "contract_id": "CONTRACT-LAB-V1-032",
             "contract_version": "1",
             "schema_id": "AUTHORITY-CONTRACT-SCHEMA-1",
             "source_id": "ROOT-AUTH-BOUNDARY-1",
             "authority_generation": 1,
             "binding_generation": 1,
             "lineage": "LINEAGE-AUTH-BOUNDARY-1",
-            "policy_id": "POLICY-LAB-V0-008",
+            "policy_id": "POLICY-LAB-V1-032",
             "policy_version": "1",
             "producer_kind": "AUTHORITY_ROOT",
             "producer_id": "ROOT-AUTH-BOUNDARY-1",
             "scope": {
               "subject": "S",
               "artifact": "A",
-              "control_state": "RETRY",
+              "control_state": "C1",
               "identity_basis": "I1",
               "boundary_epoch": "B1",
               "decision": "AUTHORIZED",
@@ -323,7 +319,7 @@
             "scope": {
               "subject": "S",
               "artifact": "A",
-              "control_state": "RETRY",
+              "control_state": "C1",
               "identity_basis": "I1",
               "boundary_epoch": "B1",
               "decision": "AUTHORIZED",
@@ -336,10 +332,10 @@
         "state": "KNOWN",
         "value": [
           {
-            "binding_id": "BINDING-LAB-V0-008",
+            "binding_id": "BINDING-LAB-V1-032",
             "binding_generation": 1,
             "state": "ACTIVE",
-            "event_id": "EVENT-LAB-V0-008-1",
+            "event_id": "EVENT-LAB-V1-032-1",
             "event_order": 1,
             "source_id": "ROOT-AUTH-BOUNDARY-1",
             "authority_generation": 1,
@@ -353,7 +349,7 @@
           "ordering_source_id": "ORDER-AUTH-BOUNDARY-1",
           "lineage": "LINEAGE-AUTH-BOUNDARY-1",
           "authority_generation": 1,
-          "head_binding_id": "BINDING-LAB-V0-008",
+          "head_binding_id": "BINDING-LAB-V1-032",
           "head_binding_generation": 1,
           "head_event_order": 1
         }
@@ -367,36 +363,40 @@
       "boundary_epoch",
       "decision_binding",
       "applicable_boundary",
-      "commit_state",
+      "evidence_binding",
+      "execution_context",
+      "freshness",
       "consumption_state"
     ],
     "required_values": {
       "subject_identity": "S",
       "artifact_identity": "A",
-      "control_state": "RETRY",
+      "control_state": "C1",
       "identity_basis": "I1",
       "boundary_epoch": "B1",
-      "decision_binding": "ONE-SHOT-U",
+      "decision_binding": "EV-A-B1",
       "applicable_boundary": "AUTH-BOUNDARY-1",
       "evidence_binding": "CURRENT",
       "execution_context": "E1",
       "freshness": "CURRENT",
-      "consumption_state": "CONSUMED",
-      "commit_state": "COMMITTED"
+      "consumption_state": "UNUSED"
     },
     "prohibition": {
       "state": "KNOWN",
-      "applies": true,
-      "id": "ONE_SHOT_REPLAY_PROHIBITED"
+      "applies": false,
+      "id": "none"
     },
-    "authority_question": "May the consumed one-shot authority be reused after acknowledgment loss?"
+    "authority_question": "Summarized authority state cannot inherit raw-state authority?"
   },
   "applicable_invariants": [
-    "INV-USE",
     "INV-CONT",
-    "INV-EVD"
+    "INV-DISC",
+    "INV-BND",
+    "INV-EVD",
+    "INV-USE",
+    "INV-CLO"
   ],
-  "expected_outcome": "DENIED",
-  "expected_reason": "Consumption is established and replay is prohibited.",
-  "notes": "Derived from GT-CASE-020."
+  "expected_outcome": "UNAVAILABLE",
+  "expected_reason": "The summarized artifact lacks exact current evidence and closure binding.",
+  "notes": "Objective-binding v1 hostile regression; expected fields do not control the oracle."
 }
