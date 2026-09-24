@@ -8,9 +8,12 @@ from typing import Any
 from .model import (
     AuthorityOutcome,
     AuthorityStateBinding,
+    BindingScope,
     FactState,
     INVARIANTS,
     MANDATORY_T3_FACTS,
+    OBJECTIVE_BINDING_FACTS,
+    ObjectiveBindingFacts,
     OracleInput,
     OracleResult,
     RELATIONAL_T3_FACTS,
@@ -78,6 +81,8 @@ GRANT_SCOPE_FIELDS = (
     "subject_mode",
 )
 
+NEGATIVE_BINDING_STATES = {"INVALID", "REVOKED", "REJECTED", "SUPERSEDED"}
+
 
 def _engaged(case: OracleInput) -> tuple[str, ...]:
     selected = set(case.applicable_invariants)
@@ -92,6 +97,402 @@ def _unavailable(
         (Reason(code, detail, facts),),
         _engaged(case),
     )
+
+
+def _binding_scope_for_t3(case: OracleInput) -> BindingScope | None:
+    boundary = case.facts.get("applicable_boundary")
+    if boundary is None or boundary.state is not FactState.KNOWN:
+        return None
+    if not isinstance(boundary.value, str) or boundary.value == "":
+        return None
+    for fact_name, tuple_field in TUPLE_FACT_BINDINGS:
+        fact = case.facts.get(fact_name)
+        if (
+            fact is None
+            or fact.state is not FactState.KNOWN
+            or fact.value != getattr(case.authority_tuple, tuple_field)
+        ):
+            return None
+    return BindingScope(
+        subject=case.authority_tuple.subject,
+        artifact=case.authority_tuple.artifact,
+        control_state=case.authority_tuple.control_state,
+        identity_basis=case.authority_tuple.identity_basis,
+        boundary_epoch=case.authority_tuple.boundary_epoch,
+        decision=case.authority_tuple.decision,
+        applicable_boundary=boundary.value,
+    )
+
+
+def _binding_scope_for_t1(case: OracleInput) -> BindingScope:
+    state = case.t1_authority_state
+    return BindingScope(
+        subject=state.subject,
+        artifact=state.artifact,
+        control_state=state.control_state,
+        identity_basis=state.identity_basis,
+        boundary_epoch=state.boundary_epoch,
+        decision=state.decision,
+        applicable_boundary=state.applicable_boundary,
+    )
+
+
+def _binding_unavailable(
+    case: OracleInput, phase: str, code: str, detail: str, facts: tuple[str, ...] = ()
+) -> OracleResult:
+    return _unavailable(case, f"{phase}_{code}", detail, facts)
+
+
+def _admit_objective_contract(
+    case: OracleInput,
+    binding_facts: ObjectiveBindingFacts,
+    expected_scope: BindingScope | None,
+    phase: str,
+) -> OracleResult:
+    unavailable = tuple(
+        name
+        for name in OBJECTIVE_BINDING_FACTS
+        if binding_facts.raw[name].state is FactState.UNKNOWN
+    )
+    conflicting = tuple(
+        name
+        for name in OBJECTIVE_BINDING_FACTS
+        if binding_facts.raw[name].state is FactState.CONFLICTING
+    )
+    if expected_scope is None:
+        unavailable = (*unavailable, "applicable_boundary")
+    if unavailable or conflicting:
+        return _binding_unavailable(
+            case,
+            phase,
+            "OBJECTIVE_BINDING_UNAVAILABLE",
+            "Required objective-binding facts are missing, unknown, or conflicting.",
+            tuple(dict.fromkeys((*unavailable, *conflicting))),
+        )
+
+    objective = binding_facts.objective_identity
+    contract = binding_facts.decision_contract_identity
+    root = binding_facts.authority_root
+    ordering = binding_facts.ordering
+    if objective is None or contract is None or root is None or ordering is None:
+        return _binding_unavailable(
+            case,
+            phase,
+            "OBJECTIVE_BINDING_UNAVAILABLE",
+            "Typed objective, contract, root, or ordering state is unavailable.",
+        )
+    assert expected_scope is not None
+
+    if (
+        root.boundary != expected_scope.applicable_boundary
+        or root.boundary_epoch != expected_scope.boundary_epoch
+        or root.root_id == expected_scope.subject
+    ):
+        return _binding_unavailable(
+            case,
+            phase,
+            "AUTHORITY_ROOT_RELATIONSHIP_UNAVAILABLE",
+            "The admitted root is not independently bound to the exact boundary and epoch.",
+            ("authority_root",),
+        )
+    if (
+        ordering.ordering_source_id != root.ordering_source_id
+        or ordering.lineage != root.lineage
+        or ordering.authority_generation != root.authority_generation
+    ):
+        return _binding_unavailable(
+            case,
+            phase,
+            "AUTHORITATIVE_ORDERING_UNAVAILABLE",
+            "Binding ordering is not established by the exact current root lineage.",
+            ("binding_ordering",),
+        )
+
+    candidate_ids: dict[tuple[str, int], Any] = {}
+    for candidate in binding_facts.candidates:
+        key = (candidate.binding_id, candidate.binding_generation)
+        prior = candidate_ids.get(key)
+        if prior is not None and prior != candidate:
+            return _binding_unavailable(
+                case,
+                phase,
+                "OBJECTIVE_BINDING_CONFLICTING",
+                "One binding identity and generation has conflicting candidate bodies.",
+                ("objective_binding",),
+            )
+        candidate_ids[key] = candidate
+
+    applicable = tuple(
+        candidate
+        for candidate in candidate_ids.values()
+        if candidate.objective_id == objective.objective_id
+        and candidate.objective_generation == objective.objective_generation
+        and candidate.policy_id == objective.policy_id
+        and candidate.policy_version == objective.policy_version
+        and candidate.schema_id == contract.schema_id
+        and candidate.scope == expected_scope
+        and candidate.lineage == root.lineage
+        and candidate.authority_generation == root.authority_generation
+        and (
+            (
+                candidate.contract_id == contract.contract_id
+                and candidate.contract_version == contract.contract_version
+            )
+            or (
+                contract.derived_from != "NONE"
+                and candidate.contract_id == contract.derived_from
+            )
+        )
+    )
+    selected = tuple(
+        candidate
+        for candidate in applicable
+        if candidate.binding_id == ordering.head_binding_id
+        and candidate.binding_generation == ordering.head_binding_generation
+    )
+    if len(selected) != 1:
+        return _binding_unavailable(
+            case,
+            phase,
+            "AUTHORITATIVE_ORDERING_UNAVAILABLE",
+            "Authoritative ordering does not select exactly one applicable binding.",
+            ("objective_binding", "binding_ordering"),
+        )
+    binding = selected[0]
+
+    sources = tuple(
+        source
+        for source in set(binding_facts.sources)
+        if source.root_id == root.root_id
+        and source.source_id == binding.source_id
+        and source.authority_generation == root.authority_generation
+        and source.boundary == root.boundary
+        and source.boundary_epoch == root.boundary_epoch
+        and source.lineage == root.lineage
+        and source.scope == expected_scope
+    )
+    if len(sources) != 1:
+        return _binding_unavailable(
+            case,
+            phase,
+            "BINDING_SOURCE_AUTHORITY_UNAVAILABLE",
+            "The binding source lacks one exact independent root or delegation relationship.",
+            ("binding_source_authority",),
+        )
+    source = sources[0]
+    root_relationship = (
+        source.relationship == "ROOT"
+        and source.source_id == root.root_id
+        and source.delegation_id == "NONE"
+    )
+    delegated_relationship = (
+        source.relationship == "EXACT_DELEGATION"
+        and source.source_id != root.root_id
+        and source.delegation_id != "NONE"
+    )
+    producer_matches_source = (
+        binding.producer_id == source.source_id
+        and (
+            (source.relationship == "ROOT" and binding.producer_kind == "AUTHORITY_ROOT")
+            or (
+                source.relationship == "EXACT_DELEGATION"
+                and binding.producer_kind == "DELEGATE"
+            )
+        )
+    )
+    if (
+        not (root_relationship or delegated_relationship)
+        or not producer_matches_source
+        or source.source_id == expected_scope.subject
+    ):
+        return _binding_unavailable(
+            case,
+            phase,
+            "BINDING_SOURCE_AUTHORITY_UNAVAILABLE",
+            "The candidate producer must exactly match a separately admitted root or delegate source.",
+            ("objective_binding", "binding_source_authority"),
+        )
+    if source.status in {"REVOKED", "REJECTED"}:
+        return OracleResult(
+            AuthorityOutcome.DENIED,
+            (
+                Reason(
+                    f"{phase}_BINDING_SOURCE_{source.status}",
+                    "Current authoritative source or delegation state prohibits admission.",
+                    ("binding_source_authority",),
+                ),
+            ),
+            _engaged(case),
+        )
+
+    lifecycles = tuple(
+        lifecycle
+        for lifecycle in set(binding_facts.lifecycles)
+        if lifecycle.binding_id == binding.binding_id
+        and lifecycle.binding_generation == binding.binding_generation
+        and lifecycle.source_id == binding.source_id
+        and lifecycle.authority_generation == root.authority_generation
+        and lifecycle.lineage == root.lineage
+        and lifecycle.event_order == ordering.head_event_order
+    )
+    if len(lifecycles) != 1:
+        return _binding_unavailable(
+            case,
+            phase,
+            "BINDING_LIFECYCLE_UNAVAILABLE",
+            "No unique authoritative lifecycle event establishes the selected binding state.",
+            ("binding_lifecycle", "binding_ordering"),
+        )
+    lifecycle = lifecycles[0]
+    if binding.disposition == "REJECT" or lifecycle.state in NEGATIVE_BINDING_STATES:
+        return OracleResult(
+            AuthorityOutcome.DENIED,
+            (
+                Reason(
+                    f"{phase}_OBJECTIVE_BINDING_DENIED",
+                    "Current authoritative binding state rejects, invalidates, revokes, or supersedes the exact use.",
+                    ("objective_binding", "binding_lifecycle", "binding_ordering"),
+                ),
+            ),
+            _engaged(case),
+        )
+
+    direct = (
+        binding.contract_id == contract.contract_id
+        and binding.contract_version == contract.contract_version
+    )
+    if not direct:
+        transformations = tuple(
+            transformation
+            for transformation in set(binding_facts.transformations)
+            if transformation.source_contract_id == binding.contract_id
+            and transformation.source_contract_version == binding.contract_version
+            and transformation.target_contract_id == contract.contract_id
+            and transformation.target_contract_version == contract.contract_version
+            and transformation.objective_id == objective.objective_id
+            and transformation.objective_generation == objective.objective_generation
+            and transformation.source_id == binding.source_id
+            and transformation.authority_generation == root.authority_generation
+            and transformation.boundary == root.boundary
+            and transformation.boundary_epoch == root.boundary_epoch
+            and transformation.lineage == root.lineage
+            and transformation.scope == expected_scope
+        )
+        if len(transformations) != 1:
+            return _binding_unavailable(
+                case,
+                phase,
+                "TRANSFORMATION_ADMISSION_UNAVAILABLE",
+                "Derived decision contract lacks one exact authoritative transformation admission.",
+                ("contract_transformation_binding",),
+            )
+        if transformations[0].state in {"INVALID", "REVOKED", "REJECTED"}:
+            return OracleResult(
+                AuthorityOutcome.DENIED,
+                (
+                    Reason(
+                        f"{phase}_TRANSFORMATION_ADMISSION_DENIED",
+                        "The exact authoritative transformation admission is not usable.",
+                        ("contract_transformation_binding",),
+                    ),
+                ),
+                _engaged(case),
+            )
+
+    return OracleResult(
+        AuthorityOutcome.AUTHORIZED,
+        (
+            Reason(
+                f"{phase}_OBJECTIVE_BINDING_ADMITTED",
+                "Exact current authoritative objective binding admits the decision contract.",
+            ),
+        ),
+        _engaged(case),
+    )
+
+
+def _binding_mutation_mismatches(case: OracleInput) -> tuple[str, ...]:
+    mismatches: list[str] = []
+    for name in (*OBJECTIVE_BINDING_FACTS, "contract_transformation_binding"):
+        before_fact = case.t1_binding_facts.raw[name]
+        after_fact = case.t3_binding_facts.raw[name]
+        before = before_fact.value if before_fact.state is FactState.KNOWN else before_fact.state.value
+        after = after_fact.value if after_fact.state is FactState.KNOWN else after_fact.state.value
+        mutations = tuple(mutation for mutation in case.t2_mutations if mutation.field == name)
+        value = before
+        for mutation in mutations:
+            if mutation.before != value:
+                mismatches.append(name)
+                break
+            value = mutation.after
+        else:
+            if value != after:
+                mismatches.append(name)
+    return tuple(dict.fromkeys(mismatches))
+
+
+def _binding_identity_reuse_mismatches(case: OracleInput) -> tuple[str, ...]:
+    before = case.t1_binding_facts
+    after = case.t3_binding_facts
+    mismatches: list[str] = []
+    if (
+        before.objective_identity is not None
+        and after.objective_identity is not None
+        and (
+            before.objective_identity.objective_id,
+            before.objective_identity.objective_generation,
+        )
+        == (
+            after.objective_identity.objective_id,
+            after.objective_identity.objective_generation,
+        )
+        and before.objective_identity != after.objective_identity
+    ):
+        mismatches.append("objective_identity")
+    if (
+        before.decision_contract_identity is not None
+        and after.decision_contract_identity is not None
+        and (
+            before.decision_contract_identity.contract_id,
+            before.decision_contract_identity.contract_version,
+        )
+        == (
+            after.decision_contract_identity.contract_id,
+            after.decision_contract_identity.contract_version,
+        )
+        and before.decision_contract_identity != after.decision_contract_identity
+    ):
+        mismatches.append("decision_contract_identity")
+    if (
+        before.authority_root is not None
+        and after.authority_root is not None
+        and (
+            before.authority_root.root_id,
+            before.authority_root.authority_generation,
+        )
+        == (after.authority_root.root_id, after.authority_root.authority_generation)
+        and before.authority_root != after.authority_root
+    ):
+        mismatches.append("authority_root")
+    prior_candidates = {
+        (candidate.binding_id, candidate.binding_generation): candidate
+        for candidate in before.candidates
+    }
+    for candidate in after.candidates:
+        prior = prior_candidates.get((candidate.binding_id, candidate.binding_generation))
+        if prior is not None and prior != candidate:
+            mismatches.append("objective_binding")
+    prior_transformations = {
+        (transformation.transformation_id, transformation.transformation_generation): transformation
+        for transformation in before.transformations
+    }
+    for transformation in after.transformations:
+        prior = prior_transformations.get(
+            (transformation.transformation_id, transformation.transformation_generation)
+        )
+        if prior is not None and prior != transformation:
+            mismatches.append("contract_transformation_binding")
+    return tuple(dict.fromkeys(mismatches))
 
 
 def _relation_matches(value: Any, expected: Mapping[str, Any]) -> bool:
@@ -282,6 +683,20 @@ def _state_has_empty_identifier(state: AuthorityStateBinding) -> bool:
 
 def evaluate(case: OracleInput) -> OracleResult:
     """Compute an authority outcome without fixture expectation access."""
+    if case.schema_version == "authority-lab-v0":
+        return _unavailable(
+            case,
+            "LEGACY_SCHEMA_UNAVAILABLE",
+            "Authority Lab v0 has no objective-binding admission and cannot authorize.",
+            ("schema_version", "objective_binding"),
+        )
+
+    t3_binding_result = _admit_objective_contract(
+        case, case.t3_binding_facts, _binding_scope_for_t3(case), "T3"
+    )
+    if t3_binding_result.outcome is AuthorityOutcome.DENIED:
+        return t3_binding_result
+
     required_facts = tuple(dict.fromkeys((*MANDATORY_T3_FACTS, *case.required_facts)))
     unestablished: list[str] = []
     conflicting: list[str] = []
@@ -401,6 +816,11 @@ def evaluate(case: OracleInput) -> OracleResult:
             (Reason("T1_DENIED", "The established T1 decision prohibits the transition."),),
             _engaged(case),
         )
+    t1_binding_result = _admit_objective_contract(
+        case, case.t1_binding_facts, _binding_scope_for_t1(case), "T1"
+    )
+    if t1_binding_result.outcome is not AuthorityOutcome.AUTHORIZED:
+        return t1_binding_result
     if case.authority_tuple.decision is AuthorityOutcome.UNAVAILABLE:
         return _unavailable(
             case,
@@ -469,6 +889,22 @@ def evaluate(case: OracleInput) -> OracleResult:
             "T2_T3_HYBRID_STATE",
             "IMPLEMENTATION_OBLIGATION: ordered T2 mutations do not produce the exact observed T3 state.",
             mutation_chain_mismatches,
+        )
+    binding_identity_reuse = _binding_identity_reuse_mismatches(case)
+    if binding_identity_reuse:
+        return _unavailable(
+            case,
+            "OBJECTIVE_BINDING_IDENTITY_REUSED",
+            "Objective, contract, root, or binding semantics changed without a new identity or generation.",
+            binding_identity_reuse,
+        )
+    binding_mutation_mismatches = _binding_mutation_mismatches(case)
+    if binding_mutation_mismatches:
+        return _unavailable(
+            case,
+            "OBJECTIVE_BINDING_CONTINUITY_UNAVAILABLE",
+            "Ordered T2 mutations do not produce the exact current objective-binding state.",
+            binding_mutation_mismatches,
         )
     if _consumption_regenerated(case):
         return _unavailable(
@@ -649,6 +1085,9 @@ def evaluate(case: OracleInput) -> OracleResult:
             "MODEL_LIMITATION: generic closure cannot authorize a distinct derived artifact.",
             ("closure_binding",),
         )
+
+    if t3_binding_result.outcome is not AuthorityOutcome.AUTHORIZED:
+        return t3_binding_result
 
     return OracleResult(
         AuthorityOutcome.AUTHORIZED,

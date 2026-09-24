@@ -12,6 +12,7 @@ from .model import (
     FactState,
     HarnessStatus,
     MANDATORY_T3_FACTS,
+    OBJECTIVE_BINDING_FACTS,
     OracleInput,
     RunResult,
 )
@@ -23,7 +24,7 @@ def load_fixture(path: str | Path) -> dict[str, Any]:
         value = json.load(handle)
     if not isinstance(value, dict):
         raise ValueError("fixture root must be an object")
-    if value.get("schema_version") != "authority-lab-v0":
+    if value.get("schema_version") not in {"authority-lab-v0", "authority-lab-v1"}:
         raise ValueError("unsupported fixture schema_version")
     return value
 
@@ -54,6 +55,16 @@ def discover(directory: str | Path) -> tuple[Path, ...]:
     return tuple(sorted(Path(directory).glob("*.json")))
 
 
+def _render_fact(fact: Any) -> str:
+    if fact is None:
+        return "UNKNOWN"
+    if fact.state is FactState.KNOWN:
+        return f"KNOWN({fact.value})"
+    if fact.state is FactState.CONFLICTING:
+        return f"CONFLICTING({','.join(str(value) for value in fact.values)})"
+    return "UNKNOWN"
+
+
 def format_trace(result: RunResult) -> str:
     case = result.oracle_input
     lines = [
@@ -62,28 +73,46 @@ def format_trace(result: RunResult) -> str:
         "",
         "T1",
         f"result: {case.t1_result.value}",
-        "",
-        "T2",
-        f"fixture_claims_authority: {str(case.t2_creates_authority).lower()}",
-        "authority_created: false",
     ]
+    t1_binding_fact_names = (
+        *OBJECTIVE_BINDING_FACTS,
+        *(
+            ("contract_transformation_binding",)
+            if case.t1_binding_facts.raw["contract_transformation_binding"].state
+            is not FactState.UNKNOWN
+            else ()
+        ),
+    )
+    for name in t1_binding_fact_names:
+        lines.append(f"{name}: {_render_fact(case.t1_binding_facts.raw[name])}")
+    lines.extend(
+        (
+            "",
+            "T2",
+            f"fixture_claims_authority: {str(case.t2_creates_authority).lower()}",
+            "authority_created: false",
+        )
+    )
     for mutation in case.t2_mutations:
         lines.append(f"{mutation.field}: {mutation.before} -> {mutation.after}")
     lines.extend(("", "T3"))
     required_facts = tuple(
-        dict.fromkeys((*MANDATORY_T3_FACTS, *case.required_facts, *case.required_values))
+        dict.fromkeys(
+            (
+                *MANDATORY_T3_FACTS,
+                *case.required_facts,
+                *case.required_values,
+                *(
+                    ("contract_transformation_binding",)
+                    if "contract_transformation_binding" in case.facts
+                    else ()
+                ),
+            )
+        )
     )
     for name in required_facts:
         fact = case.facts.get(name)
-        if fact is None:
-            rendered = "UNKNOWN"
-        elif fact.state is FactState.KNOWN:
-            rendered = f"KNOWN({fact.value})"
-        elif fact.state is FactState.CONFLICTING:
-            rendered = f"CONFLICTING({','.join(str(value) for value in fact.values)})"
-        else:
-            rendered = "UNKNOWN"
-        lines.append(f"{name}: {rendered}")
+        lines.append(f"{name}: {_render_fact(fact)}")
     lines.extend(
         (
             "",

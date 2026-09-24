@@ -1,38 +1,554 @@
 {
-  "schema_version": "authority-lab-v0",
+  "schema_version": "authority-lab-v1",
   "case_id": "LAB-V0-006",
   "source_case_id": "GT-CASE-012",
   "title": "Monitor remains in E1 while actor escapes",
   "objective": "Test locally valid monitoring after the acting lineage leaves monitor coverage.",
-  "authority_tuple": {"subject": "S", "artifact": "A", "control_state": "E2", "identity_basis": "I1", "boundary_epoch": "B1", "decision": "AUTHORIZED"},
-  "t1": {"result": "AUTHORIZED", "evidence": ["MONITOR-E1-PASS"], "authority_state": {"subject": "S", "artifact": "A", "control_state": "E1", "identity_basis": "I1", "boundary_epoch": "B1", "decision": "AUTHORIZED", "evidence_id": "MONITOR-E1-PASS", "execution_context": "E1", "applicable_boundary": "AUTH-BOUNDARY-1", "grant_id": "GRANT-006-E1", "consumption_state": "UNUSED", "subject_mode": "DIRECT"}},
-  "t2": {"creates_authority": false, "mutations": [{"field": "actor_context", "before": "E1", "after": "E2"}, {"field": "monitor_context", "before": "E1", "after": "E1"}]},
+  "authority_tuple": {
+    "subject": "S",
+    "artifact": "A",
+    "control_state": "E2",
+    "identity_basis": "I1",
+    "boundary_epoch": "B1",
+    "decision": "AUTHORIZED"
+  },
+  "t1": {
+    "result": "AUTHORIZED",
+    "evidence": [
+      "MONITOR-E1-PASS"
+    ],
+    "authority_state": {
+      "subject": "S",
+      "artifact": "A",
+      "control_state": "E1",
+      "identity_basis": "I1",
+      "boundary_epoch": "B1",
+      "decision": "AUTHORIZED",
+      "evidence_id": "MONITOR-E1-PASS",
+      "execution_context": "E1",
+      "applicable_boundary": "AUTH-BOUNDARY-1",
+      "grant_id": "GRANT-006-E1",
+      "consumption_state": "UNUSED",
+      "subject_mode": "DIRECT"
+    },
+    "binding_facts": {
+      "objective_identity": {
+        "state": "KNOWN",
+        "value": {
+          "objective_id": "OBJECTIVE-LAB-V0-006-T1",
+          "objective_generation": 1,
+          "policy_id": "POLICY-LAB-V0-006-T1",
+          "policy_version": "1"
+        }
+      },
+      "decision_contract_identity": {
+        "state": "KNOWN",
+        "value": {
+          "contract_id": "CONTRACT-LAB-V0-006",
+          "contract_version": "1",
+          "schema_id": "AUTHORITY-CONTRACT-SCHEMA-1",
+          "derived_from": "NONE"
+        }
+      },
+      "authority_root": {
+        "state": "KNOWN",
+        "value": {
+          "root_id": "ROOT-AUTH-BOUNDARY-1",
+          "boundary": "AUTH-BOUNDARY-1",
+          "boundary_epoch": "B1",
+          "lineage": "LINEAGE-AUTH-BOUNDARY-1",
+          "authority_generation": 1,
+          "ordering_source_id": "ORDER-AUTH-BOUNDARY-1"
+        }
+      },
+      "objective_binding": {
+        "state": "KNOWN",
+        "value": [
+          {
+            "binding_id": "BINDING-LAB-V0-006-T1",
+            "disposition": "ADMIT",
+            "objective_id": "OBJECTIVE-LAB-V0-006-T1",
+            "objective_generation": 1,
+            "contract_id": "CONTRACT-LAB-V0-006",
+            "contract_version": "1",
+            "schema_id": "AUTHORITY-CONTRACT-SCHEMA-1",
+            "source_id": "ROOT-AUTH-BOUNDARY-1",
+            "authority_generation": 1,
+            "binding_generation": 1,
+            "lineage": "LINEAGE-AUTH-BOUNDARY-1",
+            "policy_id": "POLICY-LAB-V0-006-T1",
+            "policy_version": "1",
+            "producer_kind": "AUTHORITY_ROOT",
+            "producer_id": "ROOT-AUTH-BOUNDARY-1",
+            "scope": {
+              "subject": "S",
+              "artifact": "A",
+              "control_state": "E1",
+              "identity_basis": "I1",
+              "boundary_epoch": "B1",
+              "decision": "AUTHORIZED",
+              "applicable_boundary": "AUTH-BOUNDARY-1"
+            }
+          }
+        ]
+      },
+      "binding_source_authority": {
+        "state": "KNOWN",
+        "value": [
+          {
+            "relationship": "ROOT",
+            "root_id": "ROOT-AUTH-BOUNDARY-1",
+            "source_id": "ROOT-AUTH-BOUNDARY-1",
+            "delegation_id": "NONE",
+            "authority_generation": 1,
+            "boundary": "AUTH-BOUNDARY-1",
+            "boundary_epoch": "B1",
+            "lineage": "LINEAGE-AUTH-BOUNDARY-1",
+            "status": "ACTIVE",
+            "scope": {
+              "subject": "S",
+              "artifact": "A",
+              "control_state": "E1",
+              "identity_basis": "I1",
+              "boundary_epoch": "B1",
+              "decision": "AUTHORIZED",
+              "applicable_boundary": "AUTH-BOUNDARY-1"
+            }
+          }
+        ]
+      },
+      "binding_lifecycle": {
+        "state": "KNOWN",
+        "value": [
+          {
+            "binding_id": "BINDING-LAB-V0-006-T1",
+            "binding_generation": 1,
+            "state": "ACTIVE",
+            "event_id": "EVENT-LAB-V0-006-T1-1",
+            "event_order": 1,
+            "source_id": "ROOT-AUTH-BOUNDARY-1",
+            "authority_generation": 1,
+            "lineage": "LINEAGE-AUTH-BOUNDARY-1"
+          }
+        ]
+      },
+      "binding_ordering": {
+        "state": "KNOWN",
+        "value": {
+          "ordering_source_id": "ORDER-AUTH-BOUNDARY-1",
+          "lineage": "LINEAGE-AUTH-BOUNDARY-1",
+          "authority_generation": 1,
+          "head_binding_id": "BINDING-LAB-V0-006-T1",
+          "head_binding_generation": 1,
+          "head_event_order": 1
+        }
+      }
+    }
+  },
+  "t2": {
+    "creates_authority": false,
+    "mutations": [
+      {
+        "field": "actor_context",
+        "before": "E1",
+        "after": "E2"
+      },
+      {
+        "field": "monitor_context",
+        "before": "E1",
+        "after": "E1"
+      },
+      {
+        "field": "objective_binding",
+        "before": [
+          {
+            "binding_id": "BINDING-LAB-V0-006-T1",
+            "disposition": "ADMIT",
+            "objective_id": "OBJECTIVE-LAB-V0-006-T1",
+            "objective_generation": 1,
+            "contract_id": "CONTRACT-LAB-V0-006",
+            "contract_version": "1",
+            "schema_id": "AUTHORITY-CONTRACT-SCHEMA-1",
+            "source_id": "ROOT-AUTH-BOUNDARY-1",
+            "authority_generation": 1,
+            "binding_generation": 1,
+            "lineage": "LINEAGE-AUTH-BOUNDARY-1",
+            "policy_id": "POLICY-LAB-V0-006-T1",
+            "policy_version": "1",
+            "producer_kind": "AUTHORITY_ROOT",
+            "producer_id": "ROOT-AUTH-BOUNDARY-1",
+            "scope": {
+              "subject": "S",
+              "artifact": "A",
+              "control_state": "E1",
+              "identity_basis": "I1",
+              "boundary_epoch": "B1",
+              "decision": "AUTHORIZED",
+              "applicable_boundary": "AUTH-BOUNDARY-1"
+            }
+          }
+        ],
+        "after": [
+          {
+            "binding_id": "BINDING-LAB-V0-006-T3",
+            "disposition": "ADMIT",
+            "objective_id": "OBJECTIVE-LAB-V0-006-T1",
+            "objective_generation": 1,
+            "contract_id": "CONTRACT-LAB-V0-006",
+            "contract_version": "1",
+            "schema_id": "AUTHORITY-CONTRACT-SCHEMA-1",
+            "source_id": "ROOT-AUTH-BOUNDARY-1",
+            "authority_generation": 1,
+            "binding_generation": 1,
+            "lineage": "LINEAGE-AUTH-BOUNDARY-1",
+            "policy_id": "POLICY-LAB-V0-006-T1",
+            "policy_version": "1",
+            "producer_kind": "AUTHORITY_ROOT",
+            "producer_id": "ROOT-AUTH-BOUNDARY-1",
+            "scope": {
+              "subject": "S",
+              "artifact": "A",
+              "control_state": "E2",
+              "identity_basis": "I1",
+              "boundary_epoch": "B1",
+              "decision": "AUTHORIZED",
+              "applicable_boundary": "AUTH-BOUNDARY-1"
+            }
+          }
+        ]
+      },
+      {
+        "field": "binding_source_authority",
+        "before": [
+          {
+            "relationship": "ROOT",
+            "root_id": "ROOT-AUTH-BOUNDARY-1",
+            "source_id": "ROOT-AUTH-BOUNDARY-1",
+            "delegation_id": "NONE",
+            "authority_generation": 1,
+            "boundary": "AUTH-BOUNDARY-1",
+            "boundary_epoch": "B1",
+            "lineage": "LINEAGE-AUTH-BOUNDARY-1",
+            "status": "ACTIVE",
+            "scope": {
+              "subject": "S",
+              "artifact": "A",
+              "control_state": "E1",
+              "identity_basis": "I1",
+              "boundary_epoch": "B1",
+              "decision": "AUTHORIZED",
+              "applicable_boundary": "AUTH-BOUNDARY-1"
+            }
+          }
+        ],
+        "after": [
+          {
+            "relationship": "ROOT",
+            "root_id": "ROOT-AUTH-BOUNDARY-1",
+            "source_id": "ROOT-AUTH-BOUNDARY-1",
+            "delegation_id": "NONE",
+            "authority_generation": 1,
+            "boundary": "AUTH-BOUNDARY-1",
+            "boundary_epoch": "B1",
+            "lineage": "LINEAGE-AUTH-BOUNDARY-1",
+            "status": "ACTIVE",
+            "scope": {
+              "subject": "S",
+              "artifact": "A",
+              "control_state": "E2",
+              "identity_basis": "I1",
+              "boundary_epoch": "B1",
+              "decision": "AUTHORIZED",
+              "applicable_boundary": "AUTH-BOUNDARY-1"
+            }
+          }
+        ]
+      },
+      {
+        "field": "binding_lifecycle",
+        "before": [
+          {
+            "binding_id": "BINDING-LAB-V0-006-T1",
+            "binding_generation": 1,
+            "state": "ACTIVE",
+            "event_id": "EVENT-LAB-V0-006-T1-1",
+            "event_order": 1,
+            "source_id": "ROOT-AUTH-BOUNDARY-1",
+            "authority_generation": 1,
+            "lineage": "LINEAGE-AUTH-BOUNDARY-1"
+          }
+        ],
+        "after": [
+          {
+            "binding_id": "BINDING-LAB-V0-006-T3",
+            "binding_generation": 1,
+            "state": "ACTIVE",
+            "event_id": "EVENT-LAB-V0-006-T3-1",
+            "event_order": 1,
+            "source_id": "ROOT-AUTH-BOUNDARY-1",
+            "authority_generation": 1,
+            "lineage": "LINEAGE-AUTH-BOUNDARY-1"
+          }
+        ]
+      },
+      {
+        "field": "binding_ordering",
+        "before": {
+          "ordering_source_id": "ORDER-AUTH-BOUNDARY-1",
+          "lineage": "LINEAGE-AUTH-BOUNDARY-1",
+          "authority_generation": 1,
+          "head_binding_id": "BINDING-LAB-V0-006-T1",
+          "head_binding_generation": 1,
+          "head_event_order": 1
+        },
+        "after": {
+          "ordering_source_id": "ORDER-AUTH-BOUNDARY-1",
+          "lineage": "LINEAGE-AUTH-BOUNDARY-1",
+          "authority_generation": 1,
+          "head_binding_id": "BINDING-LAB-V0-006-T3",
+          "head_binding_generation": 1,
+          "head_event_order": 1
+        }
+      }
+    ]
+  },
   "t3": {
     "facts": {
-      "subject_identity": {"state": "KNOWN", "value": "S"},
-      "artifact_identity": {"state": "KNOWN", "value": "A"},
-      "control_state": {"state": "KNOWN", "value": "E2"},
-      "identity_basis": {"state": "KNOWN", "value": "I1"},
-      "boundary_epoch": {"state": "KNOWN", "value": "B1"},
-      "decision_binding": {"state": "KNOWN", "value": "MONITOR-E1-PASS"},
-      "applicable_boundary": {"state": "KNOWN", "value": "AUTH-BOUNDARY-1"},
-      "evidence_binding": {"state": "KNOWN", "value": "CURRENT"},
-      "execution_context": {"state": "UNKNOWN"},
-      "freshness": {"state": "KNOWN", "value": "CURRENT"},
-      "monitor_coverage": {"state": "UNKNOWN"},
-      "consumption_state": {"state": "KNOWN", "value": "UNUSED"},
-      "boundary_epoch_binding": {"state": "KNOWN", "value": {"applicable_boundary": "AUTH-BOUNDARY-1", "boundary_epoch": "B1"}},
-      "execution_control_binding": {"state": "UNKNOWN"},
-      "consumption_binding": {"state": "KNOWN", "value": {"grant_id": "GRANT-006-E1", "subject": "S", "artifact": "A", "boundary_epoch": "B1"}},
-      "delegation_binding": {"state": "KNOWN", "value": {"relationship": "DIRECT", "subject": "S", "artifact": "A", "control_state": "E2", "boundary_epoch": "B1", "applicable_boundary": "AUTH-BOUNDARY-1"}},
-      "closure_binding": {"state": "KNOWN", "value": {"relationship": "EXACT_EFFECT", "source_artifact": "A", "target_artifact": "A"}}
+      "subject_identity": {
+        "state": "KNOWN",
+        "value": "S"
+      },
+      "artifact_identity": {
+        "state": "KNOWN",
+        "value": "A"
+      },
+      "control_state": {
+        "state": "KNOWN",
+        "value": "E2"
+      },
+      "identity_basis": {
+        "state": "KNOWN",
+        "value": "I1"
+      },
+      "boundary_epoch": {
+        "state": "KNOWN",
+        "value": "B1"
+      },
+      "decision_binding": {
+        "state": "KNOWN",
+        "value": "MONITOR-E1-PASS"
+      },
+      "applicable_boundary": {
+        "state": "KNOWN",
+        "value": "AUTH-BOUNDARY-1"
+      },
+      "evidence_binding": {
+        "state": "KNOWN",
+        "value": "CURRENT"
+      },
+      "execution_context": {
+        "state": "UNKNOWN"
+      },
+      "freshness": {
+        "state": "KNOWN",
+        "value": "CURRENT"
+      },
+      "monitor_coverage": {
+        "state": "UNKNOWN"
+      },
+      "consumption_state": {
+        "state": "KNOWN",
+        "value": "UNUSED"
+      },
+      "boundary_epoch_binding": {
+        "state": "KNOWN",
+        "value": {
+          "applicable_boundary": "AUTH-BOUNDARY-1",
+          "boundary_epoch": "B1"
+        }
+      },
+      "execution_control_binding": {
+        "state": "UNKNOWN"
+      },
+      "consumption_binding": {
+        "state": "KNOWN",
+        "value": {
+          "grant_id": "GRANT-006-E1",
+          "subject": "S",
+          "artifact": "A",
+          "boundary_epoch": "B1"
+        }
+      },
+      "delegation_binding": {
+        "state": "KNOWN",
+        "value": {
+          "relationship": "DIRECT",
+          "subject": "S",
+          "artifact": "A",
+          "control_state": "E2",
+          "boundary_epoch": "B1",
+          "applicable_boundary": "AUTH-BOUNDARY-1"
+        }
+      },
+      "closure_binding": {
+        "state": "KNOWN",
+        "value": {
+          "relationship": "EXACT_EFFECT",
+          "source_artifact": "A",
+          "target_artifact": "A"
+        }
+      },
+      "objective_identity": {
+        "state": "KNOWN",
+        "value": {
+          "objective_id": "OBJECTIVE-LAB-V0-006-T1",
+          "objective_generation": 1,
+          "policy_id": "POLICY-LAB-V0-006-T1",
+          "policy_version": "1"
+        }
+      },
+      "decision_contract_identity": {
+        "state": "KNOWN",
+        "value": {
+          "contract_id": "CONTRACT-LAB-V0-006",
+          "contract_version": "1",
+          "schema_id": "AUTHORITY-CONTRACT-SCHEMA-1",
+          "derived_from": "NONE"
+        }
+      },
+      "authority_root": {
+        "state": "KNOWN",
+        "value": {
+          "root_id": "ROOT-AUTH-BOUNDARY-1",
+          "boundary": "AUTH-BOUNDARY-1",
+          "boundary_epoch": "B1",
+          "lineage": "LINEAGE-AUTH-BOUNDARY-1",
+          "authority_generation": 1,
+          "ordering_source_id": "ORDER-AUTH-BOUNDARY-1"
+        }
+      },
+      "objective_binding": {
+        "state": "KNOWN",
+        "value": [
+          {
+            "binding_id": "BINDING-LAB-V0-006-T3",
+            "disposition": "ADMIT",
+            "objective_id": "OBJECTIVE-LAB-V0-006-T1",
+            "objective_generation": 1,
+            "contract_id": "CONTRACT-LAB-V0-006",
+            "contract_version": "1",
+            "schema_id": "AUTHORITY-CONTRACT-SCHEMA-1",
+            "source_id": "ROOT-AUTH-BOUNDARY-1",
+            "authority_generation": 1,
+            "binding_generation": 1,
+            "lineage": "LINEAGE-AUTH-BOUNDARY-1",
+            "policy_id": "POLICY-LAB-V0-006-T1",
+            "policy_version": "1",
+            "producer_kind": "AUTHORITY_ROOT",
+            "producer_id": "ROOT-AUTH-BOUNDARY-1",
+            "scope": {
+              "subject": "S",
+              "artifact": "A",
+              "control_state": "E2",
+              "identity_basis": "I1",
+              "boundary_epoch": "B1",
+              "decision": "AUTHORIZED",
+              "applicable_boundary": "AUTH-BOUNDARY-1"
+            }
+          }
+        ]
+      },
+      "binding_source_authority": {
+        "state": "KNOWN",
+        "value": [
+          {
+            "relationship": "ROOT",
+            "root_id": "ROOT-AUTH-BOUNDARY-1",
+            "source_id": "ROOT-AUTH-BOUNDARY-1",
+            "delegation_id": "NONE",
+            "authority_generation": 1,
+            "boundary": "AUTH-BOUNDARY-1",
+            "boundary_epoch": "B1",
+            "lineage": "LINEAGE-AUTH-BOUNDARY-1",
+            "status": "ACTIVE",
+            "scope": {
+              "subject": "S",
+              "artifact": "A",
+              "control_state": "E2",
+              "identity_basis": "I1",
+              "boundary_epoch": "B1",
+              "decision": "AUTHORIZED",
+              "applicable_boundary": "AUTH-BOUNDARY-1"
+            }
+          }
+        ]
+      },
+      "binding_lifecycle": {
+        "state": "KNOWN",
+        "value": [
+          {
+            "binding_id": "BINDING-LAB-V0-006-T3",
+            "binding_generation": 1,
+            "state": "ACTIVE",
+            "event_id": "EVENT-LAB-V0-006-T3-1",
+            "event_order": 1,
+            "source_id": "ROOT-AUTH-BOUNDARY-1",
+            "authority_generation": 1,
+            "lineage": "LINEAGE-AUTH-BOUNDARY-1"
+          }
+        ]
+      },
+      "binding_ordering": {
+        "state": "KNOWN",
+        "value": {
+          "ordering_source_id": "ORDER-AUTH-BOUNDARY-1",
+          "lineage": "LINEAGE-AUTH-BOUNDARY-1",
+          "authority_generation": 1,
+          "head_binding_id": "BINDING-LAB-V0-006-T3",
+          "head_binding_generation": 1,
+          "head_event_order": 1
+        }
+      }
     },
-    "required_facts": ["subject_identity", "artifact_identity", "control_state", "identity_basis", "boundary_epoch", "decision_binding", "applicable_boundary", "execution_context", "monitor_coverage", "consumption_state"],
-    "required_values": {"subject_identity": "S", "artifact_identity": "A", "control_state": "E2", "identity_basis": "I1", "boundary_epoch": "B1", "decision_binding": "MONITOR-E1-PASS", "applicable_boundary": "AUTH-BOUNDARY-1", "evidence_binding": "CURRENT", "execution_context": "E2", "freshness": "CURRENT", "consumption_state": "UNUSED", "monitor_coverage": "COMPLETE"},
-    "prohibition": {"state": "KNOWN", "applies": false, "id": "none"},
+    "required_facts": [
+      "subject_identity",
+      "artifact_identity",
+      "control_state",
+      "identity_basis",
+      "boundary_epoch",
+      "decision_binding",
+      "applicable_boundary",
+      "execution_context",
+      "monitor_coverage",
+      "consumption_state"
+    ],
+    "required_values": {
+      "subject_identity": "S",
+      "artifact_identity": "A",
+      "control_state": "E2",
+      "identity_basis": "I1",
+      "boundary_epoch": "B1",
+      "decision_binding": "MONITOR-E1-PASS",
+      "applicable_boundary": "AUTH-BOUNDARY-1",
+      "evidence_binding": "CURRENT",
+      "execution_context": "E2",
+      "freshness": "CURRENT",
+      "consumption_state": "UNUSED",
+      "monitor_coverage": "COMPLETE"
+    },
+    "prohibition": {
+      "state": "KNOWN",
+      "applies": false,
+      "id": "none"
+    },
     "authority_question": "Does the E1 monitor report establish authority for the actor in E2?"
   },
-  "applicable_invariants": ["INV-EVD", "INV-CONT", "INV-BND", "INV-DISC"],
+  "applicable_invariants": [
+    "INV-EVD",
+    "INV-CONT",
+    "INV-BND",
+    "INV-DISC"
+  ],
   "expected_outcome": "UNAVAILABLE",
   "expected_reason": "Actor continuity and monitor coverage are not established.",
   "notes": "Derived from GT-CASE-012."

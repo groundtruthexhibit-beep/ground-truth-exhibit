@@ -34,6 +34,49 @@ def actual(payload: dict) -> AuthorityOutcome:
     return evaluate(OracleInput.from_fixture(payload)).outcome
 
 
+def rebind_objective_binding(payload: dict, *, suffix: str) -> dict:
+    """Create exact current binding relations for a changed test authority scope."""
+    facts = payload["t3"]["facts"]
+    scope = {
+        "subject": payload["authority_tuple"]["subject"],
+        "artifact": payload["authority_tuple"]["artifact"],
+        "control_state": payload["authority_tuple"]["control_state"],
+        "identity_basis": payload["authority_tuple"]["identity_basis"],
+        "boundary_epoch": payload["authority_tuple"]["boundary_epoch"],
+        "decision": payload["authority_tuple"]["decision"],
+        "applicable_boundary": facts["applicable_boundary"]["value"],
+    }
+    before_values = {
+        name: deepcopy(facts[name]["value"])
+        for name in (
+            "objective_binding",
+            "binding_source_authority",
+            "binding_lifecycle",
+            "binding_ordering",
+        )
+    }
+    binding = facts["objective_binding"]["value"][0]
+    binding["binding_id"] = f"{binding['binding_id']}-{suffix}"
+    binding["scope"] = deepcopy(scope)
+    source = facts["binding_source_authority"]["value"][0]
+    source["scope"] = deepcopy(scope)
+    lifecycle = facts["binding_lifecycle"]["value"][0]
+    lifecycle.update(
+        {
+            "binding_id": binding["binding_id"],
+            "event_id": f"{lifecycle['event_id']}-{suffix}",
+        }
+    )
+    facts["binding_ordering"]["value"]["head_binding_id"] = binding["binding_id"]
+    for name, before in before_values.items():
+        after = deepcopy(facts[name]["value"])
+        if before != after:
+            payload["t2"]["mutations"].append(
+                {"field": name, "before": before, "after": after}
+            )
+    return payload
+
+
 def reestablish_artifact(
     payload: dict,
     *,
@@ -100,6 +143,7 @@ def reestablish_artifact(
                 "current": deepcopy(current),
             },
         }
+    rebind_objective_binding(payload, suffix="CURRENT-SCOPE")
     return payload
 
 
@@ -142,9 +186,9 @@ class AuthorityLabTests(unittest.TestCase):
         self.assertIs(AuthorityOutcome.UNAVAILABLE, result.outcome)
         self.assertIn(reason_code, {reason.code for reason in result.reasons})
 
-    def test_v0_contains_twelve_deterministic_fixtures(self) -> None:
+    def test_v1_contains_thirty_two_deterministic_fixtures(self) -> None:
         paths = discover(CASES)
-        self.assertEqual(12, len(paths))
+        self.assertEqual(32, len(paths))
         self.assertEqual(paths, discover(CASES))
 
     def test_every_v0_fixture_matches_its_expected_outcome(self) -> None:
@@ -365,6 +409,7 @@ class AuthorityLabTests(unittest.TestCase):
                 },
             },
         }
+        rebind_objective_binding(authorized, suffix="E2")
         self.assertIs(AuthorityOutcome.AUTHORIZED, actual(authorized))
 
     def test_exact_tuple_and_invariant_sets_are_frozen(self) -> None:
@@ -376,7 +421,7 @@ class AuthorityLabTests(unittest.TestCase):
             ("INV-CONT", "INV-DISC", "INV-BND", "INV-EVD", "INV-USE", "INV-CLO"),
             INVARIANTS,
         )
-        self.assertEqual(16, len(MANDATORY_T3_FACTS))
+        self.assertEqual(23, len(MANDATORY_T3_FACTS))
 
     def test_artifact_rebinding_cannot_reuse_old_evidence(self) -> None:
         payload = fixture("LAB-V0-001")
@@ -705,6 +750,300 @@ class AuthorityLabTests(unittest.TestCase):
         payload = fixture("LAB-V0-001")
         payload["t3"]["facts"]["artifact_identity"]["value"] = "OTHER"
         self.assertIs(AuthorityOutcome.UNAVAILABLE, actual(payload))
+
+    def test_every_maintained_fixture_is_migrated_to_v1(self) -> None:
+        for path in discover(CASES):
+            with self.subTest(path=path.name):
+                self.assertEqual("authority-lab-v1", load_fixture(path)["schema_version"])
+
+    def test_unmigrated_v0_schema_cannot_authorize(self) -> None:
+        payload = fixture("LAB-V0-001")
+        payload["schema_version"] = "authority-lab-v0"
+        self.assert_unavailable_with_reason(payload, "LEGACY_SCHEMA_UNAVAILABLE")
+
+    def test_unknown_schema_version_fails_closed(self) -> None:
+        payload = fixture("LAB-V0-001")
+        payload["schema_version"] = "authority-lab-v2"
+        with self.assertRaisesRegex(ValueError, "unsupported fixture schema_version"):
+            OracleInput.from_fixture(payload)
+
+    def test_binding_valid_shortcut_is_rejected(self) -> None:
+        payload = fixture("LAB-V1-032")
+        payload["t3"]["facts"]["objective_binding"]["value"][0][
+            "binding_valid"
+        ] = True
+        with self.assertRaisesRegex(ValueError, "objective_binding candidate"):
+            OracleInput.from_fixture(payload)
+
+    def test_boolean_generation_is_rejected(self) -> None:
+        payload = fixture("LAB-V1-032")
+        payload["t3"]["facts"]["objective_binding"]["value"][0][
+            "binding_generation"
+        ] = True
+        with self.assertRaisesRegex(ValueError, "non-negative integer"):
+            OracleInput.from_fixture(payload)
+
+    def test_missing_binding_is_unavailable(self) -> None:
+        self.assertIs(AuthorityOutcome.UNAVAILABLE, actual(fixture("LAB-V1-013")))
+
+    def test_unknown_binding_source_authority_is_unavailable(self) -> None:
+        self.assertIs(AuthorityOutcome.UNAVAILABLE, actual(fixture("LAB-V1-014")))
+
+    def test_unordered_binding_conflict_is_unavailable(self) -> None:
+        self.assertIs(AuthorityOutcome.UNAVAILABLE, actual(fixture("LAB-V1-015")))
+
+    def test_revoked_binding_is_denied(self) -> None:
+        self.assertIs(AuthorityOutcome.DENIED, actual(fixture("LAB-V1-016")))
+
+    def test_superseding_rejection_is_denied(self) -> None:
+        self.assertIs(AuthorityOutcome.DENIED, actual(fixture("LAB-V1-017")))
+
+    def test_t1_binding_revoked_at_t2_is_denied_at_t3(self) -> None:
+        payload = fixture("LAB-V1-018")
+        self.assertTrue(
+            any(mutation["field"] == "binding_lifecycle" for mutation in payload["t2"]["mutations"])
+        )
+        self.assertIs(AuthorityOutcome.DENIED, actual(payload))
+
+    def test_binding_producers_cannot_establish_source_authority(self) -> None:
+        for case_id in ("LAB-V1-019", "LAB-V1-020", "LAB-V1-021"):
+            with self.subTest(case_id=case_id):
+                self.assertIs(AuthorityOutcome.UNAVAILABLE, actual(fixture(case_id)))
+
+    def test_verifier_pass_without_binding_is_unavailable(self) -> None:
+        self.assertIs(AuthorityOutcome.UNAVAILABLE, actual(fixture("LAB-V1-022")))
+
+    def test_signature_does_not_establish_source_authority(self) -> None:
+        payload = fixture("LAB-V1-023")
+        self.assertEqual("VALID", payload["t3"]["facts"]["signature"]["value"])
+        self.assertIs(AuthorityOutcome.UNAVAILABLE, actual(payload))
+
+    def test_provenance_and_consensus_do_not_launder_source_authority(self) -> None:
+        payload = fixture("LAB-V1-014")
+        payload["t3"]["facts"].update(
+            {
+                "provenance": {"state": "KNOWN", "value": "EXACT"},
+                "consensus": {"state": "KNOWN", "value": "UNANIMOUS"},
+            }
+        )
+        self.assertIs(AuthorityOutcome.UNAVAILABLE, actual(payload))
+
+    def test_model_producer_cannot_launder_an_authorized_root_identity(self) -> None:
+        payload = fixture("LAB-V1-032")
+        candidate = payload["t3"]["facts"]["objective_binding"]["value"][0]
+        before = deepcopy(payload["t3"]["facts"]["objective_binding"]["value"])
+        candidate["producer_kind"] = "MODEL"
+        candidate["producer_id"] = "MODEL-M"
+        payload["t2"]["mutations"].append(
+            {
+                "field": "objective_binding",
+                "before": before,
+                "after": deepcopy(
+                    payload["t3"]["facts"]["objective_binding"]["value"]
+                ),
+            }
+        )
+        self.assertIs(AuthorityOutcome.UNAVAILABLE, actual(payload))
+
+    def test_same_contract_under_wrong_objective_is_unavailable(self) -> None:
+        self.assertIs(AuthorityOutcome.UNAVAILABLE, actual(fixture("LAB-V1-024")))
+
+    def test_wrong_objective_generation_is_unavailable(self) -> None:
+        self.assertIs(AuthorityOutcome.UNAVAILABLE, actual(fixture("LAB-V1-025")))
+
+    def test_wrong_decision_contract_is_unavailable(self) -> None:
+        payload = fixture("LAB-V1-032")
+        payload["t3"]["facts"]["objective_binding"]["value"][0][
+            "contract_id"
+        ] = "OTHER-D"
+        self.assertIs(AuthorityOutcome.UNAVAILABLE, actual(payload))
+
+    def test_cross_boundary_binding_is_unavailable(self) -> None:
+        self.assertIs(AuthorityOutcome.UNAVAILABLE, actual(fixture("LAB-V1-026")))
+
+    def test_revoked_binding_delegate_is_denied(self) -> None:
+        self.assertIs(AuthorityOutcome.DENIED, actual(fixture("LAB-V1-027")))
+
+    def test_derived_contract_without_transformation_admission_is_unavailable(self) -> None:
+        self.assertIs(AuthorityOutcome.UNAVAILABLE, actual(fixture("LAB-V1-028")))
+
+    def test_exact_transformation_admission_can_authorize(self) -> None:
+        self.assertIs(AuthorityOutcome.AUTHORIZED, actual(fixture("LAB-V1-029")))
+
+    def test_stable_transformation_identity_cannot_hide_semantic_change(self) -> None:
+        payload = fixture("LAB-V1-029")
+        fact = payload["t3"]["facts"]["contract_transformation_binding"]
+        payload["t1"]["binding_facts"]["decision_contract_identity"] = deepcopy(
+            payload["t3"]["facts"]["decision_contract_identity"]
+        )
+        payload["t1"]["binding_facts"]["contract_transformation_binding"] = deepcopy(
+            fact
+        )
+        payload["t2"]["mutations"] = []
+        before = deepcopy(fact["value"])
+        fact["value"][0]["target_contract_version"] = "3"
+        payload["t3"]["facts"]["decision_contract_identity"]["value"][
+            "contract_version"
+        ] = "3"
+        payload["t2"]["mutations"].extend(
+            (
+                {
+                    "field": "contract_transformation_binding",
+                    "before": before,
+                    "after": deepcopy(fact["value"]),
+                },
+                {
+                    "field": "decision_contract_identity",
+                    "before": deepcopy(
+                        payload["t1"]["binding_facts"]["decision_contract_identity"][
+                            "value"
+                        ]
+                    ),
+                    "after": deepcopy(
+                        payload["t3"]["facts"]["decision_contract_identity"]["value"]
+                    ),
+                },
+            )
+        )
+        self.assert_unavailable_with_reason(
+            payload, "OBJECTIVE_BINDING_IDENTITY_REUSED"
+        )
+
+    def test_rollback_cannot_outrank_current_rejection(self) -> None:
+        self.assertIs(AuthorityOutcome.DENIED, actual(fixture("LAB-V1-030")))
+
+    def test_missing_authoritative_ordering_is_unavailable(self) -> None:
+        self.assertIs(AuthorityOutcome.UNAVAILABLE, actual(fixture("LAB-V1-031")))
+
+    def test_exact_objective_binding_positive_path_is_authorized(self) -> None:
+        self.assertIs(AuthorityOutcome.AUTHORIZED, actual(fixture("LAB-V1-032")))
+
+    def test_pr15_objective_fidelity_regression_has_three_outcomes(self) -> None:
+        self.assertIs(AuthorityOutcome.UNAVAILABLE, actual(fixture("LAB-V1-013")))
+        self.assertIs(AuthorityOutcome.DENIED, actual(fixture("LAB-V1-016")))
+        self.assertIs(AuthorityOutcome.AUTHORIZED, actual(fixture("LAB-V1-032")))
+
+    def test_cached_t1_binding_does_not_survive_unrecorded_t3_change(self) -> None:
+        payload = fixture("LAB-V1-032")
+        payload["t3"]["facts"]["objective_identity"]["value"][
+            "objective_generation"
+        ] = 2
+        payload["t3"]["facts"]["objective_binding"]["value"][0][
+            "objective_generation"
+        ] = 2
+        self.assert_unavailable_with_reason(
+            payload, "OBJECTIVE_BINDING_IDENTITY_REUSED"
+        )
+
+    def test_missing_t1_binding_cannot_be_repaired_only_at_t3(self) -> None:
+        payload = fixture("LAB-V1-032")
+        payload["t1"]["binding_facts"]["objective_binding"] = {"state": "UNKNOWN"}
+        self.assert_unavailable_with_reason(
+            payload, "T1_OBJECTIVE_BINDING_UNAVAILABLE"
+        )
+
+    def test_current_revocation_precedes_irrelevant_missing_operational_fact(self) -> None:
+        payload = fixture("LAB-V1-016")
+        payload["t3"]["facts"]["execution_context"] = {"state": "UNKNOWN"}
+        self.assertIs(AuthorityOutcome.DENIED, actual(payload))
+
+    def test_unknown_tuple_fact_prevents_speculative_binding_denial(self) -> None:
+        payload = fixture("LAB-V1-016")
+        payload["t3"]["facts"]["subject_identity"] = {"state": "UNKNOWN"}
+        self.assertIs(AuthorityOutcome.UNAVAILABLE, actual(payload))
+
+    def test_ordering_source_must_match_the_admitted_root(self) -> None:
+        payload = fixture("LAB-V1-032")
+        payload["t3"]["facts"]["binding_ordering"]["value"][
+            "ordering_source_id"
+        ] = "REQUESTER-ORDER"
+        self.assertIs(AuthorityOutcome.UNAVAILABLE, actual(payload))
+
+    def test_expected_outcome_remains_outside_v1_oracle_input(self) -> None:
+        payload = fixture("LAB-V1-032")
+        payload["expected_outcome"] = AuthorityOutcome.DENIED.value
+        result = run_fixture(payload)
+        self.assertIs(AuthorityOutcome.AUTHORIZED, result.actual.outcome)
+        self.assertIs(HarnessStatus.CASE_MISMATCH, result.status)
+
+    def test_newer_authoritatively_ordered_admission_can_authorize(self) -> None:
+        payload = fixture("LAB-V1-032")
+        facts = payload["t3"]["facts"]
+        before = {
+            name: deepcopy(facts[name]["value"])
+            for name in ("objective_binding", "binding_lifecycle", "binding_ordering")
+        }
+        old_binding = facts["objective_binding"]["value"][0]
+        new_binding = deepcopy(old_binding)
+        new_binding.update(
+            {
+                "binding_id": f"{old_binding['binding_id']}-G2",
+                "binding_generation": 2,
+            }
+        )
+        old_lifecycle = facts["binding_lifecycle"]["value"][0]
+        new_lifecycle = deepcopy(old_lifecycle)
+        new_lifecycle.update(
+            {
+                "binding_id": new_binding["binding_id"],
+                "binding_generation": 2,
+                "event_id": f"{old_lifecycle['event_id']}-G2",
+                "event_order": 2,
+            }
+        )
+        facts["objective_binding"]["value"] = [old_binding, new_binding]
+        facts["binding_lifecycle"]["value"] = [old_lifecycle, new_lifecycle]
+        facts["binding_ordering"]["value"].update(
+            {
+                "head_binding_id": new_binding["binding_id"],
+                "head_binding_generation": 2,
+                "head_event_order": 2,
+            }
+        )
+        for name, old_value in before.items():
+            payload["t2"]["mutations"].append(
+                {
+                    "field": name,
+                    "before": old_value,
+                    "after": deepcopy(facts[name]["value"]),
+                }
+            )
+        self.assertIs(AuthorityOutcome.AUTHORIZED, actual(payload))
+
+    def test_stable_binding_identity_cannot_hide_policy_change(self) -> None:
+        payload = fixture("LAB-V1-032")
+        facts = payload["t3"]["facts"]
+        for name in ("objective_identity", "objective_binding"):
+            before = deepcopy(facts[name]["value"])
+            if name == "objective_identity":
+                facts[name]["value"]["policy_version"] = "2"
+            else:
+                facts[name]["value"][0]["policy_version"] = "2"
+            payload["t2"]["mutations"].append(
+                {
+                    "field": name,
+                    "before": before,
+                    "after": deepcopy(facts[name]["value"]),
+                }
+            )
+        self.assert_unavailable_with_reason(
+            payload, "OBJECTIVE_BINDING_IDENTITY_REUSED"
+        )
+
+    def test_candidate_array_order_cannot_overrule_authoritative_head(self) -> None:
+        payload = fixture("LAB-V1-030")
+        self.assertEqual(
+            "REJECT",
+            payload["t3"]["facts"]["objective_binding"]["value"][0][
+                "disposition"
+            ],
+        )
+        self.assertIs(AuthorityOutcome.DENIED, actual(payload))
+
+    def test_v1_trace_includes_t1_and_transformation_admission_facts(self) -> None:
+        trace = format_trace(run_path(CASES / "LAB-V1-029.json"))
+        self.assertIn("T1\nresult: AUTHORIZED\nobjective_identity: KNOWN", trace)
+        self.assertIn("contract_transformation_binding: KNOWN", trace)
 
     def test_oracle_execution_requires_no_network(self) -> None:
         with patch("socket.socket", side_effect=AssertionError("network access attempted")):

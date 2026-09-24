@@ -1,9 +1,9 @@
 {
   "schema_version": "authority-lab-v1",
-  "case_id": "LAB-V0-007",
-  "source_case_id": "GT-CASE-011",
-  "title": "Cached authorization after boundary epoch change",
-  "objective": "Test whether a historical cached decision can become current after epoch drift.",
+  "case_id": "LAB-V1-015",
+  "source_case_id": "PR-15-OBJECTIVE-BINDING",
+  "title": "Conflicting bindings without ordering",
+  "objective": "Conflicting admit and reject candidates cannot be resolved without authoritative ordering.",
   "authority_tuple": {
     "subject": "S",
     "artifact": "A",
@@ -15,7 +15,7 @@
   "t1": {
     "result": "AUTHORIZED",
     "evidence": [
-      "CACHE-D1-B1"
+      "EV-A-B1"
     ],
     "authority_state": {
       "subject": "S",
@@ -24,10 +24,10 @@
       "identity_basis": "I1",
       "boundary_epoch": "B1",
       "decision": "AUTHORIZED",
-      "evidence_id": "CACHE-D1-B1",
+      "evidence_id": "EV-A-B1",
       "execution_context": "E1",
       "applicable_boundary": "AUTH-BOUNDARY-1",
-      "grant_id": "GRANT-007-B1",
+      "grant_id": "GRANT-001",
       "consumption_state": "UNUSED",
       "subject_mode": "DIRECT"
     },
@@ -35,16 +35,16 @@
       "objective_identity": {
         "state": "KNOWN",
         "value": {
-          "objective_id": "OBJECTIVE-LAB-V0-007",
+          "objective_id": "OBJECTIVE-LAB-V1-015",
           "objective_generation": 1,
-          "policy_id": "POLICY-LAB-V0-007",
+          "policy_id": "POLICY-LAB-V1-015",
           "policy_version": "1"
         }
       },
       "decision_contract_identity": {
         "state": "KNOWN",
         "value": {
-          "contract_id": "CONTRACT-LAB-V0-007",
+          "contract_id": "CONTRACT-LAB-V1-015",
           "contract_version": "1",
           "schema_id": "AUTHORITY-CONTRACT-SCHEMA-1",
           "derived_from": "NONE"
@@ -65,18 +65,18 @@
         "state": "KNOWN",
         "value": [
           {
-            "binding_id": "BINDING-LAB-V0-007",
+            "binding_id": "BINDING-LAB-V1-015",
             "disposition": "ADMIT",
-            "objective_id": "OBJECTIVE-LAB-V0-007",
+            "objective_id": "OBJECTIVE-LAB-V1-015",
             "objective_generation": 1,
-            "contract_id": "CONTRACT-LAB-V0-007",
+            "contract_id": "CONTRACT-LAB-V1-015",
             "contract_version": "1",
             "schema_id": "AUTHORITY-CONTRACT-SCHEMA-1",
             "source_id": "ROOT-AUTH-BOUNDARY-1",
             "authority_generation": 1,
             "binding_generation": 1,
             "lineage": "LINEAGE-AUTH-BOUNDARY-1",
-            "policy_id": "POLICY-LAB-V0-007",
+            "policy_id": "POLICY-LAB-V1-015",
             "policy_version": "1",
             "producer_kind": "AUTHORITY_ROOT",
             "producer_id": "ROOT-AUTH-BOUNDARY-1",
@@ -121,10 +121,10 @@
         "state": "KNOWN",
         "value": [
           {
-            "binding_id": "BINDING-LAB-V0-007",
+            "binding_id": "BINDING-LAB-V1-015",
             "binding_generation": 1,
             "state": "ACTIVE",
-            "event_id": "EVENT-LAB-V0-007-1",
+            "event_id": "EVENT-LAB-V1-015-1",
             "event_order": 1,
             "source_id": "ROOT-AUTH-BOUNDARY-1",
             "authority_generation": 1,
@@ -138,7 +138,7 @@
           "ordering_source_id": "ORDER-AUTH-BOUNDARY-1",
           "lineage": "LINEAGE-AUTH-BOUNDARY-1",
           "authority_generation": 1,
-          "head_binding_id": "BINDING-LAB-V0-007",
+          "head_binding_id": "BINDING-LAB-V1-015",
           "head_binding_generation": 1,
           "head_event_order": 1
         }
@@ -149,9 +149,48 @@
     "creates_authority": false,
     "mutations": [
       {
-        "field": "boundary_epoch",
-        "before": "B1",
-        "after": "B2"
+        "field": "objective_binding",
+        "before": [
+          {
+            "binding_id": "BINDING-LAB-V1-015",
+            "disposition": "ADMIT",
+            "objective_id": "OBJECTIVE-LAB-V1-015",
+            "objective_generation": 1,
+            "contract_id": "CONTRACT-LAB-V1-015",
+            "contract_version": "1",
+            "schema_id": "AUTHORITY-CONTRACT-SCHEMA-1",
+            "source_id": "ROOT-AUTH-BOUNDARY-1",
+            "authority_generation": 1,
+            "binding_generation": 1,
+            "lineage": "LINEAGE-AUTH-BOUNDARY-1",
+            "policy_id": "POLICY-LAB-V1-015",
+            "policy_version": "1",
+            "producer_kind": "AUTHORITY_ROOT",
+            "producer_id": "ROOT-AUTH-BOUNDARY-1",
+            "scope": {
+              "subject": "S",
+              "artifact": "A",
+              "control_state": "C1",
+              "identity_basis": "I1",
+              "boundary_epoch": "B1",
+              "decision": "AUTHORIZED",
+              "applicable_boundary": "AUTH-BOUNDARY-1"
+            }
+          }
+        ],
+        "after": "CONFLICTING"
+      },
+      {
+        "field": "binding_ordering",
+        "before": {
+          "ordering_source_id": "ORDER-AUTH-BOUNDARY-1",
+          "lineage": "LINEAGE-AUTH-BOUNDARY-1",
+          "authority_generation": 1,
+          "head_binding_id": "BINDING-LAB-V1-015",
+          "head_binding_generation": 1,
+          "head_event_order": 1
+        },
+        "after": "UNKNOWN"
       }
     ]
   },
@@ -174,15 +213,12 @@
         "value": "I1"
       },
       "boundary_epoch": {
-        "state": "CONFLICTING",
-        "values": [
-          "B1",
-          "B2"
-        ]
+        "state": "KNOWN",
+        "value": "B1"
       },
       "decision_binding": {
         "state": "KNOWN",
-        "value": "CACHE-D1-B1"
+        "value": "EV-A-B1"
       },
       "applicable_boundary": {
         "state": "KNOWN",
@@ -197,7 +233,8 @@
         "value": "E1"
       },
       "freshness": {
-        "state": "UNKNOWN"
+        "state": "KNOWN",
+        "value": "CURRENT"
       },
       "consumption_state": {
         "state": "KNOWN",
@@ -220,7 +257,7 @@
       "consumption_binding": {
         "state": "KNOWN",
         "value": {
-          "grant_id": "GRANT-007-B1",
+          "grant_id": "GRANT-001",
           "subject": "S",
           "artifact": "A",
           "boundary_epoch": "B1"
@@ -248,16 +285,16 @@
       "objective_identity": {
         "state": "KNOWN",
         "value": {
-          "objective_id": "OBJECTIVE-LAB-V0-007",
+          "objective_id": "OBJECTIVE-LAB-V1-015",
           "objective_generation": 1,
-          "policy_id": "POLICY-LAB-V0-007",
+          "policy_id": "POLICY-LAB-V1-015",
           "policy_version": "1"
         }
       },
       "decision_contract_identity": {
         "state": "KNOWN",
         "value": {
-          "contract_id": "CONTRACT-LAB-V0-007",
+          "contract_id": "CONTRACT-LAB-V1-015",
           "contract_version": "1",
           "schema_id": "AUTHORITY-CONTRACT-SCHEMA-1",
           "derived_from": "NONE"
@@ -275,34 +312,64 @@
         }
       },
       "objective_binding": {
-        "state": "KNOWN",
-        "value": [
-          {
-            "binding_id": "BINDING-LAB-V0-007",
-            "disposition": "ADMIT",
-            "objective_id": "OBJECTIVE-LAB-V0-007",
-            "objective_generation": 1,
-            "contract_id": "CONTRACT-LAB-V0-007",
-            "contract_version": "1",
-            "schema_id": "AUTHORITY-CONTRACT-SCHEMA-1",
-            "source_id": "ROOT-AUTH-BOUNDARY-1",
-            "authority_generation": 1,
-            "binding_generation": 1,
-            "lineage": "LINEAGE-AUTH-BOUNDARY-1",
-            "policy_id": "POLICY-LAB-V0-007",
-            "policy_version": "1",
-            "producer_kind": "AUTHORITY_ROOT",
-            "producer_id": "ROOT-AUTH-BOUNDARY-1",
-            "scope": {
-              "subject": "S",
-              "artifact": "A",
-              "control_state": "C1",
-              "identity_basis": "I1",
-              "boundary_epoch": "B1",
-              "decision": "AUTHORIZED",
-              "applicable_boundary": "AUTH-BOUNDARY-1"
+        "state": "CONFLICTING",
+        "values": [
+          [
+            {
+              "binding_id": "BINDING-LAB-V1-015",
+              "disposition": "ADMIT",
+              "objective_id": "OBJECTIVE-LAB-V1-015",
+              "objective_generation": 1,
+              "contract_id": "CONTRACT-LAB-V1-015",
+              "contract_version": "1",
+              "schema_id": "AUTHORITY-CONTRACT-SCHEMA-1",
+              "source_id": "ROOT-AUTH-BOUNDARY-1",
+              "authority_generation": 1,
+              "binding_generation": 1,
+              "lineage": "LINEAGE-AUTH-BOUNDARY-1",
+              "policy_id": "POLICY-LAB-V1-015",
+              "policy_version": "1",
+              "producer_kind": "AUTHORITY_ROOT",
+              "producer_id": "ROOT-AUTH-BOUNDARY-1",
+              "scope": {
+                "subject": "S",
+                "artifact": "A",
+                "control_state": "C1",
+                "identity_basis": "I1",
+                "boundary_epoch": "B1",
+                "decision": "AUTHORIZED",
+                "applicable_boundary": "AUTH-BOUNDARY-1"
+              }
             }
-          }
+          ],
+          [
+            {
+              "binding_id": "BINDING-LAB-V1-015",
+              "disposition": "REJECT",
+              "objective_id": "OBJECTIVE-LAB-V1-015",
+              "objective_generation": 1,
+              "contract_id": "CONTRACT-LAB-V1-015",
+              "contract_version": "1",
+              "schema_id": "AUTHORITY-CONTRACT-SCHEMA-1",
+              "source_id": "ROOT-AUTH-BOUNDARY-1",
+              "authority_generation": 1,
+              "binding_generation": 1,
+              "lineage": "LINEAGE-AUTH-BOUNDARY-1",
+              "policy_id": "POLICY-LAB-V1-015",
+              "policy_version": "1",
+              "producer_kind": "AUTHORITY_ROOT",
+              "producer_id": "ROOT-AUTH-BOUNDARY-1",
+              "scope": {
+                "subject": "S",
+                "artifact": "A",
+                "control_state": "C1",
+                "identity_basis": "I1",
+                "boundary_epoch": "B1",
+                "decision": "AUTHORIZED",
+                "applicable_boundary": "AUTH-BOUNDARY-1"
+              }
+            }
+          ]
         ]
       },
       "binding_source_authority": {
@@ -334,10 +401,10 @@
         "state": "KNOWN",
         "value": [
           {
-            "binding_id": "BINDING-LAB-V0-007",
+            "binding_id": "BINDING-LAB-V1-015",
             "binding_generation": 1,
             "state": "ACTIVE",
-            "event_id": "EVENT-LAB-V0-007-1",
+            "event_id": "EVENT-LAB-V1-015-1",
             "event_order": 1,
             "source_id": "ROOT-AUTH-BOUNDARY-1",
             "authority_generation": 1,
@@ -346,15 +413,7 @@
         ]
       },
       "binding_ordering": {
-        "state": "KNOWN",
-        "value": {
-          "ordering_source_id": "ORDER-AUTH-BOUNDARY-1",
-          "lineage": "LINEAGE-AUTH-BOUNDARY-1",
-          "authority_generation": 1,
-          "head_binding_id": "BINDING-LAB-V0-007",
-          "head_binding_generation": 1,
-          "head_event_order": 1
-        }
+        "state": "UNKNOWN"
       }
     },
     "required_facts": [
@@ -365,6 +424,8 @@
       "boundary_epoch",
       "decision_binding",
       "applicable_boundary",
+      "evidence_binding",
+      "execution_context",
       "freshness",
       "consumption_state"
     ],
@@ -374,7 +435,7 @@
       "control_state": "C1",
       "identity_basis": "I1",
       "boundary_epoch": "B1",
-      "decision_binding": "CACHE-D1-B1",
+      "decision_binding": "EV-A-B1",
       "applicable_boundary": "AUTH-BOUNDARY-1",
       "evidence_binding": "CURRENT",
       "execution_context": "E1",
@@ -386,15 +447,16 @@
       "applies": false,
       "id": "none"
     },
-    "authority_question": "May cached B1 authority be consumed after the possible B2 transition?"
+    "authority_question": "May S commit exact artifact A in unchanged E1 at B1?"
   },
   "applicable_invariants": [
     "INV-CONT",
+    "INV-DISC",
+    "INV-BND",
     "INV-EVD",
-    "INV-USE",
-    "INV-BND"
+    "INV-USE"
   ],
   "expected_outcome": "UNAVAILABLE",
-  "expected_reason": "Current epoch and decision freshness are not established.",
-  "notes": "Derived from GT-CASE-011 with boundary-epoch drift."
+  "expected_reason": "Conflicting admit and reject candidates cannot be resolved without authoritative ordering.",
+  "notes": "Objective-binding v1 hostile regression; expected fields do not control the oracle."
 }
