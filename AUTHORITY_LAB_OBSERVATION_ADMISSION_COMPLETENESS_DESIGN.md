@@ -58,10 +58,12 @@ The accepted trust boundary remains the existing current `authority_root`, linea
 - the root cannot be the requesting subject;
 - the requester cannot select or bootstrap it;
 - its boundary, epoch, lineage, generation, and ordering source must match;
-- a delegate must have an exact current source relationship; and
+- a delegated objective-binding source must have an exact current source relationship; and
 - revoked or rejected sources fail closed.
 
-The observer is not a new authority root. It supplies evidence about a defined boundary. The current root or exact delegate admits the observer, scope, interval rules, and evidence relationship. The observer cannot admit itself, its own identity basis, its scope, its handoff successor, or its completeness.
+The observer is not a new authority root. It supplies evidence about a defined boundary. Only the current `authority_root` admits the observer, scope, interval rules, handoffs, transformations, and evidence relationship. An objective-binding delegate cannot admit an observer or widen observation scope. The observer cannot admit itself, its own identity basis, its scope, its handoff successor, or its completeness.
+
+This root-only rule is the smallest rule expressible without inventing authority. The existing `binding_source_authority` relation delegates issuance of an exact objective binding; it does not carry an observer-admission purpose, observation profile, interval, handoff, or transformation scope. Treating that relation as observer authority would widen delegation beyond its exact current meaning. A future delegated observer-admission path would require a separately reviewed, purpose-bearing, current, scope- and boundary-exact relation. It is unavailable in Authority Lab v1.
 
 This does not eliminate trust. It makes the trust placement explicit, independently sourced, scope-bound, ordered, revocable, and non-circular. A compromised admitted root remains outside the lab's proof boundary, as it already does for objective binding.
 
@@ -216,7 +218,7 @@ head_anchor_id
 head_event_order
 ```
 
-Freshness is derived only when this record exactly matches the observation binding, selected root/source, profile, boundary epoch, and T3 commit anchor. It contains no `current: true` member. An old head, wrong generation, missing head, incomparable ordering source, or T3 anchor mismatch yields `UNAVAILABLE/OBSERVATION_FRESHNESS_UNAVAILABLE`.
+Freshness is derived only when this record exactly matches the root-issued observation binding, current authority root, profile, boundary epoch, and T3 commit anchor. It contains no `current: true` member. An old head, wrong generation, missing head, incomparable ordering source, or T3 anchor mismatch yields `UNAVAILABLE/OBSERVATION_FRESHNESS_UNAVAILABLE`.
 
 Current authoritative revocation or rejection of the source or observation binding yields `DENIED` only after exact applicability is independently established.
 
@@ -248,7 +250,7 @@ lineage
 The record is part of the authority-sourced observation binding. It succeeds only when:
 
 - both observer identities are separately admitted and active;
-- the issuer is the current independent root/source, not either observer;
+- the issuer is the current independent `authority_root`, not an objective-binding delegate or either observer;
 - the scope sets exactly cover the transferred responsibility;
 - the segments overlap at the handoff order or are exactly adjacent without an uncovered order;
 - the handoff order is within both admitted lifecycles;
@@ -380,7 +382,7 @@ The design rejects every self-supporting authority cycle:
 3. An observer report cannot establish the observer identity or identity basis used to admit that report.
 4. A monitor's signature or self-declared uptime cannot establish coverage.
 5. An agent assertion that monitoring was active cannot establish observer admission, segments, or freshness.
-6. O1 cannot authorize O2; only the current independent root/source may admit O2 and the handoff.
+6. O1 cannot authorize O2; only the current independent `authority_root` may admit O2 and the handoff. An objective-binding delegate has no observer-admission authority.
 7. Parent observer status does not transfer to a child agent, subprocess, wrapper, or relay.
 8. A wrapper or summarizer cannot issue its own observation-preserving transformation relation.
 9. Shared memory, caches, relays, repetition, or consensus cannot establish scope, order, or completeness.
@@ -391,7 +393,7 @@ The design rejects every self-supporting authority cycle:
 Graphically, the permitted dependency is acyclic:
 
 ```text
-independent authority root/source
+independent authority root
   -> exact observer admission and coverage contract
   -> observer stream evidence and ordered commitments
   -> derived completeness predicate
@@ -399,7 +401,7 @@ independent authority root/source
   -> AUTHORIZED remains possible only with all other requirements
 ```
 
-No reverse edge is permitted from observer evidence, completeness, or the requesting agent back into root/source admission.
+No reverse edge is permitted from observer evidence, completeness, an objective-binding delegate, or the requesting agent back into root admission.
 
 ## 16. Hostile scenario matrix
 
@@ -434,8 +436,8 @@ If B's exact transition is independently established as prohibited, B becomes `D
 
 A positive unchanged-boundary case proceeds as follows:
 
-1. the current independent root/source admits the exact objective binding and decision contract;
-2. the same current source issues an observation binding for `AUTHORITY-LAB-OBSERVATION-PROFILE-1` and the exact decision scope;
+1. the exact objective binding and decision contract are admitted through their existing independent root or exact delegated-source rules;
+2. the current independent `authority_root` separately issues the observation binding for `AUTHORITY-LAB-OBSERVATION-PROFILE-1` and the exact decision scope;
 3. every observer identity/generation is independently admitted and distinct from the subject, issuer, root, and ordering source;
 4. the union of scope sets covers all eight required families;
 5. authority-ordered segments cover every family continuously from the T1 authority anchor to the T3 commit anchor;
@@ -467,7 +469,7 @@ Negative evidence yields `DENIED` only when its boundary, scope, source, orderin
 | Existing fact or semantic | Observation-contract role | Required change |
 | --- | --- | --- |
 | `evidence_binding` | Owns exact observer admission, immutable profile reference, scope, anchors, segments, handoffs, transformations, commitments, and lifecycle records. | Replace scalar permitting value with the strict typed relationship in section 12. |
-| `freshness` | Binds the observation head to exact T3, root/source, boundary epoch, and ordering source. | Replace scalar permitting value with the strict typed relation in section 9. |
+| `freshness` | Binds the observation head to exact T3, the observation-admitting authority root, boundary epoch, and ordering source. | Replace scalar permitting value with the strict typed relation in section 9. |
 | `authority_root` | Independent trust anchor for observer admission and ordering lineage. | No new identity; oracle cross-checks observation records against the existing root. |
 | `binding_source_authority` | Establishes the source of the selected objective binding and prevents that source from being inferred from observation evidence. | Reuse unchanged; it does not delegate observer-admission authority. Observation admission remains root-issued in v1. |
 | `binding_ordering` | Establishes current root lineage/generation and selected objective binding; observation ordering must use the same admitted ordering source. | No parallel authority selector; cross-check IDs, lineage, generation, and selected objective binding. |
@@ -480,7 +482,7 @@ Negative evidence yields `DENIED` only when its boundary, scope, source, orderin
 | transformation continuity | Prevents wrapper, reducer, summary, or format conversion from dropping authority meaning. | Strict observation transformation path inside `evidence_binding`; `contract_transformation_binding` still applies if the decision contract itself changes. |
 | `objective_binding` continuity | Selects the exact contract/profile context and current independent source. | Observation binding references the selected binding and must be reissued/re-established when it changes. |
 
-The design uses a combination of existing relationships. `evidence_binding` owns the operational observation relation; root/source and ordering establish its authority and currentness; execution/boundary/use relations establish exact state; closure/transformation semantics prevent laundering. No single existing scalar is treated as sufficient.
+The design uses a combination of existing relationships. `evidence_binding` owns the operational observation relation; the current authority root and its ordering source establish that relation's authority and currentness; the separately admitted objective-binding source remains limited to objective-binding issuance; execution/boundary/use relations establish exact state; closure/transformation semantics prevent laundering. No single existing scalar is treated as sufficient.
 
 ## 20. Compatibility and migration
 
@@ -550,7 +552,8 @@ Implementation does not need to invent who may assert completeness or what compl
 | Trusted-monitor flag | Add `monitor_trusted: true`. | Same; no authority effect. |
 | Observer self-admission | Set observer as `source_id` or ordering source. | `UNAVAILABLE/OBSERVATION_ADMISSION_UNAVAILABLE`. |
 | Agent-observer cycle | Subject supplies observer record which validates subject. | Distinct independent source and identity rules fail; `UNAVAILABLE`. |
-| Root-by-observer cycle | Observer stream claims the root that admits it. | Root/source must be independently established before evidence evaluation; `UNAVAILABLE`. |
+| Root-by-observer cycle | Observer stream claims the root that admits it. | The authority root must be independently established before evidence evaluation; `UNAVAILABLE`. |
+| Objective-delegate widening | An exact objective-binding delegate appoints an observer or issues a handoff. | That delegation has no observer-admission purpose; `UNAVAILABLE/OBSERVATION_ADMISSION_UNAVAILABLE`. |
 | Scope underclaim | Observer omits credential, use, or boundary family. | Profile union incomplete; `UNAVAILABLE`. |
 | Scope overclaim | Observer adds free-form or unknown family. | Strict parser failure. |
 | Hidden interval gap | Split segments around an event or restart. | Per-family interval union exposes gap; `UNAVAILABLE`. |
