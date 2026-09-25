@@ -6,6 +6,8 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
+from .commitment import commitment_digest, state_key_digest, verifier_state_digest
+
 from .model import (
     AuthorityOutcome,
     AuthorityStateBinding,
@@ -858,6 +860,111 @@ def _valid_handoff(
     )
 
 
+def _evaluate_commitment_envelope(
+    case: OracleInput,
+    binding: ObservationBinding,
+    root: Any,
+    segments: Mapping[str, ObservationSegment],
+) -> OracleResult:
+    """Require a verified, uniquely checkpointed head backed by caller-owned state."""
+    envelopes = [record.values for record in binding.commitment_envelopes]
+    verifiers = [record.values for record in binding.commitment_verifiers]
+    verifications = [record.values for record in binding.commitment_verifications]
+    links = [record.values for record in binding.commitment_links]
+    checkpoints = [record.values for record in binding.commitment_checkpoints]
+    if not envelopes or not verifiers or not verifications or not links or not checkpoints:
+        return _observation_unavailable(
+            case, "OBSERVATION_COMMITMENT_UNIQUENESS_UNAVAILABLE",
+            "Observation records lack an exact verified commitment and durable unique-head checkpoint.",
+            ("evidence_binding", "freshness"),
+        )
+
+    logical: dict[tuple[Any, ...], str] = {}
+    stream_heads: dict[tuple[str, int], Mapping[str, Any]] = {}
+    for envelope in envelopes:
+        key = tuple(envelope[name] for name in (
+            "observation_binding_id", "observation_binding_generation", "observer_id",
+            "observer_generation", "stream_id", "stream_generation", "logical_position",
+            "start_event_order", "end_event_order", "start_sequence", "end_sequence",
+        ))
+        previous = logical.get(key)
+        if previous is not None and previous != envelope["commitment_digest"]:
+            return _observation_unavailable(
+                case, "OBSERVATION_COMMITMENT_EQUIVOCATION",
+                "The same logical observation position has incompatible commitments.",
+                ("evidence_binding",),
+            )
+        logical[key] = envelope["commitment_digest"]
+        named = [segments.get(identifier) for identifier in envelope["segment_ids"]]
+        if any(item is None for item in named):
+            return _observation_unavailable(case, "OBSERVATION_COMMITMENT_CONFLICTING", "A commitment names an unavailable segment.", ("evidence_binding",))
+        exact_segments = [item for item in named if item is not None]
+        digest = commitment_digest(envelope, exact_segments)
+        observer = next((item for item in binding.observers if item.observer_id == envelope["observer_id"] and item.observer_generation == envelope["observer_generation"]), None)
+        stream = [item for item in segments.values() if item.stream_id == envelope["stream_id"] and item.stream_generation == envelope["stream_generation"]]
+        if (
+            envelope["relationship"] != "OBSERVATION_HISTORY_COMMITMENT"
+            or envelope["commitment_format"] != "AUTHORITY-LAB-OBSERVATION-COMMITMENT-V1"
+            or envelope["commitment_digest_algorithm"] != "SHA-256"
+            or digest != envelope["canonical_payload_digest"]
+            or digest != envelope["commitment_digest"]
+            or observer is None
+            or observer.observer_identity_basis != envelope["observer_identity_basis"]
+            or tuple(item.segment_id for item in sorted(stream, key=lambda value: (value.start_event_order, value.start_sequence, value.segment_id))) != envelope["segment_ids"]
+            or any(item.stream_commitment != digest for item in stream)
+            or tuple(envelope["scope_families"]) != tuple(OBSERVATION_SCOPE_FAMILIES)
+            or envelope["observation_binding_id"] != binding.observation_binding_id
+            or envelope["observation_binding_generation"] != binding.observation_binding_generation
+            or envelope["source_id"] != root.root_id
+            or envelope["authority_generation"] != root.authority_generation
+            or envelope["boundary"] != root.boundary
+            or envelope["boundary_epoch"] != root.boundary_epoch
+            or envelope["lineage"] != root.lineage
+            or envelope["ordering_source_id"] != root.ordering_source_id
+        ):
+            return _observation_unavailable(case, "OBSERVATION_COMMITMENT_CONFLICTING", "The commitment body is not exact for the admitted observation history.", ("evidence_binding",))
+        stream_heads[(envelope["stream_id"], envelope["stream_generation"])] = envelope
+
+        verifier_matches = [item for item in verifiers if item["verifier_id"] not in {case.authority_tuple.subject, envelope["observer_id"], root.root_id, root.ordering_source_id} and item["role"] == "OBSERVATION_COMMITMENT_APPRAISER" and item["source_id"] == root.root_id and item["boundary_epoch"] == root.boundary_epoch and item["lifecycle_state"] == "ACTIVE"]
+        verified = [item for item in verifications if item["commitment_id"] == envelope["commitment_id"] and item["commitment_digest"] == digest and item["canonical_payload_digest"] == digest and item["signature_evidence_id"] == envelope["signature_evidence_id"] and item["freshness_challenge_id"] == envelope["freshness_challenge_id"] and item["disposition"] == "VERIFIED" and any(v["verifier_id"] == item["verifier_id"] and v["verifier_generation"] == item["verifier_generation"] for v in verifier_matches)]
+        if len(verified) != 1:
+            return _observation_unavailable(case, "OBSERVATION_COMMITMENT_AUTHENTICITY_UNAVAILABLE", "No exact independently admitted verifier establishes commitment authenticity.", ("evidence_binding",))
+        link_matches = [item for item in links if item["to_commitment_id"] == envelope["commitment_id"] and item["to_commitment_digest"] == digest and item["to_logical_position"] == envelope["logical_position"]]
+        if len(link_matches) != 1 or (envelope["logical_position"] == 0 and link_matches[0]["relationship"] != "GENESIS") or (envelope["logical_position"] > 0 and link_matches[0]["relationship"] not in {"EXTENDS", "CORRECTS", "SUPERSEDES"}) or link_matches[0]["from_commitment_id"] != envelope["predecessor_commitment_id"] or link_matches[0]["from_commitment_digest"] != envelope["predecessor_commitment_digest"] or link_matches[0]["from_logical_position"] != max(envelope["logical_position"] - 1, 0):
+            return _observation_unavailable(case, "OBSERVATION_COMMITMENT_CONTINUITY_UNAVAILABLE", "The commitment lacks one exact append-only predecessor relationship.", ("evidence_binding",))
+
+        candidate_checkpoints = [item for item in checkpoints if item["head_commitment_id"] == envelope["commitment_id"] and item["head_commitment_digest"] == digest and item["head_logical_position"] == envelope["logical_position"] and item["stream_id"] == envelope["stream_id"] and item["stream_generation"] == envelope["stream_generation"]]
+        if len(candidate_checkpoints) != 1:
+            return _observation_unavailable(case, "OBSERVATION_COMMITMENT_UNIQUENESS_UNAVAILABLE", "No unique current checkpoint selects this commitment.", ("evidence_binding",))
+        checkpoint = candidate_checkpoints[0]
+        if checkpoint["relationship"] != "UNIQUE_CURRENT_COMMITMENT_HEAD" or checkpoint["ordering_source_id"] != root.ordering_source_id or checkpoint["source_id"] != root.root_id or checkpoint["lifecycle_state"] != "ACTIVE" or verifier_state_digest(checkpoint) != checkpoint["current_verifier_state_digest"]:
+            return _observation_unavailable(case, "OBSERVATION_COMMITMENT_UNIQUENESS_UNAVAILABLE", "The current checkpoint is not exact or independently ordered.", ("evidence_binding",))
+        context = [item for item in case.trusted_commitment_context if item.get("stream_id") == envelope["stream_id"] and item.get("stream_generation") == envelope["stream_generation"]]
+        expected_key = state_key_digest({**envelope, "source_id": root.root_id, "authority_generation": root.authority_generation, "boundary": root.boundary, "boundary_epoch": root.boundary_epoch, "lineage": root.lineage, "ordering_source_id": root.ordering_source_id})
+        if len(context) != 1 or context[0].get("exact_state_key_digest") != expected_key:
+            return _observation_unavailable(case, "OBSERVATION_VERIFIER_STATE_UNAVAILABLE", "Harness-owned durable verifier state is unavailable for the exact stream lineage.", ("evidence_binding",))
+        trusted = context[0]
+        if trusted.get("previous_verifier_state_digest") != checkpoint["previous_verifier_state_digest"] or trusted.get("current_verifier_state_digest") != checkpoint["current_verifier_state_digest"] or trusted.get("head_commitment_digest") != digest or trusted.get("checkpoint_id") != checkpoint["checkpoint_id"] or trusted.get("freshness_challenge_id") != envelope["freshness_challenge_id"]:
+            reason = "OBSERVATION_COMMITMENT_REPLAY" if trusted.get("head_logical_position", -1) > envelope["logical_position"] else "OBSERVATION_VERIFIER_ROLLBACK"
+            return _observation_unavailable(case, reason, "The candidate commitment does not advance the independently retained durable verifier state.", ("evidence_binding", "freshness"))
+
+    witnesses = [record.values for record in binding.commitment_witnesses]
+    for checkpoint in checkpoints:
+        applicable = [item for item in witnesses if item["checkpoint_id"] == checkpoint["checkpoint_id"] and item["checkpoint_generation"] == checkpoint["checkpoint_generation"]]
+        if applicable and any(item["head_commitment_id"] != checkpoint["head_commitment_id"] or item["head_commitment_digest"] != checkpoint["head_commitment_digest"] or item["disposition"] != "CONFIRMED" for item in applicable):
+            return _observation_unavailable(case, "OBSERVATION_WITNESS_CONFLICTING", "Witness evidence conflicts with the independently ordered commitment checkpoint.", ("evidence_binding",))
+
+    freshness = case.observation_freshness
+    selected = [item for item in stream_heads.values() if freshness is not None and item["commitment_id"] == freshness.commitment_id and item["commitment_digest"] == freshness.commitment_digest]
+    if len(selected) != 1:
+        return _observation_unavailable(case, "OBSERVATION_FRESHNESS_UNAVAILABLE", "Freshness does not select one exact durable commitment head.", ("freshness",))
+    head = selected[0]
+    checkpoint = next(item for item in checkpoints if item["head_commitment_id"] == head["commitment_id"])
+    if freshness is None or freshness.checkpoint_id != checkpoint["checkpoint_id"] or freshness.checkpoint_generation != checkpoint["checkpoint_generation"] or freshness.verifier_state_id != checkpoint["verifier_state_id"] or freshness.verifier_state_generation != checkpoint["verifier_state_generation"] or freshness.verifier_state_digest != checkpoint["current_verifier_state_digest"] or freshness.freshness_challenge_id != checkpoint["freshness_challenge_id"]:
+        return _observation_unavailable(case, "OBSERVATION_FRESHNESS_UNAVAILABLE", "Verifier-bound freshness is stale, self-issued, or not bound to the current checkpoint.", ("freshness",))
+    return OracleResult(AuthorityOutcome.AUTHORIZED, (Reason("OBSERVATION_COMMITMENT_ESTABLISHED", "A current authentic uniquely checkpointed observation history is established.", ("evidence_binding", "freshness")),), _engaged(case))
+
+
 def _evaluate_observation(case: OracleInput) -> OracleResult:
     binding = case.observation_binding
     if binding is None:
@@ -1323,6 +1430,10 @@ def _evaluate_observation(case: OracleInput) -> OracleResult:
             "Observation evidence is stale or does not terminate at the exact current T3 anchor.",
             ("freshness", "evidence_binding"),
         )
+
+    commitment_result = _evaluate_commitment_envelope(case, binding, root, segments)
+    if commitment_result.outcome is not AuthorityOutcome.AUTHORIZED:
+        return commitment_result
 
     return OracleResult(
         AuthorityOutcome.AUTHORIZED,

@@ -21,12 +21,23 @@ from .oracle import analyze_continuity_path, evaluate
 
 
 def load_fixture(path: str | Path) -> dict[str, Any]:
-    with Path(path).open("r", encoding="utf-8") as handle:
+    fixture_path = Path(path)
+    with fixture_path.open("r", encoding="utf-8") as handle:
         value = json.load(handle)
     if not isinstance(value, dict):
         raise ValueError("fixture root must be an object")
     if value.get("schema_version") not in {"authority-lab-v0", "authority-lab-v1"}:
         raise ValueError("unsupported fixture schema_version")
+    if "_trusted_commitment_context" in value:
+        raise ValueError("fixture cannot supply harness-owned trusted commitment state")
+    manifest_path = fixture_path.parent / "trusted_commitment_state.json"
+    if value.get("schema_version") == "authority-lab-v1" and manifest_path.exists():
+        with manifest_path.open("r", encoding="utf-8") as handle:
+            manifest = json.load(handle)
+        context = manifest.get(fixture_path.name, [])
+        if not isinstance(context, list) or not all(isinstance(item, dict) for item in context):
+            raise ValueError("trusted commitment state manifest entry is invalid")
+        value["_trusted_commitment_context"] = context
     return value
 
 
@@ -53,7 +64,7 @@ def run_path(path: str | Path) -> RunResult:
 
 
 def discover(directory: str | Path) -> tuple[Path, ...]:
-    return tuple(sorted(Path(directory).glob("*.json")))
+    return tuple(sorted(Path(directory).glob("LAB-*.json")))
 
 
 def _render_fact(fact: Any) -> str:
@@ -141,6 +152,21 @@ def _observation_trace(case: OracleInput) -> tuple[str, ...]:
             key=lambda value: (value.transformation_id, value.transformation_generation),
         )
     )
+    lines.extend(
+        "commitment: "
+        f"{item.values['commitment_id']} position={item.values['logical_position']} "
+        f"digest={item.values['commitment_digest']} stream="
+        f"{item.values['stream_id']}@{item.values['stream_generation']}"
+        for item in binding.commitment_envelopes
+    )
+    lines.extend(
+        "checkpoint: "
+        f"{item.values['checkpoint_id']}@{item.values['checkpoint_generation']} "
+        f"head={item.values['head_commitment_id']} state="
+        f"{item.values['verifier_state_id']}@{item.values['verifier_state_generation']}"
+        for item in binding.commitment_checkpoints
+    )
+    lines.append(f"trusted_commitment_states: {len(case.trusted_commitment_context)}")
     lines.append(f"gaps: {','.join(gaps) if gaps else 'none'}")
     lines.append(
         "freshness: "

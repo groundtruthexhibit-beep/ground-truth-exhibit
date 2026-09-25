@@ -224,7 +224,13 @@
               "boundary_epoch": "B1",
               "lineage": "LINEAGE-AUTH-BOUNDARY-1"
             }
-          ]
+          ],
+          "commitment_envelopes": [],
+          "commitment_verifiers": [],
+          "commitment_verifications": [],
+          "commitment_links": [],
+          "commitment_checkpoints": [],
+          "commitment_witnesses": []
         }
       },
       "execution_context": {

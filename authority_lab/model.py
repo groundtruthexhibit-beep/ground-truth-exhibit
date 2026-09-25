@@ -146,6 +146,9 @@ OBSERVATION_LIFECYCLE_STATES = (
     "SUPERSEDED",
 )
 
+OBSERVATION_COMMITMENT_FORMAT = "AUTHORITY-LAB-OBSERVATION-COMMITMENT-V1"
+OBSERVATION_COMMITMENT_DIGEST_ALGORITHM = "SHA-256"
+
 
 def _exact_string(value: Any, field: str) -> str:
     if not isinstance(value, str):
@@ -903,6 +906,140 @@ def _typed_object_array(value: Any, field: str, parser: Any) -> tuple[Any, ...]:
     return tuple(parser(item) for item in value)
 
 
+def _strict_commitment_record(
+    value: Mapping[str, Any], field: str, fields: tuple[str, ...]
+) -> Mapping[str, Any]:
+    """Parse a commitment subrelation without coercion or ignored members."""
+    _require_exact_fields(value, set(fields), field)
+    parsed: dict[str, Any] = {}
+    for name in fields:
+        item = value[name]
+        item_field = f"{field}.{name}"
+        if name in {
+            "observer_generation", "issuer_key_generation", "stream_generation",
+            "logical_position", "start_event_order", "end_event_order",
+            "start_sequence", "end_sequence", "observation_binding_generation",
+            "objective_binding_generation", "authority_generation",
+            "verifier_generation", "verification_event_order", "checkpoint_generation",
+            "verifier_state_generation", "previous_verifier_state_generation",
+            "head_logical_position", "checkpoint_event_order", "from_logical_position",
+            "to_logical_position", "link_event_order", "witness_generation",
+            "witness_event_order",
+        }:
+            parsed[name] = _exact_generation(item, item_field)
+        elif name == "scope_families":
+            parsed[name] = _exact_scope_families(item, item_field)
+        elif name == "segment_ids":
+            if not isinstance(item, (list, tuple)) or not item:
+                raise ValueError(f"{item_field} must be a non-empty array")
+            parsed[name] = tuple(_exact_nonempty_string(part, item_field) for part in item)
+            if len(parsed[name]) != len(set(parsed[name])):
+                raise ValueError(f"{item_field} must not contain duplicates")
+        else:
+            parsed[name] = _exact_nonempty_string(item, item_field)
+    return MappingProxyType(parsed)
+
+
+ENVELOPE_FIELDS = (
+    "relationship", "commitment_id", "commitment_format",
+    "commitment_digest_algorithm", "commitment_digest", "observer_id",
+    "observer_generation", "observer_identity_basis", "issuer_key_id",
+    "issuer_key_generation", "stream_id", "stream_generation",
+    "logical_position", "segment_ids", "start_anchor_id", "start_event_order",
+    "end_anchor_id", "end_event_order", "start_sequence", "end_sequence",
+    "scope_families", "observation_binding_id", "observation_binding_generation",
+    "objective_binding_id", "objective_binding_generation", "decision_contract_id",
+    "decision_contract_version", "source_id", "authority_generation", "boundary",
+    "boundary_epoch", "lineage", "ordering_source_id", "freshness_challenge_id",
+    "predecessor_commitment_id", "predecessor_commitment_digest",
+    "canonical_payload_digest", "signature_evidence_id",
+)
+VERIFIER_FIELDS = (
+    "verifier_id", "verifier_generation", "verifier_identity_basis", "role",
+    "scope_families", "boundary", "boundary_epoch", "source_id",
+    "authority_generation", "lineage", "ordering_source_id", "lifecycle_state",
+)
+VERIFICATION_FIELDS = (
+    "verification_id", "verifier_id", "verifier_generation", "commitment_id",
+    "commitment_digest", "canonical_payload_digest", "signature_evidence_id",
+    "issuer_key_id", "issuer_key_generation", "verification_method_id",
+    "freshness_challenge_id", "verification_event_order", "disposition",
+)
+LINK_FIELDS = (
+    "relationship", "link_id", "stream_id", "stream_generation",
+    "from_commitment_id", "from_commitment_digest", "from_logical_position",
+    "to_commitment_id", "to_commitment_digest", "to_logical_position",
+    "consistency_evidence_id", "verifier_id", "verifier_generation",
+    "ordering_source_id", "link_event_order", "source_id", "authority_generation",
+    "boundary", "boundary_epoch", "lineage",
+)
+CHECKPOINT_FIELDS = (
+    "relationship", "checkpoint_id", "checkpoint_generation", "verifier_state_id",
+    "verifier_state_generation", "previous_verifier_state_id",
+    "previous_verifier_state_generation", "previous_verifier_state_digest",
+    "current_verifier_state_digest", "observation_binding_id",
+    "observation_binding_generation", "stream_id", "stream_generation",
+    "head_logical_position", "head_commitment_id", "head_commitment_digest",
+    "freshness_challenge_id", "checkpoint_event_order", "source_id",
+    "authority_generation", "boundary", "boundary_epoch", "lineage",
+    "ordering_source_id", "lifecycle_state",
+)
+WITNESS_FIELDS = (
+    "witness_id", "witness_generation", "checkpoint_id", "checkpoint_generation",
+    "head_commitment_id", "head_commitment_digest", "source_id",
+    "authority_generation", "boundary", "boundary_epoch", "lineage",
+    "witness_event_order", "disposition",
+)
+
+
+@dataclass(frozen=True)
+class ObservationCommitmentEnvelope:
+    values: Mapping[str, Any]
+    @classmethod
+    def from_mapping(cls, value: Mapping[str, Any]) -> "ObservationCommitmentEnvelope":
+        return cls(_strict_commitment_record(value, "commitment_envelopes entry", ENVELOPE_FIELDS))
+
+
+@dataclass(frozen=True)
+class CommitmentVerifierAdmission:
+    values: Mapping[str, Any]
+    @classmethod
+    def from_mapping(cls, value: Mapping[str, Any]) -> "CommitmentVerifierAdmission":
+        return cls(_strict_commitment_record(value, "commitment_verifiers entry", VERIFIER_FIELDS))
+
+
+@dataclass(frozen=True)
+class CommitmentVerification:
+    values: Mapping[str, Any]
+    @classmethod
+    def from_mapping(cls, value: Mapping[str, Any]) -> "CommitmentVerification":
+        return cls(_strict_commitment_record(value, "commitment_verifications entry", VERIFICATION_FIELDS))
+
+
+@dataclass(frozen=True)
+class CommitmentLink:
+    values: Mapping[str, Any]
+    @classmethod
+    def from_mapping(cls, value: Mapping[str, Any]) -> "CommitmentLink":
+        return cls(_strict_commitment_record(value, "commitment_links entry", LINK_FIELDS))
+
+
+@dataclass(frozen=True)
+class CommitmentCheckpoint:
+    values: Mapping[str, Any]
+    @classmethod
+    def from_mapping(cls, value: Mapping[str, Any]) -> "CommitmentCheckpoint":
+        return cls(_strict_commitment_record(value, "commitment_checkpoints entry", CHECKPOINT_FIELDS))
+
+
+@dataclass(frozen=True)
+class CommitmentWitness:
+    values: Mapping[str, Any]
+    @classmethod
+    def from_mapping(cls, value: Mapping[str, Any]) -> "CommitmentWitness":
+        return cls(_strict_commitment_record(value, "commitment_witnesses entry", WITNESS_FIELDS))
+
+
 @dataclass(frozen=True)
 class ObservationBinding:
     relationship: str
@@ -927,13 +1064,17 @@ class ObservationBinding:
     handoffs: tuple[ObservationHandoff, ...]
     transformations: tuple[ObservationTransformation, ...]
     lifecycle_records: tuple[ObservationLifecycle, ...]
+    commitment_envelopes: tuple[ObservationCommitmentEnvelope, ...]
+    commitment_verifiers: tuple[CommitmentVerifierAdmission, ...]
+    commitment_verifications: tuple[CommitmentVerification, ...]
+    commitment_links: tuple[CommitmentLink, ...]
+    commitment_checkpoints: tuple[CommitmentCheckpoint, ...]
+    commitment_witnesses: tuple[CommitmentWitness, ...]
 
     @classmethod
     def from_mapping(cls, value: Mapping[str, Any]) -> "ObservationBinding":
         field = "evidence_binding"
-        _require_exact_fields(
-            value,
-            {
+        base_fields = {
                 "relationship", "observation_binding_id",
                 "observation_binding_generation", "profile_id", "profile_version",
                 "objective_binding_id", "objective_binding_generation",
@@ -941,9 +1082,14 @@ class ObservationBinding:
                 "authority_generation", "boundary", "boundary_epoch", "lineage",
                 "ordering_source_id", "t1_anchor", "t3_anchor", "observers",
                 "segments", "handoffs", "transformations", "lifecycle_records",
-            },
-            field,
-        )
+        }
+        commitment_fields = {
+                "commitment_envelopes", "commitment_verifiers",
+                "commitment_verifications", "commitment_links",
+                "commitment_checkpoints", "commitment_witnesses",
+        }
+        if set(value) not in {frozenset(base_fields), frozenset(base_fields | commitment_fields)}:
+            raise ValueError(f"{field} must contain the exact legacy or commitment-envelope field set")
         relationship = _exact_nonempty_string(value["relationship"], f"{field}.relationship")
         if relationship != "OBSERVATION_COVERAGE":
             raise ValueError(f"{field}.relationship must be OBSERVATION_COVERAGE")
@@ -996,6 +1142,12 @@ class ObservationBinding:
                 f"{field}.lifecycle_records",
                 ObservationLifecycle.from_mapping,
             ),
+            _typed_object_array(value.get("commitment_envelopes", []), f"{field}.commitment_envelopes", ObservationCommitmentEnvelope.from_mapping),
+            _typed_object_array(value.get("commitment_verifiers", []), f"{field}.commitment_verifiers", CommitmentVerifierAdmission.from_mapping),
+            _typed_object_array(value.get("commitment_verifications", []), f"{field}.commitment_verifications", CommitmentVerification.from_mapping),
+            _typed_object_array(value.get("commitment_links", []), f"{field}.commitment_links", CommitmentLink.from_mapping),
+            _typed_object_array(value.get("commitment_checkpoints", []), f"{field}.commitment_checkpoints", CommitmentCheckpoint.from_mapping),
+            _typed_object_array(value.get("commitment_witnesses", []), f"{field}.commitment_witnesses", CommitmentWitness.from_mapping),
         )
 
 
@@ -1014,21 +1166,34 @@ class ObservationFreshness:
     ordering_source_id: str
     head_anchor_id: str
     head_event_order: int
+    commitment_id: str
+    commitment_digest: str
+    checkpoint_id: str
+    checkpoint_generation: int
+    verifier_state_id: str
+    verifier_state_generation: int
+    verifier_state_digest: str
+    freshness_challenge_id: str
 
     @classmethod
     def from_mapping(cls, value: Mapping[str, Any]) -> "ObservationFreshness":
         field = "freshness"
-        _require_exact_fields(
-            value,
-            {
+        base_fields = {
                 "relationship", "observation_binding_id",
                 "observation_binding_generation", "profile_id", "profile_version",
                 "boundary", "boundary_epoch", "lineage", "source_id",
                 "authority_generation", "ordering_source_id", "head_anchor_id",
                 "head_event_order",
-            },
-            field,
-        )
+        }
+        commitment_fields = {
+                "commitment_id", "commitment_digest",
+                "checkpoint_id", "checkpoint_generation", "verifier_state_id",
+                "verifier_state_generation", "verifier_state_digest",
+                "freshness_challenge_id",
+        }
+        has_commitment = set(value) == base_fields | commitment_fields
+        if set(value) not in {frozenset(base_fields), frozenset(base_fields | commitment_fields)}:
+            raise ValueError(f"{field} must contain the exact legacy or commitment-envelope field set")
         relationship = _exact_nonempty_string(value["relationship"], f"{field}.relationship")
         if relationship != "OBSERVATION_CURRENT_AT_T3":
             raise ValueError(f"{field}.relationship must be OBSERVATION_CURRENT_AT_T3")
@@ -1051,6 +1216,14 @@ class ObservationFreshness:
             _exact_nonempty_string(value["ordering_source_id"], f"{field}.ordering_source_id"),
             _exact_nonempty_string(value["head_anchor_id"], f"{field}.head_anchor_id"),
             _exact_generation(value["head_event_order"], f"{field}.head_event_order"),
+            _exact_nonempty_string(value["commitment_id"], f"{field}.commitment_id") if has_commitment else "",
+            _exact_nonempty_string(value["commitment_digest"], f"{field}.commitment_digest") if has_commitment else "",
+            _exact_nonempty_string(value["checkpoint_id"], f"{field}.checkpoint_id") if has_commitment else "",
+            _exact_generation(value["checkpoint_generation"], f"{field}.checkpoint_generation") if has_commitment else 0,
+            _exact_nonempty_string(value["verifier_state_id"], f"{field}.verifier_state_id") if has_commitment else "",
+            _exact_generation(value["verifier_state_generation"], f"{field}.verifier_state_generation") if has_commitment else 0,
+            _exact_nonempty_string(value["verifier_state_digest"], f"{field}.verifier_state_digest") if has_commitment else "",
+            _exact_nonempty_string(value["freshness_challenge_id"], f"{field}.freshness_challenge_id") if has_commitment else "",
         )
 
 
@@ -1640,6 +1813,7 @@ class OracleInput:
     t3_binding_facts: ObjectiveBindingFacts
     observation_binding: ObservationBinding | None
     observation_freshness: ObservationFreshness | None
+    trusted_commitment_context: tuple[Mapping[str, Any], ...]
     required_facts: tuple[str, ...]
     required_values: Mapping[str, Any]
     reestablishment_state: FactState
@@ -1733,6 +1907,11 @@ class OracleInput:
             and not isinstance(observation_freshness_fact.value, str)
         ):
             raise ValueError("KNOWN freshness requires a typed object or legacy string")
+        raw_context = fixture.get("_trusted_commitment_context", ())
+        if not isinstance(raw_context, (list, tuple)) or not all(
+            isinstance(item, Mapping) for item in raw_context
+        ):
+            raise ValueError("trusted commitment context must be a harness-owned array")
         return cls(
             schema_version=schema_version,
             case_id=str(fixture["case_id"]),
@@ -1747,6 +1926,7 @@ class OracleInput:
             t3_binding_facts=ObjectiveBindingFacts.from_facts(facts),
             observation_binding=observation_binding,
             observation_freshness=observation_freshness,
+            trusted_commitment_context=tuple(MappingProxyType(dict(item)) for item in raw_context),
             required_facts=required_facts,
             required_values=required_values,
             reestablishment_state=raw_reestablishment.state,

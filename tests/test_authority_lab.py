@@ -245,9 +245,9 @@ class AuthorityLabTests(unittest.TestCase):
         self.assertIs(AuthorityOutcome.UNAVAILABLE, result.outcome)
         self.assertIn(reason_code, {reason.code for reason in result.reasons})
 
-    def test_v1_contains_eighty_eight_deterministic_fixtures(self) -> None:
+    def test_v1_contains_one_hundred_twelve_deterministic_fixtures(self) -> None:
         paths = discover(CASES)
-        self.assertEqual(88, len(paths))
+        self.assertEqual(112, len(paths))
         self.assertEqual(paths, discover(CASES))
 
     def test_every_v0_fixture_matches_its_expected_outcome(self) -> None:
@@ -1706,6 +1706,91 @@ class AuthorityLabTests(unittest.TestCase):
         self.assertIn("observation_scopes=EXECUTION_CONTROL,CREDENTIAL_AND_IDENTITY", trace)
         self.assertIn("path_aba_targets: execution_context", trace)
         self.assertIn("successor_admission_required: true", trace)
+
+    def test_commitment_hostile_matrix_matches_independent_expectations(self) -> None:
+        for number in range(89, 113):
+            case_id = f"LAB-V1-{number:03d}"
+            with self.subTest(case_id=case_id):
+                self.assertIs(HarnessStatus.PASS, run_fixture(fixture(case_id)).status)
+
+    def test_commitment_digest_is_recomputed_from_exact_body(self) -> None:
+        payload = fixture("LAB-V1-032")
+        binding = payload["t3"]["facts"]["evidence_binding"]["value"]
+        binding["commitment_envelopes"][0]["objective_binding_id"] += "-ALTERED"
+        self.assert_unavailable_with_reason(payload, "OBSERVATION_COMMITMENT_CONFLICTING")
+
+    def test_isolated_equivocation_is_unavailable(self) -> None:
+        self.assert_unavailable_with_reason(
+            fixture("LAB-V1-090"), "OBSERVATION_COMMITMENT_EQUIVOCATION"
+        )
+
+    def test_replay_after_newer_checkpoint_is_unavailable(self) -> None:
+        self.assert_unavailable_with_reason(
+            fixture("LAB-V1-091"), "OBSERVATION_COMMITMENT_REPLAY"
+        )
+
+    def test_stream_generation_replay_is_unavailable(self) -> None:
+        self.assert_unavailable_with_reason(
+            fixture("LAB-V1-092"), "OBSERVATION_VERIFIER_STATE_UNAVAILABLE"
+        )
+
+    def test_self_updated_freshness_is_unavailable(self) -> None:
+        self.assert_unavailable_with_reason(
+            fixture("LAB-V1-094"), "OBSERVATION_FRESHNESS_UNAVAILABLE"
+        )
+
+    def test_missing_predecessor_relation_is_unavailable(self) -> None:
+        self.assert_unavailable_with_reason(
+            fixture("LAB-V1-095"), "OBSERVATION_COMMITMENT_UNIQUENESS_UNAVAILABLE"
+        )
+
+    def test_verifier_state_loss_and_rollback_fail_closed(self) -> None:
+        expected = {
+            "LAB-V1-103": "OBSERVATION_VERIFIER_STATE_UNAVAILABLE",
+            "LAB-V1-104": "OBSERVATION_VERIFIER_ROLLBACK",
+        }
+        for case_id, reason in expected.items():
+            with self.subTest(case_id=case_id):
+                self.assert_unavailable_with_reason(fixture(case_id), reason)
+
+    def test_subject_cannot_be_commitment_verifier(self) -> None:
+        self.assert_unavailable_with_reason(
+            fixture("LAB-V1-105"), "OBSERVATION_COMMITMENT_AUTHENTICITY_UNAVAILABLE"
+        )
+
+    def test_conflicting_witness_cannot_create_authority(self) -> None:
+        self.assert_unavailable_with_reason(
+            fixture("LAB-V1-106"), "OBSERVATION_WITNESS_CONFLICTING"
+        )
+
+    def test_incomplete_committed_scope_is_unavailable(self) -> None:
+        self.assert_unavailable_with_reason(
+            fixture("LAB-V1-107"), "OBSERVATION_COMMITMENT_CONFLICTING"
+        )
+
+    def test_unverified_commitment_is_unavailable(self) -> None:
+        self.assert_unavailable_with_reason(
+            fixture("LAB-V1-108"), "OBSERVATION_COMMITMENT_AUTHENTICITY_UNAVAILABLE"
+        )
+
+    def test_commitment_without_checkpoint_is_unavailable(self) -> None:
+        self.assert_unavailable_with_reason(
+            fixture("LAB-V1-109"), "OBSERVATION_COMMITMENT_UNIQUENESS_UNAVAILABLE"
+        )
+
+    def test_candidate_fixture_cannot_supply_trusted_state(self) -> None:
+        path = CASES / "LAB-V1-032.json"
+        raw = json.loads(path.read_text(encoding="utf-8"))
+        raw["_trusted_commitment_context"] = []
+        with self.assertRaises(ValueError):
+            # Disk fixtures are never allowed to choose their own durable anchor.
+            with patch("json.load", return_value=raw):
+                load_fixture(path)
+
+    def test_positive_commitment_and_successor_paths_remain_authorized(self) -> None:
+        for case_id in ("LAB-V1-098", "LAB-V1-099", "LAB-V1-102", "LAB-V1-111", "LAB-V1-112"):
+            with self.subTest(case_id=case_id):
+                self.assertIs(AuthorityOutcome.AUTHORIZED, actual(fixture(case_id)))
 
     def test_fixture_files_are_valid_json_objects(self) -> None:
         for path in discover(CASES):

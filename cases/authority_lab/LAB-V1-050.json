@@ -248,7 +248,7 @@
               "end_event_order": 3,
               "start_sequence": 1,
               "end_sequence": 3,
-              "stream_commitment": "COMMITMENT-LAB-V1-032-1",
+              "stream_commitment": "3cc8c89a9733f82049c362e4ca9cd93c415be57443b38abef6547bce9746dd97",
               "boundary_epoch": "B1",
               "observation_binding_generation": 1
             }
@@ -284,7 +284,156 @@
               "boundary_epoch": "B1",
               "lineage": "LINEAGE-AUTH-BOUNDARY-1"
             }
-          ]
+          ],
+          "commitment_envelopes": [
+            {
+              "relationship": "OBSERVATION_HISTORY_COMMITMENT",
+              "commitment_id": "COMMITMENT-LAB-V1-050-1",
+              "commitment_format": "AUTHORITY-LAB-OBSERVATION-COMMITMENT-V1",
+              "commitment_digest_algorithm": "SHA-256",
+              "commitment_digest": "3cc8c89a9733f82049c362e4ca9cd93c415be57443b38abef6547bce9746dd97",
+              "observer_id": "MONITOR-LAB-V1-032",
+              "observer_generation": 1,
+              "observer_identity_basis": "IDENTITY-BASIS-MONITOR-LAB-V1-032",
+              "issuer_key_id": "OBSERVER-KEY-LAB-V1-050-1",
+              "issuer_key_generation": 1,
+              "stream_id": "STREAM-LAB-V1-032-1",
+              "stream_generation": 1,
+              "logical_position": 0,
+              "segment_ids": [
+                "SEGMENT-LAB-V1-032-1"
+              ],
+              "start_anchor_id": "T1-ANCHOR-LAB-V1-032",
+              "start_event_order": 1,
+              "end_anchor_id": "T3-ANCHOR-LAB-V1-032",
+              "end_event_order": 3,
+              "start_sequence": 1,
+              "end_sequence": 3,
+              "scope_families": [
+                "SUBJECT_AND_DELEGATION",
+                "ARTIFACT_AND_TRANSFORMATION",
+                "EXECUTION_CONTROL",
+                "BOUNDARY_AND_EPOCH",
+                "CREDENTIAL_AND_IDENTITY",
+                "GRANT_USE_AND_CONSUMPTION",
+                "OBJECTIVE_AUTHORITY_LIFECYCLE",
+                "OBSERVATION_PIPELINE"
+              ],
+              "observation_binding_id": "OBSERVATION-LAB-V1-050",
+              "observation_binding_generation": 1,
+              "objective_binding_id": "BINDING-LAB-V1-032",
+              "objective_binding_generation": 1,
+              "decision_contract_id": "CONTRACT-LAB-V1-032",
+              "decision_contract_version": "1",
+              "source_id": "MONITOR-LAB-V1-032",
+              "authority_generation": 1,
+              "boundary": "AUTH-BOUNDARY-1",
+              "boundary_epoch": "B1",
+              "lineage": "LINEAGE-AUTH-BOUNDARY-1",
+              "ordering_source_id": "ORDER-AUTH-BOUNDARY-1",
+              "freshness_challenge_id": "CHALLENGE-LAB-V1-050-1",
+              "predecessor_commitment_id": "GENESIS",
+              "predecessor_commitment_digest": "GENESIS",
+              "canonical_payload_digest": "3cc8c89a9733f82049c362e4ca9cd93c415be57443b38abef6547bce9746dd97",
+              "signature_evidence_id": "SIGNATURE-LAB-V1-050-1"
+            }
+          ],
+          "commitment_verifiers": [
+            {
+              "verifier_id": "VERIFIER-LAB-V1-050-1",
+              "verifier_generation": 1,
+              "verifier_identity_basis": "VERIFIER-IDENTITY-LAB-V1-050-1",
+              "role": "OBSERVATION_COMMITMENT_APPRAISER",
+              "scope_families": [
+                "SUBJECT_AND_DELEGATION",
+                "ARTIFACT_AND_TRANSFORMATION",
+                "EXECUTION_CONTROL",
+                "BOUNDARY_AND_EPOCH",
+                "CREDENTIAL_AND_IDENTITY",
+                "GRANT_USE_AND_CONSUMPTION",
+                "OBJECTIVE_AUTHORITY_LIFECYCLE",
+                "OBSERVATION_PIPELINE"
+              ],
+              "boundary": "AUTH-BOUNDARY-1",
+              "boundary_epoch": "B1",
+              "source_id": "MONITOR-LAB-V1-032",
+              "authority_generation": 1,
+              "lineage": "LINEAGE-AUTH-BOUNDARY-1",
+              "ordering_source_id": "ORDER-AUTH-BOUNDARY-1",
+              "lifecycle_state": "ACTIVE"
+            }
+          ],
+          "commitment_verifications": [
+            {
+              "verification_id": "VERIFICATION-LAB-V1-050-1",
+              "verifier_id": "VERIFIER-LAB-V1-050-1",
+              "verifier_generation": 1,
+              "commitment_id": "COMMITMENT-LAB-V1-050-1",
+              "commitment_digest": "3cc8c89a9733f82049c362e4ca9cd93c415be57443b38abef6547bce9746dd97",
+              "canonical_payload_digest": "3cc8c89a9733f82049c362e4ca9cd93c415be57443b38abef6547bce9746dd97",
+              "signature_evidence_id": "SIGNATURE-LAB-V1-050-1",
+              "issuer_key_id": "OBSERVER-KEY-LAB-V1-050-1",
+              "issuer_key_generation": 1,
+              "verification_method_id": "SHA256-AND-ADMITTED-SIGNATURE-V1",
+              "freshness_challenge_id": "CHALLENGE-LAB-V1-050-1",
+              "verification_event_order": 3,
+              "disposition": "VERIFIED"
+            }
+          ],
+          "commitment_links": [
+            {
+              "relationship": "GENESIS",
+              "link_id": "LINK-LAB-V1-050-1",
+              "stream_id": "STREAM-LAB-V1-032-1",
+              "stream_generation": 1,
+              "from_commitment_id": "GENESIS",
+              "from_commitment_digest": "GENESIS",
+              "from_logical_position": 0,
+              "to_commitment_id": "COMMITMENT-LAB-V1-050-1",
+              "to_commitment_digest": "3cc8c89a9733f82049c362e4ca9cd93c415be57443b38abef6547bce9746dd97",
+              "to_logical_position": 0,
+              "consistency_evidence_id": "CONSISTENCY-LAB-V1-050-1",
+              "verifier_id": "VERIFIER-LAB-V1-050-1",
+              "verifier_generation": 1,
+              "ordering_source_id": "ORDER-AUTH-BOUNDARY-1",
+              "link_event_order": 3,
+              "source_id": "MONITOR-LAB-V1-032",
+              "authority_generation": 1,
+              "boundary": "AUTH-BOUNDARY-1",
+              "boundary_epoch": "B1",
+              "lineage": "LINEAGE-AUTH-BOUNDARY-1"
+            }
+          ],
+          "commitment_checkpoints": [
+            {
+              "relationship": "UNIQUE_CURRENT_COMMITMENT_HEAD",
+              "checkpoint_id": "CHECKPOINT-LAB-V1-050-1",
+              "checkpoint_generation": 1,
+              "verifier_state_id": "VERIFIER-STATE-LAB-V1-050-1",
+              "verifier_state_generation": 1,
+              "previous_verifier_state_id": "GENESIS",
+              "previous_verifier_state_generation": 0,
+              "previous_verifier_state_digest": "GENESIS-STATE",
+              "current_verifier_state_digest": "6009da869f2cfe7f21869c4e2dfe619d7b7cc3d541a69d752ce13a7777c5d10f",
+              "observation_binding_id": "OBSERVATION-LAB-V1-050",
+              "observation_binding_generation": 1,
+              "stream_id": "STREAM-LAB-V1-032-1",
+              "stream_generation": 1,
+              "head_logical_position": 0,
+              "head_commitment_id": "COMMITMENT-LAB-V1-050-1",
+              "head_commitment_digest": "3cc8c89a9733f82049c362e4ca9cd93c415be57443b38abef6547bce9746dd97",
+              "freshness_challenge_id": "CHALLENGE-LAB-V1-050-1",
+              "checkpoint_event_order": 3,
+              "source_id": "MONITOR-LAB-V1-032",
+              "authority_generation": 1,
+              "boundary": "AUTH-BOUNDARY-1",
+              "boundary_epoch": "B1",
+              "lineage": "LINEAGE-AUTH-BOUNDARY-1",
+              "ordering_source_id": "ORDER-AUTH-BOUNDARY-1",
+              "lifecycle_state": "ACTIVE"
+            }
+          ],
+          "commitment_witnesses": []
         }
       },
       "execution_context": {
@@ -306,7 +455,15 @@
           "authority_generation": 1,
           "ordering_source_id": "ORDER-AUTH-BOUNDARY-1",
           "head_anchor_id": "T3-ANCHOR-LAB-V1-032",
-          "head_event_order": 3
+          "head_event_order": 3,
+          "commitment_id": "COMMITMENT-LAB-V1-050-1",
+          "commitment_digest": "3cc8c89a9733f82049c362e4ca9cd93c415be57443b38abef6547bce9746dd97",
+          "checkpoint_id": "CHECKPOINT-LAB-V1-050-1",
+          "checkpoint_generation": 1,
+          "verifier_state_id": "VERIFIER-STATE-LAB-V1-050-1",
+          "verifier_state_generation": 1,
+          "verifier_state_digest": "6009da869f2cfe7f21869c4e2dfe619d7b7cc3d541a69d752ce13a7777c5d10f",
+          "freshness_challenge_id": "CHALLENGE-LAB-V1-050-1"
         }
       },
       "consumption_state": {
