@@ -8,6 +8,7 @@ from copy import deepcopy
 from pathlib import Path
 from unittest.mock import patch
 
+from authority_lab.commitment import commitment_digest, state_key_digest, verifier_state_digest
 from authority_lab.model import (
     AuthorityOutcome,
     ContinuityEffect,
@@ -23,6 +24,7 @@ from authority_lab.model import (
     OBSERVATION_PROFILE_ID,
     OBSERVATION_PROFILE_VERSION,
     OBSERVATION_SCOPE_FAMILIES,
+    ObservationSegment,
     OracleInput,
     RELATIONAL_T3_FACTS,
     TUPLE_FIELDS,
@@ -47,6 +49,52 @@ def fixture(case_id: str) -> dict:
 
 def actual(payload: dict) -> AuthorityOutcome:
     return evaluate(OracleInput.from_fixture(payload)).outcome
+
+
+def reissue_observation_commitment(payload: dict) -> None:
+    """Reissue the exact test commitment after an authorized scope change."""
+    facts = payload["t3"]["facts"]
+    binding = facts["evidence_binding"]["value"]
+    objective = facts["objective_binding"]["value"][-1]
+    envelope = binding["commitment_envelopes"][0]
+    envelope.update(
+        objective_binding_id=objective["binding_id"],
+        objective_binding_generation=objective["binding_generation"],
+        decision_contract_id=binding["decision_contract_id"],
+        decision_contract_version=binding["decision_contract_version"],
+        source_id=binding["source_id"],
+        authority_generation=binding["authority_generation"],
+        boundary=binding["boundary"],
+        boundary_epoch=binding["boundary_epoch"],
+        lineage=binding["lineage"],
+        ordering_source_id=binding["ordering_source_id"],
+    )
+    segments = [
+        ObservationSegment.from_mapping(item)
+        for item in binding["segments"]
+        if item["segment_id"] in envelope["segment_ids"]
+    ]
+    digest = commitment_digest(envelope, segments)
+    envelope.update(commitment_digest=digest, canonical_payload_digest=digest)
+    for segment in binding["segments"]:
+        if segment["segment_id"] in envelope["segment_ids"]:
+            segment["stream_commitment"] = digest
+    verification = binding["commitment_verifications"][0]
+    verification.update(commitment_digest=digest, canonical_payload_digest=digest)
+    binding["commitment_links"][0]["to_commitment_digest"] = digest
+    checkpoint = binding["commitment_checkpoints"][0]
+    checkpoint["head_commitment_digest"] = digest
+    checkpoint["current_verifier_state_digest"] = verifier_state_digest(checkpoint)
+    facts["freshness"]["value"].update(
+        commitment_digest=digest,
+        verifier_state_digest=checkpoint["current_verifier_state_digest"],
+    )
+    context = payload["_trusted_commitment_context"][0]
+    context.update(
+        exact_state_key_digest=state_key_digest(envelope),
+        current_verifier_state_digest=checkpoint["current_verifier_state_digest"],
+        head_commitment_digest=digest,
+    )
 
 
 def rebind_objective_binding(payload: dict, *, suffix: str) -> dict:
@@ -133,6 +181,7 @@ def rebind_objective_binding(payload: dict, *, suffix: str) -> dict:
         )
     for segment in observation["segments"]:
         segment["boundary_epoch"] = source["boundary_epoch"]
+    reissue_observation_commitment(payload)
     return payload
 
 
@@ -1026,6 +1075,7 @@ class AuthorityLabTests(unittest.TestCase):
         observation["objective_binding_generation"] = new_binding[
             "binding_generation"
         ]
+        reissue_observation_commitment(payload)
         for name, old_value in before.items():
             payload["t2"]["mutations"].append(
                 {
