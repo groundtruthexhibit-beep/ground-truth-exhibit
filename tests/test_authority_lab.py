@@ -19,6 +19,9 @@ from authority_lab.model import (
     MUTATION_REGISTRY,
     MUTATION_SPECS,
     MutationTargetKind,
+    OBSERVATION_PROFILE_ID,
+    OBSERVATION_PROFILE_VERSION,
+    OBSERVATION_SCOPE_FAMILIES,
     OracleInput,
     RELATIONAL_T3_FACTS,
     TUPLE_FIELDS,
@@ -85,6 +88,50 @@ def rebind_objective_binding(payload: dict, *, suffix: str) -> dict:
             payload["t2"]["mutations"].append(
                 {"field": name, "before": before, "after": after}
             )
+    # Observation admission is independently root-issued, but it must identify
+    # the exact current objective binding and decision contract it covers.
+    observation = facts["evidence_binding"]["value"]
+    freshness = facts["freshness"]["value"]
+    observation.update(
+        {
+            "objective_binding_id": binding["binding_id"],
+            "objective_binding_generation": binding["binding_generation"],
+            "decision_contract_id": binding["contract_id"],
+            "decision_contract_version": binding["contract_version"],
+            "source_id": source["root_id"],
+            "authority_generation": source["authority_generation"],
+            "boundary": source["boundary"],
+            "boundary_epoch": source["boundary_epoch"],
+            "lineage": source["lineage"],
+            "ordering_source_id": facts["binding_ordering"]["value"][
+                "ordering_source_id"
+            ],
+        }
+    )
+    freshness.update(
+        {
+            "source_id": source["root_id"],
+            "authority_generation": source["authority_generation"],
+            "boundary": source["boundary"],
+            "boundary_epoch": source["boundary_epoch"],
+            "lineage": source["lineage"],
+            "ordering_source_id": facts["binding_ordering"]["value"][
+                "ordering_source_id"
+            ],
+        }
+    )
+    for record in observation["lifecycle_records"]:
+        record.update(
+            {
+                "source_id": source["root_id"],
+                "authority_generation": source["authority_generation"],
+                "boundary": source["boundary"],
+                "boundary_epoch": source["boundary_epoch"],
+                "lineage": source["lineage"],
+            }
+        )
+    for segment in observation["segments"]:
+        segment["boundary_epoch"] = source["boundary_epoch"]
     return payload
 
 
@@ -197,9 +244,9 @@ class AuthorityLabTests(unittest.TestCase):
         self.assertIs(AuthorityOutcome.UNAVAILABLE, result.outcome)
         self.assertIn(reason_code, {reason.code for reason in result.reasons})
 
-    def test_v1_contains_forty_eight_deterministic_fixtures(self) -> None:
+    def test_v1_contains_sixty_eight_deterministic_fixtures(self) -> None:
         paths = discover(CASES)
-        self.assertEqual(48, len(paths))
+        self.assertEqual(68, len(paths))
         self.assertEqual(paths, discover(CASES))
 
     def test_every_v0_fixture_matches_its_expected_outcome(self) -> None:
@@ -254,12 +301,12 @@ class AuthorityLabTests(unittest.TestCase):
     def test_stale_freshness_cannot_authorize(self) -> None:
         payload = fixture("LAB-V0-001")
         payload["t3"]["facts"]["freshness"]["value"] = "STALE"
-        self.assert_unavailable_with_reason(payload, "REQUIRED_VALUE_MISMATCH")
+        self.assert_unavailable_with_reason(payload, "OBSERVATION_FRESHNESS_UNAVAILABLE")
 
     def test_wrong_evidence_binding_cannot_authorize(self) -> None:
         payload = fixture("LAB-V0-001")
         payload["t3"]["facts"]["evidence_binding"]["value"] = "STALE"
-        self.assert_unavailable_with_reason(payload, "REQUIRED_VALUE_MISMATCH")
+        self.assert_unavailable_with_reason(payload, "OBSERVATION_ADMISSION_UNAVAILABLE")
 
     def test_changed_execution_context_cannot_authorize_without_rebinding(self) -> None:
         payload = fixture("LAB-V0-001")
@@ -301,11 +348,7 @@ class AuthorityLabTests(unittest.TestCase):
         self.assert_unavailable_with_reason(payload, "REQUIRED_VALUE_UNSPECIFIED")
 
     def test_fixture_required_values_cannot_launder_nonpermitting_core_values(self) -> None:
-        for field, value in (
-            ("consumption_state", "CONSUMED"),
-            ("freshness", "STALE"),
-            ("evidence_binding", "STALE"),
-        ):
+        for field, value in (("consumption_state", "CONSUMED"),):
             with self.subTest(field=field):
                 payload = fixture("LAB-V0-001")
                 payload["t3"]["facts"][field]["value"] = value
@@ -322,7 +365,7 @@ class AuthorityLabTests(unittest.TestCase):
                     )
                 )
                 self.assertTrue(
-                    set(payload["t3"]["required_facts"]).issubset(
+                    (set(payload["t3"]["required_facts"]) - set(RELATIONAL_T3_FACTS)).issubset(
                         payload["t3"]["required_values"]
                     )
                 )
@@ -1011,6 +1054,11 @@ class AuthorityLabTests(unittest.TestCase):
                 "head_event_order": 2,
             }
         )
+        observation = facts["evidence_binding"]["value"]
+        observation["objective_binding_id"] = new_binding["binding_id"]
+        observation["objective_binding_generation"] = new_binding[
+            "binding_generation"
+        ]
         for name, old_value in before.items():
             payload["t2"]["mutations"].append(
                 {
@@ -1407,6 +1455,180 @@ class AuthorityLabTests(unittest.TestCase):
             "actor_context [canonical=execution_context; target=STATE:execution_context]",
             alias_trace,
         )
+
+    def test_observation_hostile_fixture_matrix_matches_independent_expectations(self) -> None:
+        expected = {
+            **{f"LAB-V1-{number:03d}": AuthorityOutcome.UNAVAILABLE for number in range(49, 58)},
+            "LAB-V1-058": AuthorityOutcome.AUTHORIZED,
+            **{f"LAB-V1-{number:03d}": AuthorityOutcome.UNAVAILABLE for number in range(59, 66)},
+            "LAB-V1-066": AuthorityOutcome.AUTHORIZED,
+            "LAB-V1-067": AuthorityOutcome.DENIED,
+            "LAB-V1-068": AuthorityOutcome.AUTHORIZED,
+        }
+        for case_id, outcome in expected.items():
+            with self.subTest(case_id=case_id):
+                result = run_path(CASES / f"{case_id}.json")
+                self.assertIs(HarnessStatus.PASS, result.status)
+                self.assertIs(outcome, result.actual.outcome)
+
+    def test_observation_profile_and_scope_vocabulary_are_frozen(self) -> None:
+        self.assertEqual("AUTHORITY-LAB-OBSERVATION-PROFILE-1", OBSERVATION_PROFILE_ID)
+        self.assertEqual(1, OBSERVATION_PROFILE_VERSION)
+        self.assertEqual(
+            (
+                "SUBJECT_AND_DELEGATION",
+                "ARTIFACT_AND_TRANSFORMATION",
+                "EXECUTION_CONTROL",
+                "BOUNDARY_AND_EPOCH",
+                "CREDENTIAL_AND_IDENTITY",
+                "GRANT_USE_AND_CONSUMPTION",
+                "OBJECTIVE_AUTHORITY_LIFECYCLE",
+                "OBSERVATION_PIPELINE",
+            ),
+            OBSERVATION_SCOPE_FAMILIES,
+        )
+
+    def test_absence_of_observation_cannot_imply_continuity(self) -> None:
+        payload = fixture("LAB-V1-032")
+        payload["t3"]["facts"]["evidence_binding"]["value"] = "EXACT"
+        payload["t3"]["facts"]["freshness"]["value"] = "CURRENT"
+        self.assert_unavailable_with_reason(payload, "OBSERVATION_ADMISSION_UNAVAILABLE")
+
+    def test_unchecked_observation_completeness_boolean_is_malformed(self) -> None:
+        payload = fixture("LAB-V1-032")
+        payload["t3"]["facts"]["evidence_binding"]["value"][
+            "observations_complete"
+        ] = True
+        with self.assertRaises(ValueError):
+            OracleInput.from_fixture(payload)
+
+    def test_root_observer_cycle_is_unavailable(self) -> None:
+        payload = fixture("LAB-V1-032")
+        root_id = payload["t3"]["facts"]["authority_root"]["value"]["root_id"]
+        observation = payload["t3"]["facts"]["evidence_binding"]["value"]
+        observation["observers"][0]["observer_id"] = root_id
+        observation["segments"][0]["observer_id"] = root_id
+        observation["lifecycle_records"][1]["target_id"] = root_id
+        self.assert_unavailable_with_reason(payload, "OBSERVATION_ADMISSION_UNAVAILABLE")
+
+    def test_delegate_observer_widening_is_unavailable(self) -> None:
+        payload = fixture("LAB-V1-051")
+        self.assert_unavailable_with_reason(payload, "OBSERVATION_ADMISSION_UNAVAILABLE")
+        payload["t3"]["facts"]["evidence_binding"]["value"]["source_id"] = (
+            "ROOT-AUTH-BOUNDARY-1"
+        )
+        self.assertIs(AuthorityOutcome.AUTHORIZED, actual(payload))
+
+    def test_coverage_and_restart_gaps_are_unavailable(self) -> None:
+        for case_id in ("LAB-V1-054", "LAB-V1-055"):
+            with self.subTest(case_id=case_id):
+                self.assert_unavailable_with_reason(
+                    fixture(case_id), "OBSERVATION_COVERAGE_UNAVAILABLE"
+                )
+
+    def test_substitution_requires_exact_root_issued_handoff(self) -> None:
+        self.assert_unavailable_with_reason(
+            fixture("LAB-V1-057"), "OBSERVER_HANDOFF_UNAVAILABLE"
+        )
+        self.assertIs(AuthorityOutcome.AUTHORIZED, actual(fixture("LAB-V1-058")))
+
+    def test_conflicting_observers_fail_closed_without_voting(self) -> None:
+        self.assert_unavailable_with_reason(
+            fixture("LAB-V1-059"), "OBSERVATION_CONFLICTING"
+        )
+
+    def test_observation_laundering_paths_are_unavailable(self) -> None:
+        expected_reasons = {
+            "LAB-V1-061": "OBSERVATION_TRANSFORMATION_UNAVAILABLE",
+            "LAB-V1-062": "OBSERVATION_TRANSFORMATION_UNAVAILABLE",
+            "LAB-V1-063": "OBSERVATION_ADMISSION_UNAVAILABLE",
+            "LAB-V1-064": "OBSERVATION_ADMISSION_UNAVAILABLE",
+            "LAB-V1-065": "OBSERVATION_TRANSFORMATION_UNAVAILABLE",
+        }
+        for case_id, reason in expected_reasons.items():
+            with self.subTest(case_id=case_id):
+                self.assert_unavailable_with_reason(fixture(case_id), reason)
+
+    def test_duplicate_observation_segment_is_idempotent_but_conflict_is_not(self) -> None:
+        payload = fixture("LAB-V1-032")
+        segments = payload["t3"]["facts"]["evidence_binding"]["value"]["segments"]
+        segments.append(deepcopy(segments[0]))
+        self.assertIs(AuthorityOutcome.AUTHORIZED, actual(payload))
+        segments[-1]["stream_commitment"] = "CONFLICTING-COMMITMENT"
+        self.assert_unavailable_with_reason(payload, "OBSERVATION_CONFLICTING")
+
+    def test_reordered_stream_sequence_cannot_hide_behind_interval_coverage(self) -> None:
+        payload = fixture("LAB-V1-032")
+        segments = payload["t3"]["facts"]["evidence_binding"]["value"]["segments"]
+        segments[0].update(
+            {"end_anchor_id": "MID", "end_event_order": 2, "end_sequence": 10}
+        )
+        after = deepcopy(segments[0])
+        after.update(
+            {
+                "segment_id": "SEGMENT-REORDERED-AFTER",
+                "start_anchor_id": "MID",
+                "start_event_order": 2,
+                "end_anchor_id": payload["t3"]["facts"]["evidence_binding"]["value"][
+                    "t3_anchor"
+                ]["anchor_id"],
+                "end_event_order": 3,
+                "start_sequence": 1,
+                "end_sequence": 2,
+            }
+        )
+        segments.append(after)
+        self.assert_unavailable_with_reason(payload, "OBSERVATION_ORDERING_UNAVAILABLE")
+
+    def test_multihop_transformation_cannot_drop_scope(self) -> None:
+        payload = fixture("LAB-V1-061")
+        transformations = payload["t3"]["facts"]["evidence_binding"]["value"][
+            "transformations"
+        ]
+        first = transformations[0]
+        first["scope_families"] = deepcopy(
+            payload["t3"]["facts"]["evidence_binding"]["value"]["segments"][0][
+                "scope_families"
+            ]
+        )
+        second = deepcopy(first)
+        second.update(
+            {
+                "transformation_id": "TRANSFORM-MULTIHOP-LOSS",
+                "source_stream_id": first["target_stream_id"],
+                "source_stream_generation": first["target_stream_generation"],
+                "source_commitment": first["target_commitment"],
+                "target_stream_id": "SUMMARY-MULTIHOP-LOSS",
+                "target_commitment": "SUMMARY-COMMITMENT-MULTIHOP-LOSS",
+                "scope_families": first["scope_families"][:-1],
+            }
+        )
+        transformations.append(second)
+        self.assert_unavailable_with_reason(
+            payload, "OBSERVATION_TRANSFORMATION_UNAVAILABLE"
+        )
+
+    def test_current_root_issued_observer_revocation_is_denied(self) -> None:
+        result = evaluate(OracleInput.from_fixture(fixture("LAB-V1-067")))
+        self.assertIs(AuthorityOutcome.DENIED, result.outcome)
+        self.assertIn("OBSERVATION_SOURCE_REVOKED", {r.code for r in result.reasons})
+
+    def test_positive_root_issued_observation_path_remains_authorized(self) -> None:
+        for case_id in ("LAB-V1-066", "LAB-V1-068"):
+            with self.subTest(case_id=case_id):
+                result = evaluate(OracleInput.from_fixture(fixture(case_id)))
+                self.assertIs(AuthorityOutcome.AUTHORIZED, result.outcome)
+                self.assertIn(
+                    "CURRENT_AUTHORITY_ESTABLISHED",
+                    {reason.code for reason in result.reasons},
+                )
+
+    def test_trace_exposes_observation_admission_and_coverage(self) -> None:
+        trace = format_trace(run_path(CASES / "LAB-V1-058.json"))
+        self.assertIn("OBSERVATION\nprofile: AUTHORITY-LAB-OBSERVATION-PROFILE-1@1", trace)
+        self.assertIn("handoff: HANDOFF-LAB-V1-058", trace)
+        self.assertIn("gaps: none", trace)
+        self.assertIn("freshness: T3-ANCHOR-LAB-V1-032@3", trace)
 
     def test_fixture_files_are_valid_json_objects(self) -> None:
         for path in discover(CASES):

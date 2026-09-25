@@ -15,6 +15,12 @@ from .model import (
     MUTATION_SPECS,
     MutationTargetKind,
     OBJECTIVE_BINDING_FACTS,
+    OBSERVATION_PROFILE_ID,
+    OBSERVATION_PROFILE_VERSION,
+    OBSERVATION_SCOPE_FAMILIES,
+    ObservationBinding,
+    ObservationHandoff,
+    ObservationSegment,
     ObjectiveBindingFacts,
     OracleInput,
     OracleResult,
@@ -34,8 +40,6 @@ TUPLE_FACT_BINDINGS = (
 
 AUTHORITY_PERMITTING_VALUES = {
     "consumption_state": "UNUSED",
-    "evidence_binding": "CURRENT",
-    "freshness": "CURRENT",
 }
 
 STATE_MUTATION_TARGETS = tuple(
@@ -66,6 +70,7 @@ GRANT_SCOPE_FIELDS = (
 )
 
 NEGATIVE_BINDING_STATES = {"INVALID", "REVOKED", "REJECTED", "SUPERSEDED"}
+NEGATIVE_OBSERVATION_STATES = {"INVALID", "REVOKED", "REJECTED", "SUPERSEDED"}
 
 
 def _engaged(case: OracleInput) -> tuple[str, ...]:
@@ -698,6 +703,527 @@ def _state_has_empty_identifier(state: AuthorityStateBinding) -> bool:
     )
 
 
+def _observation_unavailable(
+    case: OracleInput, code: str, detail: str, facts: tuple[str, ...] = ()
+) -> OracleResult:
+    return _unavailable(case, code, detail, facts)
+
+
+def _observation_denied(
+    case: OracleInput, state: str, detail: str, facts: tuple[str, ...]
+) -> OracleResult:
+    return OracleResult(
+        AuthorityOutcome.DENIED,
+        (Reason(f"OBSERVATION_SOURCE_{state}", detail, facts),),
+        _engaged(case),
+    )
+
+
+def _valid_handoff(
+    binding: ObservationBinding,
+    handoff: ObservationHandoff,
+    before: ObservationSegment,
+    after: ObservationSegment,
+    family: str,
+) -> bool:
+    return (
+        handoff.source_id == binding.source_id
+        and handoff.authority_generation == binding.authority_generation
+        and handoff.boundary == binding.boundary
+        and handoff.boundary_epoch == binding.boundary_epoch
+        and handoff.lineage == binding.lineage
+        and handoff.from_observer_id == before.observer_id
+        and handoff.from_observer_generation == before.observer_generation
+        and handoff.to_observer_id == after.observer_id
+        and handoff.to_observer_generation == after.observer_generation
+        and handoff.from_segment_id == before.segment_id
+        and handoff.to_segment_id == after.segment_id
+        and family in handoff.scope_families
+        and handoff.handoff_anchor_id in {before.end_anchor_id, after.start_anchor_id}
+        and before.end_event_order <= handoff.handoff_event_order
+        and handoff.handoff_event_order <= after.start_event_order
+    )
+
+
+def _evaluate_observation(case: OracleInput) -> OracleResult:
+    binding = case.observation_binding
+    if binding is None:
+        return _observation_unavailable(
+            case,
+            "OBSERVATION_ADMISSION_UNAVAILABLE",
+            "A strict root-issued observation binding is not established.",
+            ("evidence_binding",),
+        )
+    freshness = case.observation_freshness
+    if freshness is None:
+        return _observation_unavailable(
+            case,
+            "OBSERVATION_FRESHNESS_UNAVAILABLE",
+            "A strict observation freshness relationship is not established at T3.",
+            ("freshness",),
+        )
+
+    facts = case.t3_binding_facts
+    root = facts.authority_root
+    contract = facts.decision_contract_identity
+    ordering = facts.ordering
+    if root is None or contract is None or ordering is None:
+        return _observation_unavailable(
+            case,
+            "OBSERVATION_ADMISSION_UNAVAILABLE",
+            "Observation admission lacks the independently established current root context.",
+            ("authority_root", "binding_ordering"),
+        )
+    selected = tuple(
+        candidate
+        for candidate in facts.candidates
+        if candidate.binding_id == ordering.head_binding_id
+        and candidate.binding_generation == ordering.head_binding_generation
+    )
+    if len(selected) != 1:
+        return _observation_unavailable(
+            case,
+            "OBSERVATION_ADMISSION_UNAVAILABLE",
+            "Observation admission cannot identify one exact selected objective binding.",
+            ("objective_binding", "binding_ordering"),
+        )
+    objective_binding = selected[0]
+    if (
+        binding.profile_id != OBSERVATION_PROFILE_ID
+        or binding.profile_version != OBSERVATION_PROFILE_VERSION
+        or binding.objective_binding_id != objective_binding.binding_id
+        or binding.objective_binding_generation != objective_binding.binding_generation
+        or binding.decision_contract_id != contract.contract_id
+        or binding.decision_contract_version != contract.contract_version
+        or binding.source_id != root.root_id
+        or binding.authority_generation != root.authority_generation
+        or binding.boundary != root.boundary
+        or binding.boundary_epoch != root.boundary_epoch
+        or binding.lineage != root.lineage
+        or binding.ordering_source_id != root.ordering_source_id
+        or binding.source_id == case.authority_tuple.subject
+    ):
+        return _observation_unavailable(
+            case,
+            "OBSERVATION_ADMISSION_UNAVAILABLE",
+            "Observation admission is not issued by the exact current authority root for this binding and boundary.",
+            ("evidence_binding", "authority_root", "objective_binding"),
+        )
+    if binding.t3_anchor.event_order < binding.t1_anchor.event_order:
+        return _observation_unavailable(
+            case,
+            "OBSERVATION_ORDERING_UNAVAILABLE",
+            "The observation interval is not authoritatively ordered from T1 through T3.",
+            ("evidence_binding",),
+        )
+
+    lifecycle_ids: dict[str, Any] = {}
+    lifecycle_heads: dict[tuple[str, str, int], Any] = {}
+    for record in binding.lifecycle_records:
+        prior = lifecycle_ids.get(record.record_id)
+        if prior is not None and prior != record:
+            return _observation_unavailable(
+                case,
+                "OBSERVATION_CONFLICTING",
+                "One lifecycle record identity has conflicting bodies.",
+                ("evidence_binding",),
+            )
+        lifecycle_ids[record.record_id] = record
+        if (
+            record.source_id != root.root_id
+            or record.authority_generation != root.authority_generation
+            or record.boundary != root.boundary
+            or record.boundary_epoch != root.boundary_epoch
+            or record.lineage != root.lineage
+            or record.event_order > binding.t3_anchor.event_order
+        ):
+            return _observation_unavailable(
+                case,
+                "OBSERVATION_ORDERING_UNAVAILABLE",
+                "Observation lifecycle state is not ordered by the exact current root lineage.",
+                ("evidence_binding",),
+            )
+        key = (record.target_kind, record.target_id, record.target_generation)
+        head = lifecycle_heads.get(key)
+        if head is None or record.event_order > head.event_order:
+            lifecycle_heads[key] = record
+        elif record.event_order == head.event_order and record != head:
+            return _observation_unavailable(
+                case,
+                "OBSERVATION_CONFLICTING",
+                "One observation lifecycle target has conflicting current heads.",
+                ("evidence_binding",),
+            )
+
+    binding_head = lifecycle_heads.get(
+        ("OBSERVATION_BINDING", binding.observation_binding_id, binding.observation_binding_generation)
+    )
+    if binding_head is None:
+        return _observation_unavailable(
+            case,
+            "OBSERVATION_ADMISSION_UNAVAILABLE",
+            "The observation binding has no current root-issued lifecycle head.",
+            ("evidence_binding",),
+        )
+    if binding_head.state in NEGATIVE_OBSERVATION_STATES:
+        return _observation_denied(
+            case,
+            binding_head.state,
+            "Current root-issued lifecycle evidence rejects the observation binding.",
+            ("evidence_binding",),
+        )
+
+    observers: dict[tuple[str, int], Any] = {}
+    for observer in binding.observers:
+        key = (observer.observer_id, observer.observer_generation)
+        prior = observers.get(key)
+        if prior is not None and prior != observer:
+            return _observation_unavailable(
+                case,
+                "OBSERVATION_CONFLICTING",
+                "One observer identity and generation has conflicting admissions.",
+                ("evidence_binding",),
+            )
+        observers[key] = observer
+        if (
+            observer.observation_binding_id != binding.observation_binding_id
+            or observer.observation_binding_generation != binding.observation_binding_generation
+            or observer.observer_id
+            in {
+                case.authority_tuple.subject,
+                binding.source_id,
+                root.root_id,
+                root.ordering_source_id,
+            }
+        ):
+            return _observation_unavailable(
+                case,
+                "OBSERVATION_ADMISSION_UNAVAILABLE",
+                "Observer identity or admission is self-issued, circular, or bound to another observation contract.",
+                ("evidence_binding",),
+            )
+        observer_head = lifecycle_heads.get(("OBSERVER", *key))
+        if observer_head is None or observer_head.state != observer.lifecycle_state:
+            return _observation_unavailable(
+                case,
+                "OBSERVATION_ADMISSION_UNAVAILABLE",
+                "Observer admission lacks one matching current root-issued lifecycle head.",
+                ("evidence_binding",),
+            )
+        if observer_head.state in NEGATIVE_OBSERVATION_STATES:
+            return _observation_denied(
+                case,
+                observer_head.state,
+                "Current root-issued lifecycle evidence rejects an applicable observer.",
+                ("evidence_binding",),
+            )
+    if not observers:
+        return _observation_unavailable(
+            case,
+            "OBSERVATION_ADMISSION_UNAVAILABLE",
+            "No independently admitted observer is established.",
+            ("evidence_binding",),
+        )
+    scope_union = {family for observer in observers.values() for family in observer.scope_families}
+    if scope_union != set(OBSERVATION_SCOPE_FAMILIES):
+        return _observation_unavailable(
+            case,
+            "OBSERVATION_SCOPE_UNAVAILABLE",
+            "Admitted observers do not cover the complete immutable observation profile.",
+            ("evidence_binding",),
+        )
+
+    segments: dict[str, ObservationSegment] = {}
+    for segment in binding.segments:
+        prior = segments.get(segment.segment_id)
+        if prior is not None and prior != segment:
+            return _observation_unavailable(
+                case,
+                "OBSERVATION_CONFLICTING",
+                "One segment identity has conflicting bodies.",
+                ("evidence_binding",),
+            )
+        segments[segment.segment_id] = segment
+        observer = observers.get((segment.observer_id, segment.observer_generation))
+        if (
+            observer is None
+            or not set(segment.scope_families).issubset(observer.scope_families)
+            or segment.boundary_epoch != binding.boundary_epoch
+            or segment.observation_binding_generation != binding.observation_binding_generation
+        ):
+            return _observation_unavailable(
+                case,
+                "OBSERVATION_COVERAGE_UNAVAILABLE",
+                "A coverage segment is not bound to an admitted observer, scope, epoch, and observation generation.",
+                ("evidence_binding",),
+            )
+        if (
+            segment.end_event_order < segment.start_event_order
+            or segment.end_sequence < segment.start_sequence
+            or segment.start_event_order < binding.t1_anchor.event_order
+            or segment.end_event_order > binding.t3_anchor.event_order
+        ):
+            return _observation_unavailable(
+                case,
+                "OBSERVATION_ORDERING_UNAVAILABLE",
+                "A coverage segment has stale, reversed, or out-of-interval ordering.",
+                ("evidence_binding",),
+            )
+    if not segments:
+        return _observation_unavailable(
+            case,
+            "OBSERVATION_COVERAGE_UNAVAILABLE",
+            "No ordered observation coverage segments are established.",
+            ("evidence_binding",),
+        )
+
+    handoff_ids: dict[str, ObservationHandoff] = {}
+    for handoff in binding.handoffs:
+        prior = handoff_ids.get(handoff.handoff_id)
+        if prior is not None and prior != handoff:
+            return _observation_unavailable(
+                case,
+                "OBSERVATION_CONFLICTING",
+                "One handoff identity has conflicting bodies.",
+                ("evidence_binding",),
+            )
+        handoff_ids[handoff.handoff_id] = handoff
+        before = segments.get(handoff.from_segment_id)
+        after = segments.get(handoff.to_segment_id)
+        if before is None or after is None or not all(
+            _valid_handoff(binding, handoff, before, after, family)
+            for family in handoff.scope_families
+        ):
+            return _observation_unavailable(
+                case,
+                "OBSERVER_HANDOFF_UNAVAILABLE",
+                "Observer substitution is not established by one exact root-issued handoff.",
+                ("evidence_binding",),
+            )
+
+    for family in OBSERVATION_SCOPE_FAMILIES:
+        coverage = sorted(
+            (segment for segment in segments.values() if family in segment.scope_families),
+            key=lambda item: (item.start_event_order, item.end_event_order, item.segment_id),
+        )
+        if (
+            not coverage
+            or coverage[0].start_event_order != binding.t1_anchor.event_order
+            or coverage[-1].end_event_order != binding.t3_anchor.event_order
+        ):
+            return _observation_unavailable(
+                case,
+                "OBSERVATION_COVERAGE_UNAVAILABLE",
+                "A required observation family lacks complete T1-through-T3 coverage.",
+                ("evidence_binding", family),
+            )
+        covered_end = coverage[0].end_event_order
+        for before, after in zip(coverage, coverage[1:]):
+            if after.start_event_order > covered_end + 1:
+                return _observation_unavailable(
+                    case,
+                    "OBSERVATION_COVERAGE_UNAVAILABLE",
+                    "A required observation family contains an uncovered interval.",
+                    ("evidence_binding", family),
+                )
+            changed_stream = (
+                before.observer_id,
+                before.observer_generation,
+                before.stream_id,
+                before.stream_generation,
+            ) != (
+                after.observer_id,
+                after.observer_generation,
+                after.stream_id,
+                after.stream_generation,
+            )
+            valid_handoff = any(
+                _valid_handoff(binding, handoff, before, after, family)
+                for handoff in handoff_ids.values()
+            )
+            if changed_stream and not valid_handoff:
+                if after.start_event_order <= before.end_event_order:
+                    return _observation_unavailable(
+                        case,
+                        "OBSERVATION_CONFLICTING",
+                        "Overlapping admitted streams disagree without an authoritative handoff.",
+                        ("evidence_binding", family),
+                    )
+                return _observation_unavailable(
+                    case,
+                    "OBSERVER_HANDOFF_UNAVAILABLE",
+                    "Observer or stream substitution lacks a complete root-issued handoff.",
+                    ("evidence_binding", family),
+                )
+            covered_end = max(covered_end, after.end_event_order)
+
+    stream_segments: dict[tuple[str, int], list[ObservationSegment]] = {}
+    for segment in segments.values():
+        stream_segments.setdefault((segment.stream_id, segment.stream_generation), []).append(segment)
+    stream_commitments: dict[tuple[str, int], str] = {}
+    stream_scopes: dict[tuple[str, int], set[str]] = {}
+    for stream_key, stream in stream_segments.items():
+        commitments_for_stream = {segment.stream_commitment for segment in stream}
+        if len(commitments_for_stream) != 1:
+            return _observation_unavailable(
+                case,
+                "OBSERVATION_CONFLICTING",
+                "One stream identity and generation has conflicting commitments.",
+                ("evidence_binding",),
+            )
+        stream_commitments[stream_key] = next(iter(commitments_for_stream))
+        stream_scopes[stream_key] = {
+            family for segment in stream for family in segment.scope_families
+        }
+        ordered = sorted(stream, key=lambda item: (item.start_event_order, item.segment_id))
+        for before, after in zip(ordered, ordered[1:]):
+            if (
+                after.start_event_order - before.end_event_order
+                != after.start_sequence - before.end_sequence
+            ):
+                return _observation_unavailable(
+                    case,
+                    "OBSERVATION_ORDERING_UNAVAILABLE",
+                    "An admitted observation stream has a gap, rollback, duplicate suppression, or reordered sequence.",
+                    ("evidence_binding",),
+                )
+
+    transformation_ids: dict[str, Any] = {}
+    graph: dict[tuple[str, int], tuple[str, int]] = {}
+    target_sources: dict[tuple[str, int], tuple[str, int]] = {}
+    for transformation in binding.transformations:
+        prior = transformation_ids.get(transformation.transformation_id)
+        if prior is not None and prior != transformation:
+            return _observation_unavailable(
+                case,
+                "OBSERVATION_CONFLICTING",
+                "One observation transformation identity has conflicting bodies.",
+                ("evidence_binding",),
+            )
+        transformation_ids[transformation.transformation_id] = transformation
+        if (
+            transformation.source_id != root.root_id
+            or transformation.authority_generation != root.authority_generation
+            or transformation.boundary != root.boundary
+            or transformation.boundary_epoch != root.boundary_epoch
+            or transformation.lineage != root.lineage
+        ):
+            return _observation_unavailable(
+                case,
+                "OBSERVATION_TRANSFORMATION_UNAVAILABLE",
+                "An observation transformation is not admitted by the exact current root.",
+                ("evidence_binding",),
+            )
+        if transformation.lifecycle_state in NEGATIVE_OBSERVATION_STATES:
+            return _observation_denied(
+                case,
+                transformation.lifecycle_state,
+                "Current root-issued lifecycle evidence rejects an observation transformation.",
+                ("evidence_binding",),
+            )
+        source_key = (
+            transformation.source_stream_id,
+            transformation.source_stream_generation,
+        )
+        if stream_commitments.get(source_key) != transformation.source_commitment:
+            return _observation_unavailable(
+                case,
+                "OBSERVATION_TRANSFORMATION_UNAVAILABLE",
+                "A transformed stream lacks exact source commitment continuity.",
+                ("evidence_binding",),
+            )
+        target_key = (
+            transformation.target_stream_id,
+            transformation.target_stream_generation,
+        )
+        if source_key in graph and (
+            graph[source_key] != target_key
+            or stream_commitments.get(target_key) != transformation.target_commitment
+        ):
+            return _observation_unavailable(
+                case,
+                "OBSERVATION_TRANSFORMATION_UNAVAILABLE",
+                "Fan-out transformation cannot preserve observation authority in v1.",
+                ("evidence_binding",),
+            )
+        prior_source = target_sources.get(target_key)
+        if prior_source is not None and prior_source != source_key:
+            return _observation_unavailable(
+                case,
+                "OBSERVATION_TRANSFORMATION_UNAVAILABLE",
+                "Fan-in transformation cannot preserve observation authority in v1.",
+                ("evidence_binding",),
+            )
+        if target_key in stream_commitments and (
+            target_key not in target_sources
+            or stream_commitments[target_key] != transformation.target_commitment
+        ):
+            return _observation_unavailable(
+                case,
+                "OBSERVATION_TRANSFORMATION_UNAVAILABLE",
+                "A transformation conflicts with an existing stream identity or commitment.",
+                ("evidence_binding",),
+            )
+        graph[source_key] = target_key
+        target_sources[target_key] = source_key
+        source_scopes = stream_scopes.get(source_key)
+        if source_scopes is None or set(transformation.scope_families) != source_scopes:
+            return _observation_unavailable(
+                case,
+                "OBSERVATION_TRANSFORMATION_UNAVAILABLE",
+                "A transformation drops or widens an authority-relevant observation scope.",
+                ("evidence_binding",),
+            )
+        stream_commitments[target_key] = transformation.target_commitment
+        stream_scopes[target_key] = set(transformation.scope_families)
+    for start in graph:
+        seen: set[tuple[str, int]] = set()
+        node = start
+        while node in graph:
+            if node in seen:
+                return _observation_unavailable(
+                    case,
+                    "OBSERVATION_TRANSFORMATION_UNAVAILABLE",
+                    "Observation transformation lineage is cyclic.",
+                    ("evidence_binding",),
+                )
+            seen.add(node)
+            node = graph[node]
+
+    if (
+        freshness.observation_binding_id != binding.observation_binding_id
+        or freshness.observation_binding_generation != binding.observation_binding_generation
+        or freshness.profile_id != binding.profile_id
+        or freshness.profile_version != binding.profile_version
+        or freshness.boundary != binding.boundary
+        or freshness.boundary_epoch != binding.boundary_epoch
+        or freshness.lineage != binding.lineage
+        or freshness.source_id != root.root_id
+        or freshness.authority_generation != root.authority_generation
+        or freshness.ordering_source_id != root.ordering_source_id
+        or freshness.head_anchor_id != binding.t3_anchor.anchor_id
+        or freshness.head_event_order != binding.t3_anchor.event_order
+    ):
+        return _observation_unavailable(
+            case,
+            "OBSERVATION_FRESHNESS_UNAVAILABLE",
+            "Observation evidence is stale or does not terminate at the exact current T3 anchor.",
+            ("freshness", "evidence_binding"),
+        )
+
+    return OracleResult(
+        AuthorityOutcome.AUTHORIZED,
+        (
+            Reason(
+                "OBSERVATION_COVERAGE_ESTABLISHED",
+                "Root-issued observation admission establishes complete current ordered coverage.",
+                ("evidence_binding", "freshness"),
+            ),
+        ),
+        _engaged(case),
+    )
+
+
 def evaluate(case: OracleInput) -> OracleResult:
     """Compute an authority outcome without fixture expectation access."""
     if case.schema_version == "authority-lab-v0":
@@ -1131,12 +1657,16 @@ def evaluate(case: OracleInput) -> OracleResult:
     if t3_binding_result.outcome is not AuthorityOutcome.AUTHORIZED:
         return t3_binding_result
 
+    observation_result = _evaluate_observation(case)
+    if observation_result.outcome is not AuthorityOutcome.AUTHORIZED:
+        return observation_result
+
     return OracleResult(
         AuthorityOutcome.AUTHORIZED,
         (
             Reason(
                 "CURRENT_AUTHORITY_ESTABLISHED",
-                "All required current facts and relationships are established and no applicable prohibition applies.",
+                "All required current facts, observation coverage, and relationships are established and no applicable prohibition applies.",
             ),
         ),
         _engaged(case),

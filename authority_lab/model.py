@@ -86,6 +86,8 @@ MANDATORY_T3_FACTS = (
 )
 
 RELATIONAL_T3_FACTS = (
+    "evidence_binding",
+    "freshness",
     "boundary_epoch_binding",
     "execution_control_binding",
     "consumption_binding",
@@ -108,6 +110,26 @@ OBJECTIVE_BINDING_FACTS = (
     "binding_source_authority",
     "binding_lifecycle",
     "binding_ordering",
+)
+
+OBSERVATION_PROFILE_ID = "AUTHORITY-LAB-OBSERVATION-PROFILE-1"
+OBSERVATION_PROFILE_VERSION = 1
+OBSERVATION_SCOPE_FAMILIES = (
+    "SUBJECT_AND_DELEGATION",
+    "ARTIFACT_AND_TRANSFORMATION",
+    "EXECUTION_CONTROL",
+    "BOUNDARY_AND_EPOCH",
+    "CREDENTIAL_AND_IDENTITY",
+    "GRANT_USE_AND_CONSUMPTION",
+    "OBJECTIVE_AUTHORITY_LIFECYCLE",
+    "OBSERVATION_PIPELINE",
+)
+OBSERVATION_LIFECYCLE_STATES = (
+    "ACTIVE",
+    "INVALID",
+    "REVOKED",
+    "REJECTED",
+    "SUPERSEDED",
 )
 
 
@@ -133,6 +155,25 @@ def _exact_generation(value: Any, field: str) -> int:
 def _require_exact_fields(value: Mapping[str, Any], fields: set[str], field: str) -> None:
     if set(value) != fields:
         raise ValueError(f"{field} must contain exactly {sorted(fields)}")
+
+
+def _exact_scope_families(value: Any, field: str) -> tuple[str, ...]:
+    if not isinstance(value, (list, tuple)) or not value:
+        raise ValueError(f"{field} must be a non-empty array")
+    families = tuple(_exact_nonempty_string(item, field) for item in value)
+    if len(families) != len(set(families)):
+        raise ValueError(f"{field} must not contain duplicates")
+    unknown = set(families) - set(OBSERVATION_SCOPE_FAMILIES)
+    if unknown:
+        raise ValueError(f"{field} contains unknown scope families: {sorted(unknown)}")
+    return families
+
+
+def _exact_lifecycle_state(value: Any, field: str) -> str:
+    state = _exact_nonempty_string(value, field)
+    if state not in OBSERVATION_LIFECYCLE_STATES:
+        raise ValueError(f"{field} is unsupported")
+    return state
 
 
 def exact_value_equal(left: Any, right: Any) -> bool:
@@ -554,6 +595,448 @@ class BindingOrdering:
             head_event_order=_exact_generation(
                 value["head_event_order"], "binding_ordering.head_event_order"
             ),
+        )
+
+
+@dataclass(frozen=True)
+class ObservationAnchor:
+    anchor_id: str
+    event_order: int
+
+    @classmethod
+    def from_mapping(cls, value: Mapping[str, Any], field: str) -> "ObservationAnchor":
+        _require_exact_fields(value, {"anchor_id", "event_order"}, field)
+        return cls(
+            _exact_nonempty_string(value["anchor_id"], f"{field}.anchor_id"),
+            _exact_generation(value["event_order"], f"{field}.event_order"),
+        )
+
+
+@dataclass(frozen=True)
+class ObserverAdmission:
+    observer_id: str
+    observer_generation: int
+    observer_identity_basis: str
+    scope_families: tuple[str, ...]
+    lifecycle_state: str
+    observation_binding_id: str
+    observation_binding_generation: int
+
+    @classmethod
+    def from_mapping(cls, value: Mapping[str, Any]) -> "ObserverAdmission":
+        field = "evidence_binding.observers"
+        _require_exact_fields(
+            value,
+            {
+                "observer_id",
+                "observer_generation",
+                "observer_identity_basis",
+                "scope_families",
+                "lifecycle_state",
+                "observation_binding_id",
+                "observation_binding_generation",
+            },
+            f"{field} entry",
+        )
+        return cls(
+            _exact_nonempty_string(value["observer_id"], f"{field}.observer_id"),
+            _exact_generation(value["observer_generation"], f"{field}.observer_generation"),
+            _exact_nonempty_string(
+                value["observer_identity_basis"], f"{field}.observer_identity_basis"
+            ),
+            _exact_scope_families(value["scope_families"], f"{field}.scope_families"),
+            _exact_lifecycle_state(value["lifecycle_state"], f"{field}.lifecycle_state"),
+            _exact_nonempty_string(
+                value["observation_binding_id"], f"{field}.observation_binding_id"
+            ),
+            _exact_generation(
+                value["observation_binding_generation"],
+                f"{field}.observation_binding_generation",
+            ),
+        )
+
+
+@dataclass(frozen=True)
+class ObservationSegment:
+    segment_id: str
+    observer_id: str
+    observer_generation: int
+    stream_id: str
+    stream_generation: int
+    scope_families: tuple[str, ...]
+    start_anchor_id: str
+    start_event_order: int
+    end_anchor_id: str
+    end_event_order: int
+    start_sequence: int
+    end_sequence: int
+    stream_commitment: str
+    boundary_epoch: str
+    observation_binding_generation: int
+
+    @classmethod
+    def from_mapping(cls, value: Mapping[str, Any]) -> "ObservationSegment":
+        field = "evidence_binding.segments"
+        _require_exact_fields(
+            value,
+            {
+                "segment_id", "observer_id", "observer_generation", "stream_id",
+                "stream_generation", "scope_families", "start_anchor_id",
+                "start_event_order", "end_anchor_id", "end_event_order",
+                "start_sequence", "end_sequence", "stream_commitment",
+                "boundary_epoch", "observation_binding_generation",
+            },
+            f"{field} entry",
+        )
+        return cls(
+            _exact_nonempty_string(value["segment_id"], f"{field}.segment_id"),
+            _exact_nonempty_string(value["observer_id"], f"{field}.observer_id"),
+            _exact_generation(value["observer_generation"], f"{field}.observer_generation"),
+            _exact_nonempty_string(value["stream_id"], f"{field}.stream_id"),
+            _exact_generation(value["stream_generation"], f"{field}.stream_generation"),
+            _exact_scope_families(value["scope_families"], f"{field}.scope_families"),
+            _exact_nonempty_string(value["start_anchor_id"], f"{field}.start_anchor_id"),
+            _exact_generation(value["start_event_order"], f"{field}.start_event_order"),
+            _exact_nonempty_string(value["end_anchor_id"], f"{field}.end_anchor_id"),
+            _exact_generation(value["end_event_order"], f"{field}.end_event_order"),
+            _exact_generation(value["start_sequence"], f"{field}.start_sequence"),
+            _exact_generation(value["end_sequence"], f"{field}.end_sequence"),
+            _exact_nonempty_string(value["stream_commitment"], f"{field}.stream_commitment"),
+            _exact_nonempty_string(value["boundary_epoch"], f"{field}.boundary_epoch"),
+            _exact_generation(
+                value["observation_binding_generation"],
+                f"{field}.observation_binding_generation",
+            ),
+        )
+
+
+@dataclass(frozen=True)
+class ObservationHandoff:
+    relationship: str
+    handoff_id: str
+    from_observer_id: str
+    from_observer_generation: int
+    to_observer_id: str
+    to_observer_generation: int
+    from_segment_id: str
+    to_segment_id: str
+    scope_families: tuple[str, ...]
+    handoff_anchor_id: str
+    handoff_event_order: int
+    source_id: str
+    authority_generation: int
+    boundary: str
+    boundary_epoch: str
+    lineage: str
+
+    @classmethod
+    def from_mapping(cls, value: Mapping[str, Any]) -> "ObservationHandoff":
+        field = "evidence_binding.handoffs"
+        _require_exact_fields(
+            value,
+            {
+                "relationship", "handoff_id", "from_observer_id",
+                "from_observer_generation", "to_observer_id",
+                "to_observer_generation", "from_segment_id", "to_segment_id",
+                "scope_families", "handoff_anchor_id", "handoff_event_order",
+                "source_id", "authority_generation", "boundary", "boundary_epoch",
+                "lineage",
+            },
+            f"{field} entry",
+        )
+        relationship = _exact_nonempty_string(value["relationship"], f"{field}.relationship")
+        if relationship != "AUTHORITY_PRESERVING_OBSERVER_HANDOFF":
+            raise ValueError(f"{field}.relationship is unsupported")
+        return cls(
+            relationship,
+            _exact_nonempty_string(value["handoff_id"], f"{field}.handoff_id"),
+            _exact_nonempty_string(value["from_observer_id"], f"{field}.from_observer_id"),
+            _exact_generation(
+                value["from_observer_generation"], f"{field}.from_observer_generation"
+            ),
+            _exact_nonempty_string(value["to_observer_id"], f"{field}.to_observer_id"),
+            _exact_generation(
+                value["to_observer_generation"], f"{field}.to_observer_generation"
+            ),
+            _exact_nonempty_string(value["from_segment_id"], f"{field}.from_segment_id"),
+            _exact_nonempty_string(value["to_segment_id"], f"{field}.to_segment_id"),
+            _exact_scope_families(value["scope_families"], f"{field}.scope_families"),
+            _exact_nonempty_string(value["handoff_anchor_id"], f"{field}.handoff_anchor_id"),
+            _exact_generation(value["handoff_event_order"], f"{field}.handoff_event_order"),
+            _exact_nonempty_string(value["source_id"], f"{field}.source_id"),
+            _exact_generation(value["authority_generation"], f"{field}.authority_generation"),
+            _exact_nonempty_string(value["boundary"], f"{field}.boundary"),
+            _exact_nonempty_string(value["boundary_epoch"], f"{field}.boundary_epoch"),
+            _exact_nonempty_string(value["lineage"], f"{field}.lineage"),
+        )
+
+
+@dataclass(frozen=True)
+class ObservationTransformation:
+    relationship: str
+    transformation_id: str
+    transformation_generation: int
+    source_stream_id: str
+    source_stream_generation: int
+    source_commitment: str
+    target_stream_id: str
+    target_stream_generation: int
+    target_commitment: str
+    scope_families: tuple[str, ...]
+    source_id: str
+    authority_generation: int
+    boundary: str
+    boundary_epoch: str
+    lineage: str
+    lifecycle_state: str
+
+    @classmethod
+    def from_mapping(cls, value: Mapping[str, Any]) -> "ObservationTransformation":
+        field = "evidence_binding.transformations"
+        _require_exact_fields(
+            value,
+            {
+                "relationship", "transformation_id", "transformation_generation",
+                "source_stream_id", "source_stream_generation", "source_commitment",
+                "target_stream_id", "target_stream_generation", "target_commitment",
+                "scope_families", "source_id", "authority_generation", "boundary",
+                "boundary_epoch", "lineage", "lifecycle_state",
+            },
+            f"{field} entry",
+        )
+        relationship = _exact_nonempty_string(value["relationship"], f"{field}.relationship")
+        if relationship != "OBSERVATION_PRESERVING":
+            raise ValueError(f"{field}.relationship is unsupported")
+        return cls(
+            relationship,
+            _exact_nonempty_string(
+                value["transformation_id"], f"{field}.transformation_id"
+            ),
+            _exact_generation(
+                value["transformation_generation"], f"{field}.transformation_generation"
+            ),
+            _exact_nonempty_string(value["source_stream_id"], f"{field}.source_stream_id"),
+            _exact_generation(
+                value["source_stream_generation"], f"{field}.source_stream_generation"
+            ),
+            _exact_nonempty_string(value["source_commitment"], f"{field}.source_commitment"),
+            _exact_nonempty_string(value["target_stream_id"], f"{field}.target_stream_id"),
+            _exact_generation(
+                value["target_stream_generation"], f"{field}.target_stream_generation"
+            ),
+            _exact_nonempty_string(value["target_commitment"], f"{field}.target_commitment"),
+            _exact_scope_families(value["scope_families"], f"{field}.scope_families"),
+            _exact_nonempty_string(value["source_id"], f"{field}.source_id"),
+            _exact_generation(value["authority_generation"], f"{field}.authority_generation"),
+            _exact_nonempty_string(value["boundary"], f"{field}.boundary"),
+            _exact_nonempty_string(value["boundary_epoch"], f"{field}.boundary_epoch"),
+            _exact_nonempty_string(value["lineage"], f"{field}.lineage"),
+            _exact_lifecycle_state(value["lifecycle_state"], f"{field}.lifecycle_state"),
+        )
+
+
+@dataclass(frozen=True)
+class ObservationLifecycle:
+    record_id: str
+    target_kind: str
+    target_id: str
+    target_generation: int
+    state: str
+    event_id: str
+    event_order: int
+    source_id: str
+    authority_generation: int
+    boundary: str
+    boundary_epoch: str
+    lineage: str
+
+    @classmethod
+    def from_mapping(cls, value: Mapping[str, Any]) -> "ObservationLifecycle":
+        field = "evidence_binding.lifecycle_records"
+        _require_exact_fields(
+            value,
+            {
+                "record_id", "target_kind", "target_id", "target_generation", "state",
+                "event_id", "event_order", "source_id", "authority_generation",
+                "boundary", "boundary_epoch", "lineage",
+            },
+            f"{field} entry",
+        )
+        target_kind = _exact_nonempty_string(value["target_kind"], f"{field}.target_kind")
+        if target_kind not in {"OBSERVATION_BINDING", "OBSERVER"}:
+            raise ValueError(f"{field}.target_kind is unsupported")
+        return cls(
+            _exact_nonempty_string(value["record_id"], f"{field}.record_id"),
+            target_kind,
+            _exact_nonempty_string(value["target_id"], f"{field}.target_id"),
+            _exact_generation(value["target_generation"], f"{field}.target_generation"),
+            _exact_lifecycle_state(value["state"], f"{field}.state"),
+            _exact_nonempty_string(value["event_id"], f"{field}.event_id"),
+            _exact_generation(value["event_order"], f"{field}.event_order"),
+            _exact_nonempty_string(value["source_id"], f"{field}.source_id"),
+            _exact_generation(value["authority_generation"], f"{field}.authority_generation"),
+            _exact_nonempty_string(value["boundary"], f"{field}.boundary"),
+            _exact_nonempty_string(value["boundary_epoch"], f"{field}.boundary_epoch"),
+            _exact_nonempty_string(value["lineage"], f"{field}.lineage"),
+        )
+
+
+def _typed_object_array(value: Any, field: str, parser: Any) -> tuple[Any, ...]:
+    if not isinstance(value, (list, tuple)):
+        raise ValueError(f"{field} must be an array")
+    if not all(isinstance(item, Mapping) for item in value):
+        raise ValueError(f"{field} entries must be objects")
+    return tuple(parser(item) for item in value)
+
+
+@dataclass(frozen=True)
+class ObservationBinding:
+    relationship: str
+    observation_binding_id: str
+    observation_binding_generation: int
+    profile_id: str
+    profile_version: int
+    objective_binding_id: str
+    objective_binding_generation: int
+    decision_contract_id: str
+    decision_contract_version: str
+    source_id: str
+    authority_generation: int
+    boundary: str
+    boundary_epoch: str
+    lineage: str
+    ordering_source_id: str
+    t1_anchor: ObservationAnchor
+    t3_anchor: ObservationAnchor
+    observers: tuple[ObserverAdmission, ...]
+    segments: tuple[ObservationSegment, ...]
+    handoffs: tuple[ObservationHandoff, ...]
+    transformations: tuple[ObservationTransformation, ...]
+    lifecycle_records: tuple[ObservationLifecycle, ...]
+
+    @classmethod
+    def from_mapping(cls, value: Mapping[str, Any]) -> "ObservationBinding":
+        field = "evidence_binding"
+        _require_exact_fields(
+            value,
+            {
+                "relationship", "observation_binding_id",
+                "observation_binding_generation", "profile_id", "profile_version",
+                "objective_binding_id", "objective_binding_generation",
+                "decision_contract_id", "decision_contract_version", "source_id",
+                "authority_generation", "boundary", "boundary_epoch", "lineage",
+                "ordering_source_id", "t1_anchor", "t3_anchor", "observers",
+                "segments", "handoffs", "transformations", "lifecycle_records",
+            },
+            field,
+        )
+        relationship = _exact_nonempty_string(value["relationship"], f"{field}.relationship")
+        if relationship != "OBSERVATION_COVERAGE":
+            raise ValueError(f"{field}.relationship must be OBSERVATION_COVERAGE")
+        t1_anchor = value["t1_anchor"]
+        t3_anchor = value["t3_anchor"]
+        if not isinstance(t1_anchor, Mapping) or not isinstance(t3_anchor, Mapping):
+            raise ValueError(f"{field} anchors must be objects")
+        return cls(
+            relationship,
+            _exact_nonempty_string(
+                value["observation_binding_id"], f"{field}.observation_binding_id"
+            ),
+            _exact_generation(
+                value["observation_binding_generation"],
+                f"{field}.observation_binding_generation",
+            ),
+            _exact_nonempty_string(value["profile_id"], f"{field}.profile_id"),
+            _exact_generation(value["profile_version"], f"{field}.profile_version"),
+            _exact_nonempty_string(
+                value["objective_binding_id"], f"{field}.objective_binding_id"
+            ),
+            _exact_generation(
+                value["objective_binding_generation"],
+                f"{field}.objective_binding_generation",
+            ),
+            _exact_nonempty_string(
+                value["decision_contract_id"], f"{field}.decision_contract_id"
+            ),
+            _exact_nonempty_string(
+                value["decision_contract_version"], f"{field}.decision_contract_version"
+            ),
+            _exact_nonempty_string(value["source_id"], f"{field}.source_id"),
+            _exact_generation(value["authority_generation"], f"{field}.authority_generation"),
+            _exact_nonempty_string(value["boundary"], f"{field}.boundary"),
+            _exact_nonempty_string(value["boundary_epoch"], f"{field}.boundary_epoch"),
+            _exact_nonempty_string(value["lineage"], f"{field}.lineage"),
+            _exact_nonempty_string(value["ordering_source_id"], f"{field}.ordering_source_id"),
+            ObservationAnchor.from_mapping(t1_anchor, f"{field}.t1_anchor"),
+            ObservationAnchor.from_mapping(t3_anchor, f"{field}.t3_anchor"),
+            _typed_object_array(value["observers"], f"{field}.observers", ObserverAdmission.from_mapping),
+            _typed_object_array(value["segments"], f"{field}.segments", ObservationSegment.from_mapping),
+            _typed_object_array(value["handoffs"], f"{field}.handoffs", ObservationHandoff.from_mapping),
+            _typed_object_array(
+                value["transformations"],
+                f"{field}.transformations",
+                ObservationTransformation.from_mapping,
+            ),
+            _typed_object_array(
+                value["lifecycle_records"],
+                f"{field}.lifecycle_records",
+                ObservationLifecycle.from_mapping,
+            ),
+        )
+
+
+@dataclass(frozen=True)
+class ObservationFreshness:
+    relationship: str
+    observation_binding_id: str
+    observation_binding_generation: int
+    profile_id: str
+    profile_version: int
+    boundary: str
+    boundary_epoch: str
+    lineage: str
+    source_id: str
+    authority_generation: int
+    ordering_source_id: str
+    head_anchor_id: str
+    head_event_order: int
+
+    @classmethod
+    def from_mapping(cls, value: Mapping[str, Any]) -> "ObservationFreshness":
+        field = "freshness"
+        _require_exact_fields(
+            value,
+            {
+                "relationship", "observation_binding_id",
+                "observation_binding_generation", "profile_id", "profile_version",
+                "boundary", "boundary_epoch", "lineage", "source_id",
+                "authority_generation", "ordering_source_id", "head_anchor_id",
+                "head_event_order",
+            },
+            field,
+        )
+        relationship = _exact_nonempty_string(value["relationship"], f"{field}.relationship")
+        if relationship != "OBSERVATION_CURRENT_AT_T3":
+            raise ValueError(f"{field}.relationship must be OBSERVATION_CURRENT_AT_T3")
+        return cls(
+            relationship,
+            _exact_nonempty_string(
+                value["observation_binding_id"], f"{field}.observation_binding_id"
+            ),
+            _exact_generation(
+                value["observation_binding_generation"],
+                f"{field}.observation_binding_generation",
+            ),
+            _exact_nonempty_string(value["profile_id"], f"{field}.profile_id"),
+            _exact_generation(value["profile_version"], f"{field}.profile_version"),
+            _exact_nonempty_string(value["boundary"], f"{field}.boundary"),
+            _exact_nonempty_string(value["boundary_epoch"], f"{field}.boundary_epoch"),
+            _exact_nonempty_string(value["lineage"], f"{field}.lineage"),
+            _exact_nonempty_string(value["source_id"], f"{field}.source_id"),
+            _exact_generation(value["authority_generation"], f"{field}.authority_generation"),
+            _exact_nonempty_string(value["ordering_source_id"], f"{field}.ordering_source_id"),
+            _exact_nonempty_string(value["head_anchor_id"], f"{field}.head_anchor_id"),
+            _exact_generation(value["head_event_order"], f"{field}.head_event_order"),
         )
 
 
@@ -1036,7 +1519,17 @@ def _validate_mutation_value(spec: MutationSpec, value: Any, field: str) -> None
         spec.target_kind is MutationTargetKind.RELATION
         and spec.target in {"evidence_binding", "freshness"}
     ):
-        _exact_string(value, field)
+        if isinstance(value, str):
+            _exact_string(value, field)
+        elif isinstance(value, Mapping):
+            parser = (
+                ObservationBinding.from_mapping
+                if spec.target == "evidence_binding"
+                else ObservationFreshness.from_mapping
+            )
+            parser(value)
+        else:
+            raise ValueError(f"{field} must be a typed object or legacy string marker")
         return
     if isinstance(value, str):
         if value not in {FactState.UNKNOWN.value, FactState.CONFLICTING.value}:
@@ -1125,6 +1618,8 @@ class OracleInput:
     t2_mutations: tuple[Mutation, ...]
     facts: Mapping[str, Fact]
     t3_binding_facts: ObjectiveBindingFacts
+    observation_binding: ObservationBinding | None
+    observation_freshness: ObservationFreshness | None
     required_facts: tuple[str, ...]
     required_values: Mapping[str, Any]
     reestablishment_state: FactState
@@ -1186,6 +1681,38 @@ class OracleInput:
         if not isinstance(raw_mutations, (list, tuple)):
             raise ValueError("t2.mutations must be an array")
         mutations = tuple(Mutation.from_mapping(item) for item in raw_mutations)
+        observation_binding = None
+        observation_binding_fact = facts.get("evidence_binding")
+        if (
+            observation_binding_fact is not None
+            and observation_binding_fact.state is FactState.KNOWN
+            and isinstance(observation_binding_fact.value, Mapping)
+        ):
+            observation_binding = ObservationBinding.from_mapping(
+                observation_binding_fact.value
+            )
+        elif (
+            observation_binding_fact is not None
+            and observation_binding_fact.state is FactState.KNOWN
+            and not isinstance(observation_binding_fact.value, str)
+        ):
+            raise ValueError("KNOWN evidence_binding requires a typed object or legacy string")
+        observation_freshness = None
+        observation_freshness_fact = facts.get("freshness")
+        if (
+            observation_freshness_fact is not None
+            and observation_freshness_fact.state is FactState.KNOWN
+            and isinstance(observation_freshness_fact.value, Mapping)
+        ):
+            observation_freshness = ObservationFreshness.from_mapping(
+                observation_freshness_fact.value
+            )
+        elif (
+            observation_freshness_fact is not None
+            and observation_freshness_fact.state is FactState.KNOWN
+            and not isinstance(observation_freshness_fact.value, str)
+        ):
+            raise ValueError("KNOWN freshness requires a typed object or legacy string")
         return cls(
             schema_version=schema_version,
             case_id=str(fixture["case_id"]),
@@ -1198,6 +1725,8 @@ class OracleInput:
             t2_mutations=mutations,
             facts=facts,
             t3_binding_facts=ObjectiveBindingFacts.from_facts(facts),
+            observation_binding=observation_binding,
+            observation_freshness=observation_freshness,
             required_facts=required_facts,
             required_values=required_values,
             reestablishment_state=raw_reestablishment.state,

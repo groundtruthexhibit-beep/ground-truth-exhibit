@@ -13,6 +13,7 @@ from .model import (
     HarnessStatus,
     MANDATORY_T3_FACTS,
     OBJECTIVE_BINDING_FACTS,
+    OBSERVATION_SCOPE_FAMILIES,
     OracleInput,
     RunResult,
 )
@@ -63,6 +64,94 @@ def _render_fact(fact: Any) -> str:
     if fact.state is FactState.CONFLICTING:
         return f"CONFLICTING({','.join(str(value) for value in fact.values)})"
     return "UNKNOWN"
+
+
+def _observation_trace(case: OracleInput) -> tuple[str, ...]:
+    binding = case.observation_binding
+    freshness = case.observation_freshness
+    if binding is None:
+        return ("OBSERVATION", "binding: UNAVAILABLE", "freshness: UNAVAILABLE")
+
+    gaps: list[str] = []
+    for family in OBSERVATION_SCOPE_FAMILIES:
+        intervals = sorted(
+            (segment.start_event_order, segment.end_event_order)
+            for segment in binding.segments
+            if family in segment.scope_families
+        )
+        cursor = binding.t1_anchor.event_order
+        for start, end in intervals:
+            if start > cursor:
+                gaps.append(f"{family}:{cursor}-{start - 1}")
+            cursor = max(cursor, end + 1)
+        if cursor <= binding.t3_anchor.event_order:
+            gaps.append(f"{family}:{cursor}-{binding.t3_anchor.event_order}")
+
+    lines = [
+        "OBSERVATION",
+        f"profile: {binding.profile_id}@{binding.profile_version}",
+        (
+            "binding: "
+            f"{binding.observation_binding_id}@{binding.observation_binding_generation} "
+            f"source={binding.source_id}"
+        ),
+        (
+            "interval: "
+            f"{binding.t1_anchor.anchor_id}@{binding.t1_anchor.event_order} -> "
+            f"{binding.t3_anchor.anchor_id}@{binding.t3_anchor.event_order}"
+        ),
+    ]
+    lines.extend(
+        "observer: "
+        f"{observer.observer_id}@{observer.observer_generation} "
+        f"state={observer.lifecycle_state} scopes={','.join(observer.scope_families)}"
+        for observer in sorted(
+            binding.observers,
+            key=lambda value: (value.observer_id, value.observer_generation),
+        )
+    )
+    lines.extend(
+        "segment: "
+        f"{segment.segment_id} observer={segment.observer_id}@{segment.observer_generation} "
+        f"events={segment.start_event_order}-{segment.end_event_order} "
+        f"sequence={segment.start_sequence}-{segment.end_sequence} "
+        f"stream={segment.stream_id}@{segment.stream_generation}"
+        for segment in sorted(
+            binding.segments,
+            key=lambda value: (
+                value.start_event_order,
+                value.end_event_order,
+                value.segment_id,
+            ),
+        )
+    )
+    lines.extend(
+        "handoff: "
+        f"{handoff.handoff_id} {handoff.from_observer_id}->{handoff.to_observer_id} "
+        f"at={handoff.handoff_event_order}"
+        for handoff in sorted(binding.handoffs, key=lambda value: value.handoff_id)
+    )
+    lines.extend(
+        "transformation: "
+        f"{item.transformation_id}@{item.transformation_generation} "
+        f"{item.source_stream_id}@{item.source_stream_generation}->"
+        f"{item.target_stream_id}@{item.target_stream_generation}"
+        for item in sorted(
+            binding.transformations,
+            key=lambda value: (value.transformation_id, value.transformation_generation),
+        )
+    )
+    lines.append(f"gaps: {','.join(gaps) if gaps else 'none'}")
+    lines.append(
+        "freshness: "
+        + (
+            f"{freshness.head_anchor_id}@{freshness.head_event_order} "
+            f"source={freshness.source_id}"
+            if freshness is not None
+            else "UNAVAILABLE"
+        )
+    )
+    return tuple(lines)
 
 
 def format_trace(result: RunResult) -> str:
@@ -121,6 +210,7 @@ def format_trace(result: RunResult) -> str:
     for name in required_facts:
         fact = case.facts.get(name)
         lines.append(f"{name}: {_render_fact(fact)}")
+    lines.extend(("", *_observation_trace(case)))
     lines.extend(
         (
             "",
