@@ -10,6 +10,7 @@ from unittest.mock import patch
 
 from authority_lab.model import (
     AuthorityOutcome,
+    ContinuityEffect,
     FactState,
     HarnessStatus,
     INVARIANTS,
@@ -244,9 +245,9 @@ class AuthorityLabTests(unittest.TestCase):
         self.assertIs(AuthorityOutcome.UNAVAILABLE, result.outcome)
         self.assertIn(reason_code, {reason.code for reason in result.reasons})
 
-    def test_v1_contains_sixty_eight_deterministic_fixtures(self) -> None:
+    def test_v1_contains_eighty_eight_deterministic_fixtures(self) -> None:
         paths = discover(CASES)
-        self.assertEqual(68, len(paths))
+        self.assertEqual(88, len(paths))
         self.assertEqual(paths, discover(CASES))
 
     def test_every_v0_fixture_matches_its_expected_outcome(self) -> None:
@@ -429,41 +430,7 @@ class AuthorityLabTests(unittest.TestCase):
         }
         self.assertIs(AuthorityOutcome.DENIED, actual(denied))
 
-        authorized = deepcopy(denied)
-        authorized["t3"]["prohibition"] = {"state": "KNOWN", "applies": False, "id": "none"}
-        authorized["t3"]["facts"]["decision_binding"]["value"] = "EV-E2"
-        authorized["t3"]["required_values"]["decision_binding"] = "EV-E2"
-        authorized["t3"]["facts"]["consumption_binding"]["value"]["grant_id"] = (
-            "GRANT-003-E2"
-        )
-        authorized["t2"]["mutations"].append(
-            {
-                "field": "grant_id",
-                "before": "GRANT-003-E1",
-                "after": "GRANT-003-E2",
-            }
-        )
-        authorized["t3"]["reestablishment"] = {
-            "state": "KNOWN",
-            "value": {
-                "previous_evidence_id": "EV-E1",
-                "current": {
-                    "subject": "S",
-                    "artifact": "A",
-                    "control_state": "E2",
-                    "identity_basis": "I1",
-                    "boundary_epoch": "B1",
-                    "decision": "AUTHORIZED",
-                    "evidence_id": "EV-E2",
-                    "execution_context": "E2",
-                    "applicable_boundary": "AUTH-BOUNDARY-1",
-                    "grant_id": "GRANT-003-E2",
-                    "consumption_state": "UNUSED",
-                    "subject_mode": "DIRECT",
-                },
-            },
-        }
-        rebind_objective_binding(authorized, suffix="E2")
+        authorized = fixture("LAB-V1-084")
         self.assertIs(AuthorityOutcome.AUTHORIZED, actual(authorized))
 
     def test_exact_tuple_and_invariant_sets_are_frozen(self) -> None:
@@ -616,7 +583,7 @@ class AuthorityLabTests(unittest.TestCase):
             "execution_context"
         ] = "E2"
         self.assert_unavailable_with_reason(
-            payload, "GRANT_EFFECT_RELATIONSHIP_UNAVAILABLE"
+            payload, "PREDECESSOR_GRANT_NONPORTABLE"
         )
 
     def test_delegation_cannot_retarget_old_grant(self) -> None:
@@ -745,7 +712,7 @@ class AuthorityLabTests(unittest.TestCase):
         )
         self.assertIs(AuthorityOutcome.AUTHORIZED, actual(payload))
 
-    def test_exact_grant_transition_can_establish_explicit_return_path(self) -> None:
+    def test_exact_grant_transition_cannot_erase_explicit_return_path(self) -> None:
         payload = reestablish_grant(
             fixture("LAB-V0-001"), grant_id="GRANT-001", evidence_id="EV-G1-RETURN"
         )
@@ -764,7 +731,7 @@ class AuthorityLabTests(unittest.TestCase):
                 "current": current,
             },
         }
-        self.assertIs(AuthorityOutcome.AUTHORIZED, actual(payload))
+        self.assert_unavailable_with_reason(payload, "PREDECESSOR_GRANT_NONPORTABLE")
 
     def test_disappearing_decision_binding_mutation_is_unavailable(self) -> None:
         payload = fixture("LAB-V0-001")
@@ -1629,6 +1596,116 @@ class AuthorityLabTests(unittest.TestCase):
         self.assertIn("handoff: HANDOFF-LAB-V1-058", trace)
         self.assertIn("gaps: none", trace)
         self.assertIn("freshness: T3-ANCHOR-LAB-V1-032@3", trace)
+
+    def test_shutdown_successor_fixture_matrix_matches_independent_expectations(self) -> None:
+        expected = {
+            **{f"LAB-V1-{number:03d}": AuthorityOutcome.UNAVAILABLE for number in range(69, 78)},
+            "LAB-V1-078": AuthorityOutcome.DENIED,
+            **{f"LAB-V1-{number:03d}": AuthorityOutcome.UNAVAILABLE for number in range(79, 84)},
+            "LAB-V1-084": AuthorityOutcome.AUTHORIZED,
+            "LAB-V1-085": AuthorityOutcome.AUTHORIZED,
+            **{f"LAB-V1-{number:03d}": AuthorityOutcome.UNAVAILABLE for number in range(86, 89)},
+        }
+        for case_id, outcome in expected.items():
+            with self.subTest(case_id=case_id):
+                result = run_path(CASES / f"{case_id}.json")
+                self.assertIs(HarnessStatus.PASS, result.status)
+                self.assertIs(outcome, result.actual.outcome)
+
+    def test_every_registry_spec_has_immutable_continuity_metadata(self) -> None:
+        for spec in MUTATION_SPECS:
+            with self.subTest(field=spec.canonical_field):
+                self.assertIsInstance(spec.continuity_effects, tuple)
+                self.assertTrue(spec.continuity_effects)
+                self.assertTrue(all(isinstance(item, ContinuityEffect) for item in spec.continuity_effects))
+                self.assertIsInstance(spec.observation_scope_families, tuple)
+                self.assertTrue(spec.observation_scope_families)
+                self.assertLessEqual(
+                    set(spec.observation_scope_families), set(OBSERVATION_SCOPE_FAMILIES)
+                )
+
+    def test_execution_and_subject_aba_paths_remain_unavailable(self) -> None:
+        for case_id in ("LAB-V1-069", "LAB-V1-070"):
+            with self.subTest(case_id=case_id):
+                self.assert_unavailable_with_reason(
+                    fixture(case_id), "PREDECESSOR_GRANT_NONPORTABLE"
+                )
+
+    def test_boundary_epoch_aba_is_non_restorable(self) -> None:
+        self.assert_unavailable_with_reason(
+            fixture("LAB-V1-071"), "BOUNDARY_EPOCH_REUSE_UNAVAILABLE"
+        )
+
+    def test_restart_and_generic_evidence_cannot_reuse_predecessor_grant(self) -> None:
+        for case_id in ("LAB-V1-072", "LAB-V1-073"):
+            with self.subTest(case_id=case_id):
+                self.assert_unavailable_with_reason(
+                    fixture(case_id), "PREDECESSOR_GRANT_NONPORTABLE"
+                )
+
+    def test_fresh_generic_evidence_and_grant_do_not_admit_a_successor(self) -> None:
+        payload = fixture("LAB-V1-069")
+        payload["t2"]["mutations"].append(
+            {"field": "grant_id", "before": "GRANT-001", "after": "GENERIC-GRANT-NEW"}
+        )
+        payload["t3"]["facts"]["consumption_binding"]["value"]["grant_id"] = (
+            "GENERIC-GRANT-NEW"
+        )
+        payload["t3"]["reestablishment"]["value"]["current"]["grant_id"] = (
+            "GENERIC-GRANT-NEW"
+        )
+        self.assert_unavailable_with_reason(payload, "SUCCESSOR_AUTHORITY_UNAVAILABLE")
+
+    def test_credential_checkpoint_and_alternate_path_do_not_port_authority(self) -> None:
+        for case_id in ("LAB-V1-075", "LAB-V1-076", "LAB-V1-077"):
+            with self.subTest(case_id=case_id):
+                self.assert_unavailable_with_reason(
+                    fixture(case_id), "PREDECESSOR_GRANT_NONPORTABLE"
+                )
+
+    def test_restored_labels_do_not_evade_exact_current_revocation(self) -> None:
+        result = evaluate(OracleInput.from_fixture(fixture("LAB-V1-078")))
+        self.assertIs(AuthorityOutcome.DENIED, result.outcome)
+        self.assertIn("ESTABLISHED_PROHIBITION", {reason.code for reason in result.reasons})
+
+    def test_terminal_observation_failures_remain_fail_closed(self) -> None:
+        expected_reasons = {
+            "LAB-V1-079": "OBSERVATION_FRESHNESS_UNAVAILABLE",
+            "LAB-V1-080": "OBSERVATION_TRANSFORMATION_UNAVAILABLE",
+            "LAB-V1-081": "TERMINAL_EVENT_ORDERING_UNAVAILABLE",
+            "LAB-V1-082": "TERMINAL_EVENT_ORDERING_UNAVAILABLE",
+            "LAB-V1-083": "OBSERVATION_CONFLICTING",
+        }
+        for case_id, reason in expected_reasons.items():
+            with self.subTest(case_id=case_id):
+                self.assert_unavailable_with_reason(fixture(case_id), reason)
+
+    def test_fresh_successor_and_legitimate_reentry_are_authorized(self) -> None:
+        for case_id in ("LAB-V1-084", "LAB-V1-085"):
+            with self.subTest(case_id=case_id):
+                result = evaluate(OracleInput.from_fixture(fixture(case_id)))
+                self.assertIs(AuthorityOutcome.AUTHORIZED, result.outcome)
+                self.assertIn(
+                    "CURRENT_AUTHORITY_ESTABLISHED",
+                    {reason.code for reason in result.reasons},
+                )
+
+    def test_handoff_does_not_transfer_execution_authority(self) -> None:
+        self.assert_unavailable_with_reason(
+            fixture("LAB-V1-087"), "PREDECESSOR_GRANT_NONPORTABLE"
+        )
+
+    def test_identical_code_does_not_establish_execution_identity(self) -> None:
+        self.assert_unavailable_with_reason(
+            fixture("LAB-V1-088"), "PREDECESSOR_GRANT_NONPORTABLE"
+        )
+
+    def test_trace_exposes_continuity_effect_and_observation_scope(self) -> None:
+        trace = format_trace(run_path(CASES / "LAB-V1-069.json"))
+        self.assertIn("continuity_effects=IDENTITY_DISCONTINUITY", trace)
+        self.assertIn("observation_scopes=EXECUTION_CONTROL,CREDENTIAL_AND_IDENTITY", trace)
+        self.assertIn("path_aba_targets: execution_context", trace)
+        self.assertIn("successor_admission_required: true", trace)
 
     def test_fixture_files_are_valid_json_objects(self) -> None:
         for path in discover(CASES):

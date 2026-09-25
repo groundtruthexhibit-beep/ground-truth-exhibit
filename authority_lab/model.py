@@ -33,11 +33,25 @@ class MutationTargetKind(str, Enum):
     FACT = "FACT"
 
 
+class ContinuityEffect(str, Enum):
+    """Authority effects retained for every admitted mutation edge."""
+
+    IDENTITY_DISCONTINUITY = "IDENTITY_DISCONTINUITY"
+    NON_RESTORABLE_LINEAGE = "NON_RESTORABLE_LINEAGE"
+    TERMINAL_DISCONTINUITY = "TERMINAL_DISCONTINUITY"
+    GRANT_USE_DISCONTINUITY = "GRANT_USE_DISCONTINUITY"
+    CONTROL_REESTABLISHMENT = "CONTROL_REESTABLISHMENT"
+    EVIDENCE_OR_EFFECT_REESTABLISHMENT = "EVIDENCE_OR_EFFECT_REESTABLISHMENT"
+    OBJECTIVE_AUTHORITY_REESTABLISHMENT = "OBJECTIVE_AUTHORITY_REESTABLISHMENT"
+
+
 @dataclass(frozen=True)
 class MutationSpec:
     canonical_field: str
     target_kind: MutationTargetKind
     target: str
+    continuity_effects: tuple[ContinuityEffect, ...]
+    observation_scope_families: tuple[str, ...]
     legacy_aliases: tuple[str, ...] = ()
 
 
@@ -1393,67 +1407,67 @@ class Prohibition:
 
 _MUTATION_FIELD_PATTERN = re.compile(r"[a-z][a-z0-9_]*", re.ASCII)
 
+def _mutation_spec(
+    canonical_field: str,
+    target_kind: MutationTargetKind,
+    target: str,
+    effects: tuple[ContinuityEffect, ...],
+    scopes: tuple[str, ...],
+    aliases: tuple[str, ...] = (),
+) -> MutationSpec:
+    return MutationSpec(canonical_field, target_kind, target, effects, scopes, aliases)
+
+
 MUTATION_SPECS = (
-    MutationSpec("subject", MutationTargetKind.STATE, "subject", ("principal",)),
-    MutationSpec("artifact", MutationTargetKind.STATE, "artifact"),
-    MutationSpec("control_state", MutationTargetKind.STATE, "control_state", ("privilege",)),
-    MutationSpec("identity_basis", MutationTargetKind.STATE, "identity_basis"),
-    MutationSpec("boundary_epoch", MutationTargetKind.STATE, "boundary_epoch"),
-    MutationSpec("decision", MutationTargetKind.STATE, "decision"),
-    MutationSpec("applicable_boundary", MutationTargetKind.STATE, "applicable_boundary"),
-    MutationSpec(
-        "consumption_state", MutationTargetKind.STATE, "consumption_state", ("consumption",)
-    ),
-    MutationSpec("decision_binding", MutationTargetKind.STATE, "evidence_id"),
-    MutationSpec("evidence_id", MutationTargetKind.STATE, "evidence_id"),
-    MutationSpec(
-        "execution_context", MutationTargetKind.STATE, "execution_context", ("actor_context",)
-    ),
-    MutationSpec("grant_id", MutationTargetKind.STATE, "grant_id"),
-    MutationSpec("subject_mode", MutationTargetKind.STATE, "subject_mode"),
-    MutationSpec("boundary_epoch_binding", MutationTargetKind.RELATION, "boundary_epoch_binding"),
-    MutationSpec("closure_binding", MutationTargetKind.RELATION, "closure_binding"),
-    MutationSpec("consumption_binding", MutationTargetKind.RELATION, "consumption_binding"),
-    MutationSpec("delegation_binding", MutationTargetKind.RELATION, "delegation_binding"),
-    MutationSpec("evidence_binding", MutationTargetKind.RELATION, "evidence_binding"),
-    MutationSpec(
-        "execution_control_binding", MutationTargetKind.RELATION, "execution_control_binding"
-    ),
-    MutationSpec("freshness", MutationTargetKind.RELATION, "freshness"),
-    MutationSpec("authority_root", MutationTargetKind.BINDING, "authority_root"),
-    MutationSpec("binding_lifecycle", MutationTargetKind.BINDING, "binding_lifecycle"),
-    MutationSpec("binding_ordering", MutationTargetKind.BINDING, "binding_ordering"),
-    MutationSpec(
-        "binding_source_authority", MutationTargetKind.BINDING, "binding_source_authority"
-    ),
-    MutationSpec(
-        "contract_transformation_binding",
-        MutationTargetKind.BINDING,
-        "contract_transformation_binding",
-    ),
-    MutationSpec(
-        "decision_contract_identity",
-        MutationTargetKind.BINDING,
-        "decision_contract_identity",
-    ),
-    MutationSpec("objective_binding", MutationTargetKind.BINDING, "objective_binding"),
-    MutationSpec("objective_identity", MutationTargetKind.BINDING, "objective_identity"),
-    MutationSpec("commit_state", MutationTargetKind.FACT, "commit_state"),
-    MutationSpec(
-        "credential_identity", MutationTargetKind.FACT, "credential_identity", ("credential",)
-    ),
-    MutationSpec(
-        "tool_connector_identity",
-        MutationTargetKind.FACT,
-        "tool_connector_identity",
-        ("connector_endpoint",),
-    ),
+    _mutation_spec("subject", MutationTargetKind.STATE, "subject", (ContinuityEffect.IDENTITY_DISCONTINUITY,), ("SUBJECT_AND_DELEGATION",), ("principal",)),
+    _mutation_spec("artifact", MutationTargetKind.STATE, "artifact", (ContinuityEffect.EVIDENCE_OR_EFFECT_REESTABLISHMENT,), ("ARTIFACT_AND_TRANSFORMATION",)),
+    _mutation_spec("control_state", MutationTargetKind.STATE, "control_state", (ContinuityEffect.CONTROL_REESTABLISHMENT,), ("EXECUTION_CONTROL",), ("privilege",)),
+    _mutation_spec("identity_basis", MutationTargetKind.STATE, "identity_basis", (ContinuityEffect.IDENTITY_DISCONTINUITY,), ("SUBJECT_AND_DELEGATION", "CREDENTIAL_AND_IDENTITY")),
+    _mutation_spec("boundary_epoch", MutationTargetKind.STATE, "boundary_epoch", (ContinuityEffect.NON_RESTORABLE_LINEAGE,), ("BOUNDARY_AND_EPOCH",)),
+    _mutation_spec("decision", MutationTargetKind.STATE, "decision", (ContinuityEffect.OBJECTIVE_AUTHORITY_REESTABLISHMENT,), ("OBJECTIVE_AUTHORITY_LIFECYCLE",)),
+    _mutation_spec("applicable_boundary", MutationTargetKind.STATE, "applicable_boundary", (ContinuityEffect.NON_RESTORABLE_LINEAGE,), ("BOUNDARY_AND_EPOCH",)),
+    _mutation_spec("consumption_state", MutationTargetKind.STATE, "consumption_state", (ContinuityEffect.GRANT_USE_DISCONTINUITY,), ("GRANT_USE_AND_CONSUMPTION",), ("consumption",)),
+    _mutation_spec("decision_binding", MutationTargetKind.STATE, "evidence_id", (ContinuityEffect.EVIDENCE_OR_EFFECT_REESTABLISHMENT,), ("ARTIFACT_AND_TRANSFORMATION",)),
+    _mutation_spec("evidence_id", MutationTargetKind.STATE, "evidence_id", (ContinuityEffect.EVIDENCE_OR_EFFECT_REESTABLISHMENT,), ("ARTIFACT_AND_TRANSFORMATION",)),
+    _mutation_spec("execution_context", MutationTargetKind.STATE, "execution_context", (ContinuityEffect.IDENTITY_DISCONTINUITY,), ("EXECUTION_CONTROL", "CREDENTIAL_AND_IDENTITY"), ("actor_context",)),
+    _mutation_spec("grant_id", MutationTargetKind.STATE, "grant_id", (ContinuityEffect.GRANT_USE_DISCONTINUITY,), ("GRANT_USE_AND_CONSUMPTION",)),
+    _mutation_spec("subject_mode", MutationTargetKind.STATE, "subject_mode", (ContinuityEffect.IDENTITY_DISCONTINUITY,), ("SUBJECT_AND_DELEGATION",)),
+    _mutation_spec("boundary_epoch_binding", MutationTargetKind.RELATION, "boundary_epoch_binding", (ContinuityEffect.NON_RESTORABLE_LINEAGE,), ("BOUNDARY_AND_EPOCH",)),
+    _mutation_spec("closure_binding", MutationTargetKind.RELATION, "closure_binding", (ContinuityEffect.EVIDENCE_OR_EFFECT_REESTABLISHMENT,), ("ARTIFACT_AND_TRANSFORMATION",)),
+    _mutation_spec("consumption_binding", MutationTargetKind.RELATION, "consumption_binding", (ContinuityEffect.GRANT_USE_DISCONTINUITY,), ("GRANT_USE_AND_CONSUMPTION",)),
+    _mutation_spec("delegation_binding", MutationTargetKind.RELATION, "delegation_binding", (ContinuityEffect.IDENTITY_DISCONTINUITY,), ("SUBJECT_AND_DELEGATION",)),
+    _mutation_spec("evidence_binding", MutationTargetKind.RELATION, "evidence_binding", (ContinuityEffect.EVIDENCE_OR_EFFECT_REESTABLISHMENT,), ("OBSERVATION_PIPELINE",)),
+    _mutation_spec("execution_control_binding", MutationTargetKind.RELATION, "execution_control_binding", (ContinuityEffect.CONTROL_REESTABLISHMENT,), ("EXECUTION_CONTROL",)),
+    _mutation_spec("freshness", MutationTargetKind.RELATION, "freshness", (ContinuityEffect.EVIDENCE_OR_EFFECT_REESTABLISHMENT,), ("OBSERVATION_PIPELINE",)),
+    _mutation_spec("authority_root", MutationTargetKind.BINDING, "authority_root", (ContinuityEffect.NON_RESTORABLE_LINEAGE, ContinuityEffect.OBJECTIVE_AUTHORITY_REESTABLISHMENT), ("BOUNDARY_AND_EPOCH", "OBJECTIVE_AUTHORITY_LIFECYCLE")),
+    _mutation_spec("binding_lifecycle", MutationTargetKind.BINDING, "binding_lifecycle", (ContinuityEffect.OBJECTIVE_AUTHORITY_REESTABLISHMENT,), ("OBJECTIVE_AUTHORITY_LIFECYCLE",)),
+    _mutation_spec("binding_ordering", MutationTargetKind.BINDING, "binding_ordering", (ContinuityEffect.OBJECTIVE_AUTHORITY_REESTABLISHMENT,), ("OBJECTIVE_AUTHORITY_LIFECYCLE",)),
+    _mutation_spec("binding_source_authority", MutationTargetKind.BINDING, "binding_source_authority", (ContinuityEffect.OBJECTIVE_AUTHORITY_REESTABLISHMENT,), ("OBJECTIVE_AUTHORITY_LIFECYCLE",)),
+    _mutation_spec("contract_transformation_binding", MutationTargetKind.BINDING, "contract_transformation_binding", (ContinuityEffect.EVIDENCE_OR_EFFECT_REESTABLISHMENT,), ("ARTIFACT_AND_TRANSFORMATION",)),
+    _mutation_spec("decision_contract_identity", MutationTargetKind.BINDING, "decision_contract_identity", (ContinuityEffect.OBJECTIVE_AUTHORITY_REESTABLISHMENT,), ("OBJECTIVE_AUTHORITY_LIFECYCLE",)),
+    _mutation_spec("objective_binding", MutationTargetKind.BINDING, "objective_binding", (ContinuityEffect.OBJECTIVE_AUTHORITY_REESTABLISHMENT,), ("OBJECTIVE_AUTHORITY_LIFECYCLE",)),
+    _mutation_spec("objective_identity", MutationTargetKind.BINDING, "objective_identity", (ContinuityEffect.OBJECTIVE_AUTHORITY_REESTABLISHMENT,), ("OBJECTIVE_AUTHORITY_LIFECYCLE",)),
+    _mutation_spec("commit_state", MutationTargetKind.FACT, "commit_state", (ContinuityEffect.TERMINAL_DISCONTINUITY,), ("EXECUTION_CONTROL", "GRANT_USE_AND_CONSUMPTION")),
+    _mutation_spec("credential_identity", MutationTargetKind.FACT, "credential_identity", (ContinuityEffect.IDENTITY_DISCONTINUITY,), ("CREDENTIAL_AND_IDENTITY",), ("credential",)),
+    _mutation_spec("tool_connector_identity", MutationTargetKind.FACT, "tool_connector_identity", (ContinuityEffect.CONTROL_REESTABLISHMENT,), ("EXECUTION_CONTROL",), ("connector_endpoint",)),
 )
 
 
 def _build_mutation_registry() -> Mapping[str, MutationSpec]:
     registry: dict[str, MutationSpec] = {}
     for spec in MUTATION_SPECS:
+        if not spec.continuity_effects or len(spec.continuity_effects) != len(
+            set(spec.continuity_effects)
+        ):
+            raise RuntimeError(
+                f"mutation registry field lacks exact continuity metadata: {spec.canonical_field}"
+            )
+        if not spec.observation_scope_families or (
+            set(spec.observation_scope_families) - set(OBSERVATION_SCOPE_FAMILIES)
+        ):
+            raise RuntimeError(
+                f"mutation registry field lacks exact observation metadata: {spec.canonical_field}"
+            )
         for field in (spec.canonical_field, *spec.legacy_aliases):
             if field in registry:
                 raise RuntimeError(f"duplicate mutation registry field: {field}")
@@ -1578,6 +1592,8 @@ class Mutation:
     canonical_field: str | None
     target_kind: MutationTargetKind | None
     target: str | None
+    continuity_effects: tuple[ContinuityEffect, ...]
+    observation_scope_families: tuple[str, ...]
 
     @classmethod
     def from_mapping(cls, value: Mapping[str, Any]) -> "Mutation":
@@ -1602,6 +1618,10 @@ class Mutation:
             canonical_field=spec.canonical_field if spec is not None else None,
             target_kind=spec.target_kind if spec is not None else None,
             target=spec.target if spec is not None else None,
+            continuity_effects=spec.continuity_effects if spec is not None else (),
+            observation_scope_families=(
+                spec.observation_scope_families if spec is not None else ()
+            ),
         )
 
 

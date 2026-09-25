@@ -17,7 +17,7 @@ from .model import (
     OracleInput,
     RunResult,
 )
-from .oracle import evaluate
+from .oracle import analyze_continuity_path, evaluate
 
 
 def load_fixture(path: str | Path) -> dict[str, Any]:
@@ -189,9 +189,40 @@ def format_trace(result: RunResult) -> str:
             if mutation.target is not None and mutation.target_kind is not None
             else "UNKNOWN"
         )
+        metadata = (
+            "; continuity_effects="
+            f"{','.join(effect.value for effect in mutation.continuity_effects)}; "
+            f"observation_scopes={','.join(mutation.observation_scope_families)}"
+            if mutation.target is not None
+            else ""
+        )
         lines.append(
             f"{mutation.field} [{resolution}]: {mutation.before} -> {mutation.after}"
+            f"{metadata}"
         )
+    path = analyze_continuity_path(case)
+    lines.extend(
+        (
+            "path_effects: "
+            + (
+                ",".join(sorted(effect.value for effect in path.effects))
+                if path.effects
+                else "none"
+            ),
+            "path_observation_scopes: "
+            + (
+                ",".join(
+                    family
+                    for family in OBSERVATION_SCOPE_FAMILIES
+                    if family in path.observation_scope_families
+                )
+                if path.observation_scope_families
+                else "none"
+            ),
+            f"path_aba_targets: {','.join(path.aba_targets) if path.aba_targets else 'none'}",
+            f"successor_admission_required: {str(path.successor_break).lower()}",
+        )
+    )
     lines.extend(("", "T3"))
     required_facts = tuple(
         dict.fromkeys(

@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from dataclasses import dataclass
 from typing import Any
 
 from .model import (
     AuthorityOutcome,
     AuthorityStateBinding,
     BindingScope,
+    ContinuityEffect,
     FactState,
     INVARIANTS,
     MANDATORY_T3_FACTS,
@@ -71,6 +73,37 @@ GRANT_SCOPE_FIELDS = (
 
 NEGATIVE_BINDING_STATES = {"INVALID", "REVOKED", "REJECTED", "SUPERSEDED"}
 NEGATIVE_OBSERVATION_STATES = {"INVALID", "REVOKED", "REJECTED", "SUPERSEDED"}
+
+SUCCESSOR_BREAK_EFFECTS = frozenset(
+    {
+        ContinuityEffect.IDENTITY_DISCONTINUITY,
+        ContinuityEffect.NON_RESTORABLE_LINEAGE,
+        ContinuityEffect.TERMINAL_DISCONTINUITY,
+    }
+)
+GRANT_NONPORTABLE_EFFECTS = frozenset(
+    {
+        *SUCCESSOR_BREAK_EFFECTS,
+        ContinuityEffect.GRANT_USE_DISCONTINUITY,
+    }
+)
+
+
+@dataclass(frozen=True)
+class ContinuityPath:
+    effects: frozenset[ContinuityEffect]
+    observation_scope_families: frozenset[str]
+    aba_targets: tuple[str, ...]
+
+    @property
+    def successor_break(self) -> bool:
+        # Any authority-relevant ABA path is history-discontinuous even when
+        # the individual field would otherwise support non-terminal rebinding.
+        return bool(self.effects & SUCCESSOR_BREAK_EFFECTS) or bool(self.aba_targets)
+
+    @property
+    def grant_nonportable(self) -> bool:
+        return bool(self.effects & GRANT_NONPORTABLE_EFFECTS)
 
 
 def _engaged(case: OracleInput) -> tuple[str, ...]:
@@ -600,6 +633,85 @@ def _mutation_chain_mismatches(case: OracleInput) -> tuple[str, ...]:
     return tuple(dict.fromkeys(mismatches))
 
 
+def analyze_continuity_path(case: OracleInput) -> ContinuityPath:
+    """Retain every semantic path effect, including endpoint-restoring ABA edges."""
+    histories: dict[tuple[MutationTargetKind, str], list[Any]] = {}
+    effects: set[ContinuityEffect] = set()
+    observation_scopes: set[str] = set()
+    aba_targets: list[str] = []
+    for mutation in case.t2_mutations:
+        if mutation.target_kind is None or mutation.target is None:
+            continue
+        effects.update(mutation.continuity_effects)
+        observation_scopes.update(mutation.observation_scope_families)
+        key = (mutation.target_kind, mutation.target)
+        history = histories.setdefault(key, [mutation.before])
+        if any(exact_value_equal(mutation.after, prior) for prior in history):
+            aba_targets.append(mutation.target)
+        history.append(mutation.after)
+    return ContinuityPath(
+        frozenset(effects),
+        frozenset(observation_scopes),
+        tuple(dict.fromkeys(aba_targets)),
+    )
+
+
+def _fresh_successor_chain_established(
+    case: OracleInput, active_state: AuthorityStateBinding
+) -> bool:
+    """Require an independently current identity, epoch, grant, and objective chain."""
+    t1 = case.t1_authority_state
+    before = case.t1_binding_facts
+    after = case.t3_binding_facts
+    if (
+        active_state.identity_basis == t1.identity_basis
+        or active_state.execution_context == t1.execution_context
+        or active_state.boundary_epoch == t1.boundary_epoch
+        or active_state.grant_id == t1.grant_id
+    ):
+        return False
+    if case.grant_transition is not None:
+        return False
+    if (
+        before.authority_root is None
+        or after.authority_root is None
+        or before.ordering is None
+        or after.ordering is None
+    ):
+        return False
+    before_root = before.authority_root
+    after_root = after.authority_root
+    if (
+        after_root.boundary_epoch != active_state.boundary_epoch
+        or (
+            after_root.root_id,
+            after_root.authority_generation,
+            after_root.lineage,
+            after_root.boundary_epoch,
+        )
+        == (
+            before_root.root_id,
+            before_root.authority_generation,
+            before_root.lineage,
+            before_root.boundary_epoch,
+        )
+    ):
+        return False
+    if (
+        after.ordering.head_event_order <= before.ordering.head_event_order
+        or (
+            after.ordering.head_binding_id,
+            after.ordering.head_binding_generation,
+        )
+        == (
+            before.ordering.head_binding_id,
+            before.ordering.head_binding_generation,
+        )
+    ):
+        return False
+    return True
+
+
 def _grant_mutations(case: OracleInput) -> tuple[Any, ...]:
     return _mutations_for(case, MutationTargetKind.STATE, "grant_id")
 
@@ -622,11 +734,12 @@ def _consumption_regenerated(case: OracleInput) -> bool:
     return False
 
 
-def _has_exact_mutation(case: OracleInput, target: str, before: Any, after: Any) -> bool:
-    return any(
-        exact_value_equal(mutation.before, before)
-        and exact_value_equal(mutation.after, after)
-        for mutation in _mutations_for(case, MutationTargetKind.STATE, target)
+def _has_exact_mutation_path(
+    case: OracleInput, target: str, before: Any, after: Any
+) -> bool:
+    mutations = _mutations_for(case, MutationTargetKind.STATE, target)
+    return bool(mutations) and exact_value_equal(mutations[0].before, before) and exact_value_equal(
+        mutations[-1].after, after
     )
 
 
@@ -644,20 +757,20 @@ def _changes_are_represented(
     ):
         old = getattr(before, state_field)
         new = getattr(after, state_field)
-        if old != new and not _has_exact_mutation(case, state_field, old, new):
+        if old != new and not _has_exact_mutation_path(case, state_field, old, new):
             missing.append(state_field)
     context_or_control_changed = (
         before.execution_context != after.execution_context
         or before.control_state != after.control_state
     )
     if context_or_control_changed and not (
-        _has_exact_mutation(
+        _has_exact_mutation_path(
             case,
             "execution_context",
             before.execution_context,
             after.execution_context,
         )
-        or _has_exact_mutation(
+        or _has_exact_mutation_path(
             case,
             "control_state",
             before.control_state,
@@ -1441,6 +1554,13 @@ def evaluate(case: OracleInput) -> OracleResult:
 
     mutation_chain_mismatches = _mutation_chain_mismatches(case)
     if mutation_chain_mismatches:
+        if "commit_state" in mutation_chain_mismatches:
+            return _unavailable(
+                case,
+                "TERMINAL_EVENT_ORDERING_UNAVAILABLE",
+                "Terminal lifecycle events are duplicated, reordered, or do not resolve to the exact observed T3 state.",
+                ("commit_state",),
+            )
         return _unavailable(
             case,
             "T2_T3_HYBRID_STATE",
@@ -1532,6 +1652,41 @@ def evaluate(case: OracleInput) -> OracleResult:
                 missing_mutations,
             )
         active_state = reestablishment.current
+
+    continuity_path = analyze_continuity_path(case)
+    if "boundary_epoch" in continuity_path.aba_targets:
+        return _unavailable(
+            case,
+            "BOUNDARY_EPOCH_REUSE_UNAVAILABLE",
+            "A returned boundary label does not restore the predecessor boundary lineage.",
+            ("boundary_epoch",),
+        )
+    if continuity_path.grant_nonportable and active_state.grant_id == t1_state.grant_id:
+        return _unavailable(
+            case,
+            "PREDECESSOR_GRANT_NONPORTABLE",
+            "A predecessor grant cannot cross an identity, lineage, terminal, or grant/use discontinuity.",
+            ("grant_id", "consumption_binding"),
+        )
+    if continuity_path.successor_break and not _fresh_successor_chain_established(
+        case, active_state
+    ):
+        return _unavailable(
+            case,
+            "SUCCESSOR_AUTHORITY_UNAVAILABLE",
+            "The path contains an execution-identity, lineage, or terminal break without an independently current successor authority chain.",
+            tuple(
+                dict.fromkeys(
+                    (
+                        *continuity_path.aba_targets,
+                        "identity_basis",
+                        "execution_context",
+                        "boundary_epoch",
+                        "grant_id",
+                    )
+                )
+            ),
+        )
 
     grant_scope_changed = any(
         getattr(t1_state, field) != getattr(active_state, field)
