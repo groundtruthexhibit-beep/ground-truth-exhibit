@@ -901,7 +901,10 @@ def _evaluate_commitment_envelope(
         exact_segments = [item for item in named if item is not None]
         digest = commitment_digest(envelope, exact_segments)
         observer = next((item for item in binding.observers if item.observer_id == envelope["observer_id"] and item.observer_generation == envelope["observer_generation"]), None)
-        stream = [item for item in segments.values() if item.stream_id == envelope["stream_id"] and item.stream_generation == envelope["stream_generation"]]
+        stream = sorted(
+            (item for item in segments.values() if item.stream_id == envelope["stream_id"] and item.stream_generation == envelope["stream_generation"]),
+            key=lambda value: (value.start_event_order, value.start_sequence, value.segment_id),
+        )
         if (
             envelope["relationship"] != "OBSERVATION_HISTORY_COMMITMENT"
             or envelope["commitment_format"] != "AUTHORITY-LAB-OBSERVATION-COMMITMENT-V1"
@@ -912,9 +915,20 @@ def _evaluate_commitment_envelope(
             or observer.observer_identity_basis != envelope["observer_identity_basis"]
             or tuple(item.segment_id for item in sorted(stream, key=lambda value: (value.start_event_order, value.start_sequence, value.segment_id))) != envelope["segment_ids"]
             or any(item.stream_commitment != digest for item in stream)
+            or not stream
+            or envelope["start_anchor_id"] != stream[0].start_anchor_id
+            or envelope["start_event_order"] != stream[0].start_event_order
+            or envelope["end_anchor_id"] != stream[-1].end_anchor_id
+            or envelope["end_event_order"] != stream[-1].end_event_order
+            or envelope["start_sequence"] != stream[0].start_sequence
+            or envelope["end_sequence"] != stream[-1].end_sequence
             or tuple(envelope["scope_families"]) != tuple(OBSERVATION_SCOPE_FAMILIES)
             or envelope["observation_binding_id"] != binding.observation_binding_id
             or envelope["observation_binding_generation"] != binding.observation_binding_generation
+            or envelope["objective_binding_id"] != binding.objective_binding_id
+            or envelope["objective_binding_generation"] != binding.objective_binding_generation
+            or envelope["decision_contract_id"] != binding.decision_contract_id
+            or envelope["decision_contract_version"] != binding.decision_contract_version
             or envelope["source_id"] != root.root_id
             or envelope["authority_generation"] != root.authority_generation
             or envelope["boundary"] != root.boundary
@@ -925,19 +939,19 @@ def _evaluate_commitment_envelope(
             return _observation_unavailable(case, "OBSERVATION_COMMITMENT_CONFLICTING", "The commitment body is not exact for the admitted observation history.", ("evidence_binding",))
         stream_heads[(envelope["stream_id"], envelope["stream_generation"])] = envelope
 
-        verifier_matches = [item for item in verifiers if item["verifier_id"] not in {case.authority_tuple.subject, envelope["observer_id"], root.root_id, root.ordering_source_id} and item["role"] == "OBSERVATION_COMMITMENT_APPRAISER" and item["source_id"] == root.root_id and item["boundary_epoch"] == root.boundary_epoch and item["lifecycle_state"] == "ACTIVE"]
-        verified = [item for item in verifications if item["commitment_id"] == envelope["commitment_id"] and item["commitment_digest"] == digest and item["canonical_payload_digest"] == digest and item["signature_evidence_id"] == envelope["signature_evidence_id"] and item["freshness_challenge_id"] == envelope["freshness_challenge_id"] and item["disposition"] == "VERIFIED" and any(v["verifier_id"] == item["verifier_id"] and v["verifier_generation"] == item["verifier_generation"] for v in verifier_matches)]
+        verifier_matches = [item for item in verifiers if item["verifier_id"] not in {case.authority_tuple.subject, envelope["observer_id"], root.root_id, root.ordering_source_id} and item["role"] == "OBSERVATION_COMMITMENT_APPRAISER" and tuple(item["scope_families"]) == tuple(OBSERVATION_SCOPE_FAMILIES) and item["source_id"] == root.root_id and item["authority_generation"] == root.authority_generation and item["boundary"] == root.boundary and item["boundary_epoch"] == root.boundary_epoch and item["lineage"] == root.lineage and item["ordering_source_id"] == root.ordering_source_id and item["lifecycle_state"] == "ACTIVE"]
+        verified = [item for item in verifications if item["commitment_id"] == envelope["commitment_id"] and item["commitment_digest"] == digest and item["canonical_payload_digest"] == digest and item["signature_evidence_id"] == envelope["signature_evidence_id"] and item["issuer_key_id"] == envelope["issuer_key_id"] and item["issuer_key_generation"] == envelope["issuer_key_generation"] and item["freshness_challenge_id"] == envelope["freshness_challenge_id"] and item["verification_event_order"] <= binding.t3_anchor.event_order and item["disposition"] == "VERIFIED" and any(v["verifier_id"] == item["verifier_id"] and v["verifier_generation"] == item["verifier_generation"] for v in verifier_matches)]
         if len(verified) != 1:
             return _observation_unavailable(case, "OBSERVATION_COMMITMENT_AUTHENTICITY_UNAVAILABLE", "No exact independently admitted verifier establishes commitment authenticity.", ("evidence_binding",))
         link_matches = [item for item in links if item["to_commitment_id"] == envelope["commitment_id"] and item["to_commitment_digest"] == digest and item["to_logical_position"] == envelope["logical_position"]]
-        if len(link_matches) != 1 or (envelope["logical_position"] == 0 and link_matches[0]["relationship"] != "GENESIS") or (envelope["logical_position"] > 0 and link_matches[0]["relationship"] not in {"EXTENDS", "CORRECTS", "SUPERSEDES"}) or link_matches[0]["from_commitment_id"] != envelope["predecessor_commitment_id"] or link_matches[0]["from_commitment_digest"] != envelope["predecessor_commitment_digest"] or link_matches[0]["from_logical_position"] != max(envelope["logical_position"] - 1, 0):
+        if len(link_matches) != 1 or (envelope["logical_position"] == 0 and link_matches[0]["relationship"] != "GENESIS") or (envelope["logical_position"] > 0 and link_matches[0]["relationship"] not in {"EXTENDS", "CORRECTS", "SUPERSEDES"}) or link_matches[0]["from_commitment_id"] != envelope["predecessor_commitment_id"] or link_matches[0]["from_commitment_digest"] != envelope["predecessor_commitment_digest"] or link_matches[0]["from_logical_position"] != max(envelope["logical_position"] - 1, 0) or link_matches[0]["stream_id"] != envelope["stream_id"] or link_matches[0]["stream_generation"] != envelope["stream_generation"] or link_matches[0]["ordering_source_id"] != root.ordering_source_id or link_matches[0]["source_id"] != root.root_id or link_matches[0]["authority_generation"] != root.authority_generation or link_matches[0]["boundary"] != root.boundary or link_matches[0]["boundary_epoch"] != root.boundary_epoch or link_matches[0]["lineage"] != root.lineage or not any(v["verifier_id"] == link_matches[0]["verifier_id"] and v["verifier_generation"] == link_matches[0]["verifier_generation"] for v in verifier_matches):
             return _observation_unavailable(case, "OBSERVATION_COMMITMENT_CONTINUITY_UNAVAILABLE", "The commitment lacks one exact append-only predecessor relationship.", ("evidence_binding",))
 
         candidate_checkpoints = [item for item in checkpoints if item["head_commitment_id"] == envelope["commitment_id"] and item["head_commitment_digest"] == digest and item["head_logical_position"] == envelope["logical_position"] and item["stream_id"] == envelope["stream_id"] and item["stream_generation"] == envelope["stream_generation"]]
         if len(candidate_checkpoints) != 1:
             return _observation_unavailable(case, "OBSERVATION_COMMITMENT_UNIQUENESS_UNAVAILABLE", "No unique current checkpoint selects this commitment.", ("evidence_binding",))
         checkpoint = candidate_checkpoints[0]
-        if checkpoint["relationship"] != "UNIQUE_CURRENT_COMMITMENT_HEAD" or checkpoint["ordering_source_id"] != root.ordering_source_id or checkpoint["source_id"] != root.root_id or checkpoint["lifecycle_state"] != "ACTIVE" or verifier_state_digest(checkpoint) != checkpoint["current_verifier_state_digest"]:
+        if checkpoint["relationship"] != "UNIQUE_CURRENT_COMMITMENT_HEAD" or checkpoint["observation_binding_id"] != binding.observation_binding_id or checkpoint["observation_binding_generation"] != binding.observation_binding_generation or checkpoint["ordering_source_id"] != root.ordering_source_id or checkpoint["source_id"] != root.root_id or checkpoint["authority_generation"] != root.authority_generation or checkpoint["boundary"] != root.boundary or checkpoint["boundary_epoch"] != root.boundary_epoch or checkpoint["lineage"] != root.lineage or checkpoint["freshness_challenge_id"] != envelope["freshness_challenge_id"] or checkpoint["checkpoint_event_order"] > binding.t3_anchor.event_order or checkpoint["lifecycle_state"] != "ACTIVE" or verifier_state_digest(checkpoint) != checkpoint["current_verifier_state_digest"]:
             return _observation_unavailable(case, "OBSERVATION_COMMITMENT_UNIQUENESS_UNAVAILABLE", "The current checkpoint is not exact or independently ordered.", ("evidence_binding",))
         context = [item for item in case.trusted_commitment_context if item.get("stream_id") == envelope["stream_id"] and item.get("stream_generation") == envelope["stream_generation"]]
         expected_key = state_key_digest({**envelope, "source_id": root.root_id, "authority_generation": root.authority_generation, "boundary": root.boundary, "boundary_epoch": root.boundary_epoch, "lineage": root.lineage, "ordering_source_id": root.ordering_source_id})

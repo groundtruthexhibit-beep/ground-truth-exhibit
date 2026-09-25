@@ -1773,6 +1773,16 @@ class AuthorityLabTests(unittest.TestCase):
             fixture("LAB-V1-108"), "OBSERVATION_COMMITMENT_AUTHENTICITY_UNAVAILABLE"
         )
 
+    def test_verification_must_bind_exact_issuer_key(self) -> None:
+        payload = fixture("LAB-V1-032")
+        verification = payload["t3"]["facts"]["evidence_binding"]["value"][
+            "commitment_verifications"
+        ][0]
+        verification["issuer_key_id"] = "UNRELATED-KEY"
+        self.assert_unavailable_with_reason(
+            payload, "OBSERVATION_COMMITMENT_AUTHENTICITY_UNAVAILABLE"
+        )
+
     def test_commitment_without_checkpoint_is_unavailable(self) -> None:
         self.assert_unavailable_with_reason(
             fixture("LAB-V1-109"), "OBSERVATION_COMMITMENT_UNIQUENESS_UNAVAILABLE"
