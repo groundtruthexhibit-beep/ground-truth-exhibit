@@ -81,7 +81,18 @@ It is not the private engineering repository and is not a source-code mirror of 
 - [Historical hostile-review catalog](HOSTILE_REVIEW_CATALOG.md) — historical review evidence for the earlier candidate contract; file presence does not establish current authority.
 - [Layer 2 commit-time authority review](LAYER2_COMMIT_TIME_AUTHORITY_REVIEW.md) — current public Layer 2 analysis.
 - [Research pressure map](RESEARCH_PRESSURE_MAP.md) — current public research-pressure analysis; research is evidence, not authority.
+- [Literature and prior art](LITERATURE_AND_PRIOR_ART.md) — current context for complete mediation, authorization continuity, execution-edit safety, shutdown research, and adjacent agent-security work.
 - [Agent boundary escape frontier delta](FRONTIER_DELTA_AGENT_BOUNDARY_ESCAPE.md) — completed bounded review of sandbox escape, privilege escalation, delegated and derivative actors, connector/tool substitution, credential hopping, browser/computer-use escape, restart and persistence, monitor evasion, and authority-boundary routing.
+
+## Reviewed work beyond current public main
+
+Later reviewed Authority Lab work exists beyond the current public `main` history and is awaiting exact Git transport. The transport-pending line includes executable objective binding, mutation-registry closure, observation admission/completeness, a reproducible shutdown/successor ABA authority-continuity counterexample, and a reviewed path-sensitive repair design.
+
+Those results are not presented here as remotely verifiable commits until their exact Git objects are published. See [Literature and prior art](LITERATURE_AND_PRIOR_ART.md) for claim boundaries and adjacent research context.
+
+A current research principle from that reviewed line is:
+
+> Same apparent state does not imply the same authorized history.
 
 ## Current boundary
 
