@@ -405,7 +405,14 @@
             }
           ],
           "commitment_checkpoints": [],
-          "commitment_witnesses": []
+          "commitment_witnesses": [],
+          "anchor_source_admissions": [],
+          "verifier_state_anchors": [],
+          "recovery_installations": [],
+          "verifier_rotations": [],
+          "anchor_rotations": [],
+          "replica_observations": [],
+          "witness_source_admissions": []
         }
       },
       "execution_context": {

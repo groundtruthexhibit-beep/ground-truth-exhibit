@@ -8,7 +8,13 @@ from copy import deepcopy
 from pathlib import Path
 from unittest.mock import patch
 
-from authority_lab.commitment import commitment_digest, state_key_digest, verifier_state_digest
+from authority_lab.commitment import (
+    anchor_digest,
+    anchor_key_digest,
+    commitment_digest,
+    state_key_digest,
+    verifier_state_digest,
+)
 from authority_lab.model import (
     AuthorityOutcome,
     ContinuityEffect,
@@ -94,6 +100,33 @@ def reissue_observation_commitment(payload: dict) -> None:
         exact_state_key_digest=state_key_digest(envelope),
         current_verifier_state_digest=checkpoint["current_verifier_state_digest"],
         head_commitment_digest=digest,
+    )
+    anchor = binding["verifier_state_anchors"][0]
+    anchor.update(
+        exact_state_key_digest=state_key_digest(envelope),
+        head_commitment_id=checkpoint["head_commitment_id"],
+        head_commitment_digest=digest,
+        verifier_state_digest=checkpoint["current_verifier_state_digest"],
+        checkpoint_id=checkpoint["checkpoint_id"],
+        checkpoint_generation=checkpoint["checkpoint_generation"],
+        freshness_challenge_id=checkpoint["freshness_challenge_id"],
+        source_id=binding["source_id"],
+        authority_generation=binding["authority_generation"],
+        boundary=binding["boundary"],
+        boundary_epoch=binding["boundary_epoch"],
+        lineage=binding["lineage"],
+        ordering_source_id=binding["ordering_source_id"],
+    )
+    digest = anchor_digest(anchor)
+    anchor.update(anchor_digest=digest, canonical_payload_digest=digest)
+    trusted_anchor = payload["_trusted_anchor_context"][0]
+    trusted_anchor.update(
+        exact_anchor_key_digest=anchor_key_digest(anchor),
+        anchor_digest=digest,
+        exact_state_key_digest=anchor["exact_state_key_digest"],
+        head_commitment_digest=anchor["head_commitment_digest"],
+        verifier_state_digest=anchor["verifier_state_digest"],
+        freshness_challenge_id=anchor["freshness_challenge_id"],
     )
 
 
@@ -294,9 +327,9 @@ class AuthorityLabTests(unittest.TestCase):
         self.assertIs(AuthorityOutcome.UNAVAILABLE, result.outcome)
         self.assertIn(reason_code, {reason.code for reason in result.reasons})
 
-    def test_v1_contains_one_hundred_twelve_deterministic_fixtures(self) -> None:
+    def test_v1_contains_one_hundred_forty_six_deterministic_fixtures(self) -> None:
         paths = discover(CASES)
-        self.assertEqual(112, len(paths))
+        self.assertEqual(146, len(paths))
         self.assertEqual(paths, discover(CASES))
 
     def test_every_v0_fixture_matches_its_expected_outcome(self) -> None:
@@ -1534,6 +1567,11 @@ class AuthorityLabTests(unittest.TestCase):
         payload["t3"]["facts"]["evidence_binding"]["value"]["source_id"] = (
             "ROOT-AUTH-BOUNDARY-1"
         )
+        observation = payload["t3"]["facts"]["evidence_binding"]["value"]
+        observation["anchor_source_admissions"][0]["source_id"] = (
+            "ROOT-AUTH-BOUNDARY-1"
+        )
+        reissue_observation_commitment(payload)
         self.assertIs(AuthorityOutcome.AUTHORIZED, actual(payload))
 
     def test_coverage_and_restart_gaps_are_unavailable(self) -> None:
@@ -1846,6 +1884,103 @@ class AuthorityLabTests(unittest.TestCase):
             # Disk fixtures are never allowed to choose their own durable anchor.
             with patch("json.load", return_value=raw):
                 load_fixture(path)
+
+    def test_candidate_fixture_cannot_supply_trusted_anchor_state(self) -> None:
+        path = CASES / "LAB-V1-032.json"
+        raw = json.loads(path.read_text(encoding="utf-8"))
+        raw["_trusted_anchor_context"] = []
+        with self.assertRaisesRegex(ValueError, "trusted anchor"):
+            with patch("json.load", return_value=raw):
+                load_fixture(path)
+
+    def test_anchor_hostile_matrix_matches_independent_expectations(self) -> None:
+        for number in range(113, 147):
+            case_id = f"LAB-V1-{number:03d}"
+            with self.subTest(case_id=case_id):
+                self.assertIs(HarnessStatus.PASS, run_fixture(fixture(case_id)).status)
+
+    def test_verifier_and_candidate_rollback_fails_closed(self) -> None:
+        for case_id in ("LAB-V1-113", "LAB-V1-114", "LAB-V1-115", "LAB-V1-116"):
+            with self.subTest(case_id=case_id):
+                self.assert_unavailable_with_reason(fixture(case_id), "VERIFIER_STATE_ANCHOR_REPLAY")
+
+    def test_anchor_replay_position_reuse_and_split_brain_fail_closed(self) -> None:
+        expected = {
+            "LAB-V1-117": "VERIFIER_STATE_ANCHOR_REPLAY",
+            "LAB-V1-118": "VERIFIER_STATE_REPLICA_CONFLICTING",
+            "LAB-V1-119": "VERIFIER_STATE_REPLICA_CONFLICTING",
+            "LAB-V1-120": "VERIFIER_STATE_REPLICA_CONFLICTING",
+            "LAB-V1-140": "VERIFIER_STATE_REPLICA_CONFLICTING",
+        }
+        for case_id, reason in expected.items():
+            with self.subTest(case_id=case_id):
+                self.assert_unavailable_with_reason(fixture(case_id), reason)
+
+    def test_candidate_reconstruction_and_unanchored_bootstrap_fail_closed(self) -> None:
+        for case_id in ("LAB-V1-121", "LAB-V1-138", "LAB-V1-141", "LAB-V1-144"):
+            with self.subTest(case_id=case_id):
+                self.assert_unavailable_with_reason(fixture(case_id), "VERIFIER_STATE_ANCHOR_UNAVAILABLE")
+
+    def test_incomplete_or_reordered_recovery_fails_closed(self) -> None:
+        for case_id in ("LAB-V1-122", "LAB-V1-123", "LAB-V1-124", "LAB-V1-125"):
+            with self.subTest(case_id=case_id):
+                self.assert_unavailable_with_reason(fixture(case_id), "VERIFIER_STATE_RECOVERY_INCOMPLETE")
+
+    def test_unauthorized_rotations_and_generation_rollback_fail_closed(self) -> None:
+        expected = {
+            "LAB-V1-128": "VERIFIER_ROTATION_UNAVAILABLE",
+            "LAB-V1-130": "VERIFIER_STATE_ANCHOR_ROLLBACK",
+            "LAB-V1-131": "ANCHOR_ROTATION_UNAVAILABLE",
+        }
+        for case_id, reason in expected.items():
+            with self.subTest(case_id=case_id):
+                self.assert_unavailable_with_reason(fixture(case_id), reason)
+
+    def test_witness_count_does_not_establish_source_independence(self) -> None:
+        expected = {
+            "LAB-V1-133": "WITNESS_SOURCE_CONTINUITY_UNAVAILABLE",
+            "LAB-V1-135": "OBSERVATION_WITNESS_CONFLICTING",
+            "LAB-V1-136": "WITNESS_SOURCE_CONTINUITY_UNAVAILABLE",
+            "LAB-V1-137": "WITNESS_SOURCE_CONTINUITY_UNAVAILABLE",
+        }
+        for case_id, reason in expected.items():
+            with self.subTest(case_id=case_id):
+                self.assert_unavailable_with_reason(fixture(case_id), reason)
+
+    def test_anchor_relations_are_strictly_typed(self) -> None:
+        payload = fixture("LAB-V1-032")
+        anchor = payload["t3"]["facts"]["evidence_binding"]["value"]["verifier_state_anchors"][0]
+        anchor["trusted_anchor"] = True
+        with self.assertRaisesRegex(ValueError, "contain exactly"):
+            OracleInput.from_fixture(payload)
+
+    def test_anchored_positive_paths_remain_authorized(self) -> None:
+        for case_id in (
+            "LAB-V1-127", "LAB-V1-129", "LAB-V1-132", "LAB-V1-134",
+            "LAB-V1-142", "LAB-V1-143", "LAB-V1-145",
+        ):
+            with self.subTest(case_id=case_id):
+                result = evaluate(OracleInput.from_fixture(fixture(case_id)))
+                self.assertIs(AuthorityOutcome.AUTHORIZED, result.outcome)
+                self.assertIn("CURRENT_AUTHORITY_ESTABLISHED", {reason.code for reason in result.reasons})
+
+    def test_recovery_receipt_binds_exact_ordered_replay(self) -> None:
+        payload = fixture("LAB-V1-127")
+        recovery = payload["t3"]["facts"]["evidence_binding"]["value"][
+            "recovery_installations"
+        ][0]
+        recovery["replay_commitment_ids"][0] = "REORDERED-OR-REPLACED"
+        self.assert_unavailable_with_reason(
+            payload, "VERIFIER_STATE_RECOVERY_INCOMPLETE"
+        )
+
+    def test_current_authoritative_anchor_revocation_is_denied(self) -> None:
+        result = evaluate(OracleInput.from_fixture(fixture("LAB-V1-146")))
+        self.assertIs(AuthorityOutcome.DENIED, result.outcome)
+        self.assertIn(
+            "VERIFIER_STATE_ANCHOR_PROHIBITED",
+            {reason.code for reason in result.reasons},
+        )
 
     def test_positive_commitment_and_successor_paths_remain_authorized(self) -> None:
         for case_id in ("LAB-V1-098", "LAB-V1-099", "LAB-V1-102", "LAB-V1-111", "LAB-V1-112"):

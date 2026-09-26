@@ -30,6 +30,8 @@ def load_fixture(path: str | Path) -> dict[str, Any]:
         raise ValueError("unsupported fixture schema_version")
     if "_trusted_commitment_context" in value:
         raise ValueError("fixture cannot supply harness-owned trusted commitment state")
+    if "_trusted_anchor_context" in value:
+        raise ValueError("fixture cannot supply harness-owned trusted anchor state")
     manifest_path = fixture_path.parent / "trusted_commitment_state.json"
     if value.get("schema_version") == "authority-lab-v1" and manifest_path.exists():
         with manifest_path.open("r", encoding="utf-8") as handle:
@@ -38,6 +40,14 @@ def load_fixture(path: str | Path) -> dict[str, Any]:
         if not isinstance(context, list) or not all(isinstance(item, dict) for item in context):
             raise ValueError("trusted commitment state manifest entry is invalid")
         value["_trusted_commitment_context"] = context
+    anchor_manifest_path = fixture_path.parent / "trusted_anchor_state.json"
+    if value.get("schema_version") == "authority-lab-v1" and anchor_manifest_path.exists():
+        with anchor_manifest_path.open("r", encoding="utf-8") as handle:
+            manifest = json.load(handle)
+        context = manifest.get(fixture_path.name, [])
+        if not isinstance(context, list) or not all(isinstance(item, dict) for item in context):
+            raise ValueError("trusted anchor state manifest entry is invalid")
+        value["_trusted_anchor_context"] = context
     return value
 
 
@@ -167,6 +177,14 @@ def _observation_trace(case: OracleInput) -> tuple[str, ...]:
         for item in binding.commitment_checkpoints
     )
     lines.append(f"trusted_commitment_states: {len(case.trusted_commitment_context)}")
+    lines.append(f"trusted_anchor_states: {len(case.trusted_anchor_context)}")
+    lines.extend(
+        "verifier_anchor: "
+        f"{item.values['anchor_id']}@{item.values['anchor_position']} "
+        f"head={item.values['head_commitment_digest']} "
+        f"verifier={item.values['verifier_id']}@{item.values['verifier_generation']}"
+        for item in binding.verifier_state_anchors
+    )
     lines.append(f"gaps: {','.join(gaps) if gaps else 'none'}")
     lines.append(
         "freshness: "

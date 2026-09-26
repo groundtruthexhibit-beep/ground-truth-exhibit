@@ -6,7 +6,14 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
-from .commitment import commitment_digest, state_key_digest, verifier_state_digest
+from .commitment import (
+    anchor_digest,
+    anchor_key_digest,
+    commitment_digest,
+    recovery_receipt_digest,
+    state_key_digest,
+    verifier_state_digest,
+)
 
 from .model import (
     AuthorityOutcome,
@@ -961,6 +968,11 @@ def _evaluate_commitment_envelope(
         if trusted.get("previous_verifier_state_digest") != checkpoint["previous_verifier_state_digest"] or trusted.get("current_verifier_state_digest") != checkpoint["current_verifier_state_digest"] or trusted.get("head_commitment_digest") != digest or trusted.get("checkpoint_id") != checkpoint["checkpoint_id"] or trusted.get("freshness_challenge_id") != envelope["freshness_challenge_id"]:
             reason = "OBSERVATION_COMMITMENT_REPLAY" if trusted.get("head_logical_position", -1) > envelope["logical_position"] else "OBSERVATION_VERIFIER_ROLLBACK"
             return _observation_unavailable(case, reason, "The candidate commitment does not advance the independently retained durable verifier state.", ("evidence_binding", "freshness"))
+        anchor_result = _evaluate_verifier_state_anchor(
+            case, binding, root, envelope, checkpoint, expected_key
+        )
+        if anchor_result is not None:
+            return anchor_result
 
     witnesses = [record.values for record in binding.commitment_witnesses]
     for checkpoint in checkpoints:
@@ -977,6 +989,226 @@ def _evaluate_commitment_envelope(
     if freshness is None or freshness.checkpoint_id != checkpoint["checkpoint_id"] or freshness.checkpoint_generation != checkpoint["checkpoint_generation"] or freshness.verifier_state_id != checkpoint["verifier_state_id"] or freshness.verifier_state_generation != checkpoint["verifier_state_generation"] or freshness.verifier_state_digest != checkpoint["current_verifier_state_digest"] or freshness.freshness_challenge_id != checkpoint["freshness_challenge_id"]:
         return _observation_unavailable(case, "OBSERVATION_FRESHNESS_UNAVAILABLE", "Verifier-bound freshness is stale, self-issued, or not bound to the current checkpoint.", ("freshness",))
     return OracleResult(AuthorityOutcome.AUTHORIZED, (Reason("OBSERVATION_COMMITMENT_ESTABLISHED", "A current authentic uniquely checkpointed observation history is established.", ("evidence_binding", "freshness")),), _engaged(case))
+
+
+def _evaluate_verifier_state_anchor(
+    case: OracleInput,
+    binding: ObservationBinding,
+    root: Any,
+    envelope: Mapping[str, Any],
+    checkpoint: Mapping[str, Any],
+    expected_state_key: str,
+) -> OracleResult | None:
+    """Join candidate evidence to one independently current monotonic anchor."""
+    sources = [item.values for item in binding.anchor_source_admissions]
+    anchors = [item.values for item in binding.verifier_state_anchors]
+    if not sources or not anchors or not case.trusted_anchor_context:
+        return _observation_unavailable(
+            case, "VERIFIER_STATE_ANCHOR_UNAVAILABLE",
+            "An independently retained verifier-state anchor is unavailable.",
+            ("evidence_binding", "freshness"),
+        )
+    matching = [
+        item for item in anchors
+        if item["stream_id"] == envelope["stream_id"]
+        and item["stream_generation"] == envelope["stream_generation"]
+        and item["head_commitment_digest"] == envelope["commitment_digest"]
+        and item["checkpoint_id"] == checkpoint["checkpoint_id"]
+    ]
+    if len(matching) != 1:
+        return _observation_unavailable(
+            case, "VERIFIER_STATE_ANCHOR_CONFLICTING",
+            "No unique candidate anchor selects the exact commitment checkpoint.",
+            ("evidence_binding",),
+        )
+    anchor = matching[0]
+    source_matches = [
+        item for item in sources
+        if item["relationship"] == "VERIFIER_STATE_ANCHOR_SOURCE_ADMISSION"
+        and item["scope"] == "VERIFIER_STATE_CURRENTNESS"
+        and item["anchor_source_id"] == anchor["anchor_source_id"]
+        and item["anchor_source_generation"] == anchor["anchor_source_generation"]
+        and item["anchor_source_identity_basis"] == anchor["anchor_source_identity_basis"]
+        and item["anchor_key_id"] == anchor["anchor_key_id"]
+        and item["anchor_key_generation"] == anchor["anchor_key_generation"]
+        and item["verifier_id"] == anchor["verifier_id"]
+        and item["durable_state_id"] == anchor["durable_state_id"]
+        and item["stream_id"] == anchor["stream_id"]
+        and item["stream_generation"] == anchor["stream_generation"]
+        and item["source_id"] == root.root_id
+        and item["authority_generation"] == root.authority_generation
+        and item["boundary"] == root.boundary
+        and item["boundary_epoch"] == root.boundary_epoch
+        and item["lineage"] == root.lineage
+        and item["ordering_source_id"] == root.ordering_source_id
+        and item["lifecycle_state"] == "ACTIVE"
+    ]
+    forbidden_sources = {
+        case.authority_tuple.subject,
+        envelope["observer_id"],
+        anchor["verifier_id"],
+    }
+    negative_states = {"REVOKED", "REJECTED", "INVALID", "PROHIBITED"}
+    if any(
+        item["anchor_source_id"] == anchor["anchor_source_id"]
+        and item["anchor_source_generation"] == anchor["anchor_source_generation"]
+        and item["source_id"] == root.root_id
+        and item["lifecycle_state"] in negative_states
+        for item in sources
+    ) or anchor["lifecycle_state"] in negative_states:
+        return OracleResult(
+            AuthorityOutcome.DENIED,
+            (Reason("VERIFIER_STATE_ANCHOR_PROHIBITED", "Current authoritative lifecycle evidence rejects the verifier-state anchor lineage.", ("evidence_binding",)),),
+            _engaged(case),
+        )
+    if len(source_matches) != 1 or anchor["anchor_source_id"] in forbidden_sources:
+        return _observation_unavailable(
+            case, "VERIFIER_STATE_ANCHOR_SOURCE_UNAVAILABLE",
+            "The anchor lacks one exact independent root-issued source admission.",
+            ("evidence_binding", "binding_source_authority"),
+        )
+    if (
+        anchor["relationship"] != "VERIFIER_STATE_ANCHOR"
+        or anchor["exact_state_key_digest"] != expected_state_key
+        or anchor["head_logical_position"] != checkpoint["head_logical_position"]
+        or anchor["head_commitment_id"] != checkpoint["head_commitment_id"]
+        or anchor["verifier_state_digest"] != checkpoint["current_verifier_state_digest"]
+        or anchor["checkpoint_generation"] != checkpoint["checkpoint_generation"]
+        or anchor["freshness_challenge_id"] != checkpoint["freshness_challenge_id"]
+        or anchor["source_id"] != root.root_id
+        or anchor["authority_generation"] != root.authority_generation
+        or anchor["boundary"] != root.boundary
+        or anchor["boundary_epoch"] != root.boundary_epoch
+        or anchor["lineage"] != root.lineage
+        or anchor["ordering_source_id"] != root.ordering_source_id
+        or anchor["lifecycle_state"] != "ACTIVE"
+        or anchor["anchor_event_order"] > binding.t3_anchor.event_order
+        or anchor["recovery_eligibility"] not in {"NORMAL", "RECOVERY_CHECKPOINT", "NOT_RECOVERABLE"}
+        or anchor_digest(anchor) != anchor["anchor_digest"]
+        or anchor["canonical_payload_digest"] != anchor["anchor_digest"]
+    ):
+        return _observation_unavailable(
+            case, "VERIFIER_STATE_ANCHOR_CONFLICTING",
+            "The candidate anchor is not exact for the selected verifier state.",
+            ("evidence_binding", "freshness"),
+        )
+    if anchor["anchor_position"] == 0:
+        if (
+            anchor["predecessor_anchor_id"] != "GENESIS"
+            or anchor["predecessor_anchor_generation"] != 0
+            or anchor["predecessor_anchor_position"] != 0
+            or anchor["predecessor_anchor_digest"] != "GENESIS-ANCHOR"
+        ):
+            return _observation_unavailable(case, "VERIFIER_STATE_ANCHOR_CONTINUITY_UNAVAILABLE", "Anchor genesis is not exact.", ("evidence_binding",))
+    elif anchor["predecessor_anchor_position"] != anchor["anchor_position"] - 1:
+        return _observation_unavailable(case, "VERIFIER_STATE_ANCHOR_CONTINUITY_UNAVAILABLE", "Anchor predecessor ordering is incomplete.", ("evidence_binding", "binding_ordering"))
+
+    contexts = [
+        item for item in case.trusted_anchor_context
+        if item.get("exact_anchor_key_digest") == anchor_key_digest(anchor)
+    ]
+    if len(contexts) != 1:
+        return _observation_unavailable(case, "VERIFIER_STATE_ANCHOR_UNAVAILABLE", "No unique independently current anchor context exists.", ("evidence_binding", "freshness"))
+    trusted = contexts[0]
+    conflict = trusted.get("conflicting_anchor_digests", [])
+    if conflict:
+        return _observation_unavailable(case, "VERIFIER_STATE_REPLICA_CONFLICTING", "The independently admitted anchor context reports divergent heads.", ("evidence_binding",))
+    trusted_position = trusted.get("anchor_position", -1)
+    if trusted_position > anchor["anchor_position"]:
+        return _observation_unavailable(case, "VERIFIER_STATE_ANCHOR_REPLAY", "The candidate replays a state older than the independently retained anchor.", ("evidence_binding", "freshness"))
+    if trusted_position == anchor["anchor_position"] and trusted.get("anchor_digest") != anchor["anchor_digest"]:
+        return _observation_unavailable(case, "VERIFIER_STATE_REPLICA_CONFLICTING", "The same anchor position selects an incompatible head.", ("evidence_binding",))
+    exact = {
+        "anchor_id": anchor["anchor_id"],
+        "anchor_generation": anchor["anchor_generation"],
+        "anchor_position": anchor["anchor_position"],
+        "anchor_digest": anchor["anchor_digest"],
+        "exact_state_key_digest": anchor["exact_state_key_digest"],
+        "stream_id": anchor["stream_id"],
+        "stream_generation": anchor["stream_generation"],
+        "head_logical_position": anchor["head_logical_position"],
+        "head_commitment_digest": anchor["head_commitment_digest"],
+        "verifier_id": anchor["verifier_id"],
+        "verifier_generation": anchor["verifier_generation"],
+        "verifier_state_digest": anchor["verifier_state_digest"],
+        "durable_state_id": anchor["durable_state_id"],
+        "durable_state_generation": anchor["durable_state_generation"],
+        "freshness_challenge_id": anchor["freshness_challenge_id"],
+    }
+    if any(trusted.get(name) != value for name, value in exact.items()):
+        return _observation_unavailable(case, "VERIFIER_STATE_ANCHOR_ROLLBACK", "Verifier state and independently current anchor context do not exactly join.", ("evidence_binding", "freshness"))
+
+    recovery_result = _evaluate_recovery_and_rotation(case, binding, root, anchor, trusted)
+    if recovery_result is not None:
+        return recovery_result
+    return None
+
+
+def _evaluate_recovery_and_rotation(
+    case: OracleInput,
+    binding: ObservationBinding,
+    root: Any,
+    anchor: Mapping[str, Any],
+    trusted: Mapping[str, Any],
+) -> OracleResult | None:
+    recoveries = [item.values for item in binding.recovery_installations]
+    if trusted.get("recovery_required", False):
+        if len(recoveries) != 1:
+            return _observation_unavailable(case, "VERIFIER_STATE_RECOVERY_UNAVAILABLE", "Recovery lacks one exact installation relation.", ("evidence_binding",))
+        recovery = recoveries[0]
+        ordered = tuple(range(recovery["replay_start_position"], recovery["replay_end_position"] + 1))
+        if (
+            recovery["relationship"] != "VERIFIER_STATE_RECOVERY_INSTALLATION"
+            or recovery["source_anchor_digest"] != trusted.get("recovery_source_anchor_digest")
+            or recovery["final_head_commitment_digest"] != anchor["head_commitment_digest"]
+            or recovery["final_verifier_state_digest"] != anchor["verifier_state_digest"]
+            or recovery["target_verifier_id"] != anchor["verifier_id"]
+            or recovery["target_verifier_generation"] != anchor["verifier_generation"]
+            or recovery["target_durable_state_id"] != anchor["durable_state_id"]
+            or recovery["target_durable_state_generation"] != anchor["durable_state_generation"]
+            or len(recovery["replay_commitment_ids"]) != len(ordered)
+            or len(recovery["replay_commitment_digests"]) != len(ordered)
+            or recovery["installation_receipt_digest"] != trusted.get("installation_receipt_digest")
+            or recovery_receipt_digest(recovery) != recovery["installation_receipt_digest"]
+            or recovery["recovery_authority_id"] in {
+                case.authority_tuple.subject,
+                anchor["verifier_id"],
+                anchor["anchor_source_id"],
+                root.root_id,
+                root.ordering_source_id,
+            }
+            or recovery["source_id"] != root.root_id
+            or recovery["authority_generation"] != root.authority_generation
+            or recovery["boundary"] != root.boundary
+            or recovery["boundary_epoch"] != root.boundary_epoch
+            or recovery["lineage"] != root.lineage
+            or recovery["ordering_source_id"] != root.ordering_source_id
+            or recovery["lifecycle_state"] != "ACTIVE"
+        ):
+            return _observation_unavailable(case, "VERIFIER_STATE_RECOVERY_INCOMPLETE", "Recovery replay or installation is incomplete, reordered, or circular.", ("evidence_binding", "binding_ordering"))
+    elif recoveries:
+        return _observation_unavailable(case, "VERIFIER_STATE_RECOVERY_UNAVAILABLE", "Candidate recovery data is not selected by independently current anchor state.", ("evidence_binding",))
+
+    if trusted.get("verifier_rotation_required", False):
+        rotations = [item.values for item in binding.verifier_rotations]
+        if len(rotations) != 1 or rotations[0]["new_verifier_id"] != anchor["verifier_id"] or rotations[0]["new_verifier_generation"] != anchor["verifier_generation"] or rotations[0]["source_anchor_digest"] != trusted.get("rotation_source_anchor_digest") or rotations[0]["source_id"] != root.root_id or rotations[0]["lifecycle_state"] != "ACTIVE":
+            return _observation_unavailable(case, "VERIFIER_ROTATION_UNAVAILABLE", "Verifier replacement lacks exact current rotation authority.", ("evidence_binding",))
+    if trusted.get("anchor_rotation_required", False):
+        rotations = [item.values for item in binding.anchor_rotations]
+        if len(rotations) != 1 or rotations[0]["new_anchor_source_id"] != anchor["anchor_source_id"] or rotations[0]["new_anchor_generation"] != anchor["anchor_source_generation"] or rotations[0]["new_anchor_digest"] != anchor["anchor_digest"] or rotations[0]["source_id"] != root.root_id or rotations[0]["lifecycle_state"] != "ACTIVE":
+            return _observation_unavailable(case, "ANCHOR_ROTATION_UNAVAILABLE", "Anchor replacement lacks exact old-to-new continuity.", ("evidence_binding",))
+
+    witness_sources = [item.values for item in binding.witness_source_admissions]
+    required_domains = trusted.get("required_witness_domains", 0)
+    if required_domains:
+        valid = [item for item in witness_sources if item["anchor_digest"] == anchor["anchor_digest"] and item["head_commitment_digest"] == anchor["head_commitment_digest"] and item["source_id"] == root.root_id and item["lifecycle_state"] == "ACTIVE"]
+        domains = {item["control_domain"] for item in valid}
+        source_lineages = {(item["witness_source_id"], item["source_lineage"], item["control_domain"]) for item in valid}
+        if len(domains) < required_domains or len(source_lineages) < required_domains:
+            return _observation_unavailable(case, "WITNESS_SOURCE_CONTINUITY_UNAVAILABLE", "Witness multiplicity does not establish required independent source continuity.", ("evidence_binding",))
+        if trusted.get("witness_conflict", False):
+            return _observation_unavailable(case, "OBSERVATION_WITNESS_CONFLICTING", "Admitted witness sources conflict about the selected anchor.", ("evidence_binding",))
+    return None
 
 
 def _evaluate_observation(case: OracleInput) -> OracleResult:

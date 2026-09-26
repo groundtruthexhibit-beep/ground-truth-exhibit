@@ -924,12 +924,29 @@ def _strict_commitment_record(
             "verifier_state_generation", "previous_verifier_state_generation",
             "head_logical_position", "checkpoint_event_order", "from_logical_position",
             "to_logical_position", "link_event_order", "witness_generation",
-            "witness_event_order",
+            "witness_event_order", "anchor_source_generation", "anchor_key_generation",
+            "anchor_generation", "anchor_position", "predecessor_anchor_generation",
+            "predecessor_anchor_position", "durable_state_generation",
+            "adapter_source_generation", "adapter_observation_generation",
+            "adapter_event_order", "recovery_generation",
+            "recovery_authority_generation", "replay_start_position",
+            "replay_end_position", "final_head_position", "installation_event_order",
+            "old_verifier_generation", "new_verifier_generation",
+            "old_anchor_generation", "new_anchor_generation", "replica_generation",
+            "membership_epoch", "witness_source_generation",
+            "anchor_event_order", "source_anchor_generation",
+            "source_anchor_position", "source_checkpoint_generation",
+            "source_head_position", "target_verifier_generation",
+            "target_durable_state_generation", "target_stream_generation",
         }:
             parsed[name] = _exact_generation(item, item_field)
         elif name == "scope_families":
             parsed[name] = _exact_scope_families(item, item_field)
-        elif name == "segment_ids":
+        elif name in {
+            "segment_ids", "replay_commitment_ids", "replay_commitment_digests",
+            "replay_link_ids", "replay_correction_ids", "replay_terminal_event_ids",
+            "competing_head_digests", "covered_scope_families",
+        }:
             if not isinstance(item, (list, tuple)) or not item:
                 raise ValueError(f"{item_field} must be a non-empty array")
             parsed[name] = tuple(_exact_nonempty_string(part, item_field) for part in item)
@@ -991,6 +1008,77 @@ WITNESS_FIELDS = (
     "witness_event_order", "disposition",
 )
 
+ANCHOR_SOURCE_FIELDS = (
+    "relationship", "anchor_source_id", "anchor_source_generation",
+    "anchor_source_identity_basis", "anchor_key_id", "anchor_key_generation",
+    "scope", "verifier_id", "durable_state_id", "stream_id", "stream_generation",
+    "source_id", "authority_generation", "boundary", "boundary_epoch", "lineage",
+    "ordering_source_id", "lifecycle_state",
+)
+ANCHOR_FIELDS = (
+    "relationship", "anchor_id", "anchor_generation", "anchor_source_id",
+    "anchor_source_generation", "anchor_source_identity_basis", "anchor_key_id",
+    "anchor_key_generation", "anchor_position", "anchor_digest",
+    "predecessor_anchor_id", "predecessor_anchor_generation",
+    "predecessor_anchor_position", "predecessor_anchor_digest", "verifier_id",
+    "verifier_generation", "verifier_identity_basis", "durable_state_id",
+    "durable_state_generation", "exact_state_key_digest", "stream_id",
+    "stream_generation", "head_logical_position", "head_commitment_id",
+    "head_commitment_digest", "verifier_state_digest", "checkpoint_id",
+    "checkpoint_generation", "boundary", "boundary_epoch", "source_id",
+    "authority_generation", "lineage", "ordering_source_id", "anchor_event_order",
+    "freshness_challenge_id", "recovery_eligibility", "lifecycle_state",
+    "canonical_payload_digest", "signature_evidence_id",
+)
+RECOVERY_FIELDS = (
+    "relationship", "recovery_id", "recovery_generation", "recovery_authority_id",
+    "recovery_authority_generation", "recovery_authority_identity_basis",
+    "source_anchor_id", "source_anchor_generation", "source_anchor_position",
+    "source_anchor_digest", "source_checkpoint_id", "source_checkpoint_generation",
+    "source_head_position", "source_head_commitment_id", "source_head_commitment_digest",
+    "source_verifier_state_digest", "target_verifier_id", "target_verifier_generation",
+    "target_verifier_identity_basis", "target_durable_state_id",
+    "target_durable_state_generation", "target_stream_id", "target_stream_generation",
+    "replay_start_position", "replay_end_position", "replay_commitment_ids",
+    "replay_commitment_digests", "replay_link_ids", "replay_correction_ids",
+    "replay_terminal_event_ids", "replay_completeness_evidence_id",
+    "final_head_position", "final_head_commitment_id", "final_head_commitment_digest",
+    "final_verifier_state_digest", "installation_receipt_id",
+    "installation_receipt_digest", "installation_event_order", "boundary",
+    "boundary_epoch", "source_id", "authority_generation", "lineage",
+    "ordering_source_id", "freshness_challenge_id", "lifecycle_state",
+)
+VERIFIER_ROTATION_FIELDS = (
+    "relationship", "rotation_id", "old_verifier_id", "old_verifier_generation",
+    "new_verifier_id", "new_verifier_generation", "new_verifier_identity_basis",
+    "source_anchor_digest", "installed_head_commitment_digest",
+    "installation_receipt_id", "source_id", "authority_generation", "boundary",
+    "boundary_epoch", "lineage", "ordering_source_id", "lifecycle_state",
+)
+ANCHOR_ROTATION_FIELDS = (
+    "relationship", "rotation_id", "old_anchor_source_id", "old_anchor_generation",
+    "new_anchor_source_id", "new_anchor_generation", "old_anchor_digest",
+    "new_anchor_digest", "cross_confirmation_id", "source_id",
+    "authority_generation", "boundary", "boundary_epoch", "lineage",
+    "ordering_source_id", "lifecycle_state",
+)
+REPLICA_FIELDS = (
+    "relationship", "replica_id", "replica_generation", "membership_epoch",
+    "verifier_id", "verifier_generation", "durable_state_id",
+    "durable_state_generation", "anchor_id", "anchor_generation", "anchor_position",
+    "head_commitment_digest", "competing_head_digests", "source_id",
+    "authority_generation", "boundary", "boundary_epoch", "lineage",
+    "ordering_source_id", "lifecycle_state",
+)
+WITNESS_SOURCE_FIELDS = (
+    "relationship", "witness_id", "witness_generation", "witness_identity_basis",
+    "witness_source_id", "witness_source_generation", "source_lineage",
+    "control_domain", "covered_scope_families", "start_event_order",
+    "end_event_order", "anchor_digest", "head_commitment_digest", "source_id",
+    "authority_generation", "boundary", "boundary_epoch", "lineage",
+    "ordering_source_id", "lifecycle_state",
+)
+
 
 @dataclass(frozen=True)
 class ObservationCommitmentEnvelope:
@@ -1041,6 +1129,15 @@ class CommitmentWitness:
 
 
 @dataclass(frozen=True)
+class AnchorRelation:
+    values: Mapping[str, Any]
+
+    @classmethod
+    def parse(cls, value: Mapping[str, Any], field: str, fields: tuple[str, ...]) -> "AnchorRelation":
+        return cls(_strict_commitment_record(value, field, fields))
+
+
+@dataclass(frozen=True)
 class ObservationBinding:
     relationship: str
     observation_binding_id: str
@@ -1070,6 +1167,13 @@ class ObservationBinding:
     commitment_links: tuple[CommitmentLink, ...]
     commitment_checkpoints: tuple[CommitmentCheckpoint, ...]
     commitment_witnesses: tuple[CommitmentWitness, ...]
+    anchor_source_admissions: tuple[AnchorRelation, ...]
+    verifier_state_anchors: tuple[AnchorRelation, ...]
+    recovery_installations: tuple[AnchorRelation, ...]
+    verifier_rotations: tuple[AnchorRelation, ...]
+    anchor_rotations: tuple[AnchorRelation, ...]
+    replica_observations: tuple[AnchorRelation, ...]
+    witness_source_admissions: tuple[AnchorRelation, ...]
 
     @classmethod
     def from_mapping(cls, value: Mapping[str, Any]) -> "ObservationBinding":
@@ -1088,7 +1192,15 @@ class ObservationBinding:
                 "commitment_verifications", "commitment_links",
                 "commitment_checkpoints", "commitment_witnesses",
         }
-        if set(value) not in {frozenset(base_fields), frozenset(base_fields | commitment_fields)}:
+        anchor_fields = {
+                "anchor_source_admissions", "verifier_state_anchors",
+                "recovery_installations", "verifier_rotations", "anchor_rotations",
+                "replica_observations", "witness_source_admissions",
+        }
+        if set(value) not in {
+            frozenset(base_fields), frozenset(base_fields | commitment_fields),
+            frozenset(base_fields | commitment_fields | anchor_fields),
+        }:
             raise ValueError(f"{field} must contain the exact legacy or commitment-envelope field set")
         relationship = _exact_nonempty_string(value["relationship"], f"{field}.relationship")
         if relationship != "OBSERVATION_COVERAGE":
@@ -1148,6 +1260,13 @@ class ObservationBinding:
             _typed_object_array(value.get("commitment_links", []), f"{field}.commitment_links", CommitmentLink.from_mapping),
             _typed_object_array(value.get("commitment_checkpoints", []), f"{field}.commitment_checkpoints", CommitmentCheckpoint.from_mapping),
             _typed_object_array(value.get("commitment_witnesses", []), f"{field}.commitment_witnesses", CommitmentWitness.from_mapping),
+            _typed_object_array(value.get("anchor_source_admissions", []), f"{field}.anchor_source_admissions", lambda item: AnchorRelation.parse(item, "anchor_source_admissions entry", ANCHOR_SOURCE_FIELDS)),
+            _typed_object_array(value.get("verifier_state_anchors", []), f"{field}.verifier_state_anchors", lambda item: AnchorRelation.parse(item, "verifier_state_anchors entry", ANCHOR_FIELDS)),
+            _typed_object_array(value.get("recovery_installations", []), f"{field}.recovery_installations", lambda item: AnchorRelation.parse(item, "recovery_installations entry", RECOVERY_FIELDS)),
+            _typed_object_array(value.get("verifier_rotations", []), f"{field}.verifier_rotations", lambda item: AnchorRelation.parse(item, "verifier_rotations entry", VERIFIER_ROTATION_FIELDS)),
+            _typed_object_array(value.get("anchor_rotations", []), f"{field}.anchor_rotations", lambda item: AnchorRelation.parse(item, "anchor_rotations entry", ANCHOR_ROTATION_FIELDS)),
+            _typed_object_array(value.get("replica_observations", []), f"{field}.replica_observations", lambda item: AnchorRelation.parse(item, "replica_observations entry", REPLICA_FIELDS)),
+            _typed_object_array(value.get("witness_source_admissions", []), f"{field}.witness_source_admissions", lambda item: AnchorRelation.parse(item, "witness_source_admissions entry", WITNESS_SOURCE_FIELDS)),
         )
 
 
@@ -1814,6 +1933,7 @@ class OracleInput:
     observation_binding: ObservationBinding | None
     observation_freshness: ObservationFreshness | None
     trusted_commitment_context: tuple[Mapping[str, Any], ...]
+    trusted_anchor_context: tuple[Mapping[str, Any], ...]
     required_facts: tuple[str, ...]
     required_values: Mapping[str, Any]
     reestablishment_state: FactState
@@ -1912,6 +2032,11 @@ class OracleInput:
             isinstance(item, Mapping) for item in raw_context
         ):
             raise ValueError("trusted commitment context must be a harness-owned array")
+        raw_anchor_context = fixture.get("_trusted_anchor_context", ())
+        if not isinstance(raw_anchor_context, (list, tuple)) or not all(
+            isinstance(item, Mapping) for item in raw_anchor_context
+        ):
+            raise ValueError("trusted anchor context must be a harness-owned array")
         return cls(
             schema_version=schema_version,
             case_id=str(fixture["case_id"]),
@@ -1927,6 +2052,7 @@ class OracleInput:
             observation_binding=observation_binding,
             observation_freshness=observation_freshness,
             trusted_commitment_context=tuple(MappingProxyType(dict(item)) for item in raw_context),
+            trusted_anchor_context=tuple(MappingProxyType(dict(item)) for item in raw_anchor_context),
             required_facts=required_facts,
             required_values=required_values,
             reestablishment_state=raw_reestablishment.state,

@@ -1449,5 +1449,447 @@
       "checkpoint_id": "CHECKPOINT-LAB-V1-032-1",
       "freshness_challenge_id": "CHALLENGE-LAB-V1-032-1"
     }
+  ],
+  "LAB-V1-113.json": [
+    {
+      "exact_state_key_digest": "337ddd290a1b35b63232c658bfdbb5a6286338f0d443606c2c226997b2faedb9",
+      "stream_id": "STREAM-LAB-V1-032-1",
+      "stream_generation": 1,
+      "previous_verifier_state_digest": "GENESIS-STATE",
+      "current_verifier_state_digest": "49aa2b670f37240b578df82566a464e71c2ef408d4140a152bd1eacdf3cb3421",
+      "head_logical_position": 0,
+      "head_commitment_digest": "810cb859e2e0688a32fc9ddaffe6e64fe2f876e164adafd28f75da4e917f3cb5",
+      "checkpoint_id": "CHECKPOINT-LAB-V1-032-1",
+      "freshness_challenge_id": "CHALLENGE-LAB-V1-032-1"
+    }
+  ],
+  "LAB-V1-114.json": [
+    {
+      "exact_state_key_digest": "337ddd290a1b35b63232c658bfdbb5a6286338f0d443606c2c226997b2faedb9",
+      "stream_id": "STREAM-LAB-V1-032-1",
+      "stream_generation": 1,
+      "previous_verifier_state_digest": "GENESIS-STATE",
+      "current_verifier_state_digest": "49aa2b670f37240b578df82566a464e71c2ef408d4140a152bd1eacdf3cb3421",
+      "head_logical_position": 0,
+      "head_commitment_digest": "810cb859e2e0688a32fc9ddaffe6e64fe2f876e164adafd28f75da4e917f3cb5",
+      "checkpoint_id": "CHECKPOINT-LAB-V1-032-1",
+      "freshness_challenge_id": "CHALLENGE-LAB-V1-032-1"
+    }
+  ],
+  "LAB-V1-115.json": [
+    {
+      "exact_state_key_digest": "337ddd290a1b35b63232c658bfdbb5a6286338f0d443606c2c226997b2faedb9",
+      "stream_id": "STREAM-LAB-V1-032-1",
+      "stream_generation": 1,
+      "previous_verifier_state_digest": "GENESIS-STATE",
+      "current_verifier_state_digest": "49aa2b670f37240b578df82566a464e71c2ef408d4140a152bd1eacdf3cb3421",
+      "head_logical_position": 0,
+      "head_commitment_digest": "810cb859e2e0688a32fc9ddaffe6e64fe2f876e164adafd28f75da4e917f3cb5",
+      "checkpoint_id": "CHECKPOINT-LAB-V1-032-1",
+      "freshness_challenge_id": "CHALLENGE-LAB-V1-032-1"
+    }
+  ],
+  "LAB-V1-116.json": [
+    {
+      "exact_state_key_digest": "337ddd290a1b35b63232c658bfdbb5a6286338f0d443606c2c226997b2faedb9",
+      "stream_id": "STREAM-LAB-V1-032-1",
+      "stream_generation": 1,
+      "previous_verifier_state_digest": "GENESIS-STATE",
+      "current_verifier_state_digest": "49aa2b670f37240b578df82566a464e71c2ef408d4140a152bd1eacdf3cb3421",
+      "head_logical_position": 0,
+      "head_commitment_digest": "810cb859e2e0688a32fc9ddaffe6e64fe2f876e164adafd28f75da4e917f3cb5",
+      "checkpoint_id": "CHECKPOINT-LAB-V1-032-1",
+      "freshness_challenge_id": "CHALLENGE-LAB-V1-032-1"
+    }
+  ],
+  "LAB-V1-117.json": [
+    {
+      "exact_state_key_digest": "337ddd290a1b35b63232c658bfdbb5a6286338f0d443606c2c226997b2faedb9",
+      "stream_id": "STREAM-LAB-V1-032-1",
+      "stream_generation": 1,
+      "previous_verifier_state_digest": "GENESIS-STATE",
+      "current_verifier_state_digest": "49aa2b670f37240b578df82566a464e71c2ef408d4140a152bd1eacdf3cb3421",
+      "head_logical_position": 0,
+      "head_commitment_digest": "810cb859e2e0688a32fc9ddaffe6e64fe2f876e164adafd28f75da4e917f3cb5",
+      "checkpoint_id": "CHECKPOINT-LAB-V1-032-1",
+      "freshness_challenge_id": "CHALLENGE-LAB-V1-032-1"
+    }
+  ],
+  "LAB-V1-118.json": [
+    {
+      "exact_state_key_digest": "337ddd290a1b35b63232c658bfdbb5a6286338f0d443606c2c226997b2faedb9",
+      "stream_id": "STREAM-LAB-V1-032-1",
+      "stream_generation": 1,
+      "previous_verifier_state_digest": "GENESIS-STATE",
+      "current_verifier_state_digest": "49aa2b670f37240b578df82566a464e71c2ef408d4140a152bd1eacdf3cb3421",
+      "head_logical_position": 0,
+      "head_commitment_digest": "810cb859e2e0688a32fc9ddaffe6e64fe2f876e164adafd28f75da4e917f3cb5",
+      "checkpoint_id": "CHECKPOINT-LAB-V1-032-1",
+      "freshness_challenge_id": "CHALLENGE-LAB-V1-032-1"
+    }
+  ],
+  "LAB-V1-119.json": [
+    {
+      "exact_state_key_digest": "337ddd290a1b35b63232c658bfdbb5a6286338f0d443606c2c226997b2faedb9",
+      "stream_id": "STREAM-LAB-V1-032-1",
+      "stream_generation": 1,
+      "previous_verifier_state_digest": "GENESIS-STATE",
+      "current_verifier_state_digest": "49aa2b670f37240b578df82566a464e71c2ef408d4140a152bd1eacdf3cb3421",
+      "head_logical_position": 0,
+      "head_commitment_digest": "810cb859e2e0688a32fc9ddaffe6e64fe2f876e164adafd28f75da4e917f3cb5",
+      "checkpoint_id": "CHECKPOINT-LAB-V1-032-1",
+      "freshness_challenge_id": "CHALLENGE-LAB-V1-032-1"
+    }
+  ],
+  "LAB-V1-120.json": [
+    {
+      "exact_state_key_digest": "337ddd290a1b35b63232c658bfdbb5a6286338f0d443606c2c226997b2faedb9",
+      "stream_id": "STREAM-LAB-V1-032-1",
+      "stream_generation": 1,
+      "previous_verifier_state_digest": "GENESIS-STATE",
+      "current_verifier_state_digest": "49aa2b670f37240b578df82566a464e71c2ef408d4140a152bd1eacdf3cb3421",
+      "head_logical_position": 0,
+      "head_commitment_digest": "810cb859e2e0688a32fc9ddaffe6e64fe2f876e164adafd28f75da4e917f3cb5",
+      "checkpoint_id": "CHECKPOINT-LAB-V1-032-1",
+      "freshness_challenge_id": "CHALLENGE-LAB-V1-032-1"
+    }
+  ],
+  "LAB-V1-121.json": [
+    {
+      "exact_state_key_digest": "337ddd290a1b35b63232c658bfdbb5a6286338f0d443606c2c226997b2faedb9",
+      "stream_id": "STREAM-LAB-V1-032-1",
+      "stream_generation": 1,
+      "previous_verifier_state_digest": "GENESIS-STATE",
+      "current_verifier_state_digest": "49aa2b670f37240b578df82566a464e71c2ef408d4140a152bd1eacdf3cb3421",
+      "head_logical_position": 0,
+      "head_commitment_digest": "810cb859e2e0688a32fc9ddaffe6e64fe2f876e164adafd28f75da4e917f3cb5",
+      "checkpoint_id": "CHECKPOINT-LAB-V1-032-1",
+      "freshness_challenge_id": "CHALLENGE-LAB-V1-032-1"
+    }
+  ],
+  "LAB-V1-122.json": [
+    {
+      "exact_state_key_digest": "337ddd290a1b35b63232c658bfdbb5a6286338f0d443606c2c226997b2faedb9",
+      "stream_id": "STREAM-LAB-V1-032-1",
+      "stream_generation": 1,
+      "previous_verifier_state_digest": "GENESIS-STATE",
+      "current_verifier_state_digest": "49aa2b670f37240b578df82566a464e71c2ef408d4140a152bd1eacdf3cb3421",
+      "head_logical_position": 0,
+      "head_commitment_digest": "810cb859e2e0688a32fc9ddaffe6e64fe2f876e164adafd28f75da4e917f3cb5",
+      "checkpoint_id": "CHECKPOINT-LAB-V1-032-1",
+      "freshness_challenge_id": "CHALLENGE-LAB-V1-032-1"
+    }
+  ],
+  "LAB-V1-123.json": [
+    {
+      "exact_state_key_digest": "337ddd290a1b35b63232c658bfdbb5a6286338f0d443606c2c226997b2faedb9",
+      "stream_id": "STREAM-LAB-V1-032-1",
+      "stream_generation": 1,
+      "previous_verifier_state_digest": "GENESIS-STATE",
+      "current_verifier_state_digest": "49aa2b670f37240b578df82566a464e71c2ef408d4140a152bd1eacdf3cb3421",
+      "head_logical_position": 0,
+      "head_commitment_digest": "810cb859e2e0688a32fc9ddaffe6e64fe2f876e164adafd28f75da4e917f3cb5",
+      "checkpoint_id": "CHECKPOINT-LAB-V1-032-1",
+      "freshness_challenge_id": "CHALLENGE-LAB-V1-032-1"
+    }
+  ],
+  "LAB-V1-124.json": [
+    {
+      "exact_state_key_digest": "337ddd290a1b35b63232c658bfdbb5a6286338f0d443606c2c226997b2faedb9",
+      "stream_id": "STREAM-LAB-V1-032-1",
+      "stream_generation": 1,
+      "previous_verifier_state_digest": "GENESIS-STATE",
+      "current_verifier_state_digest": "49aa2b670f37240b578df82566a464e71c2ef408d4140a152bd1eacdf3cb3421",
+      "head_logical_position": 0,
+      "head_commitment_digest": "810cb859e2e0688a32fc9ddaffe6e64fe2f876e164adafd28f75da4e917f3cb5",
+      "checkpoint_id": "CHECKPOINT-LAB-V1-032-1",
+      "freshness_challenge_id": "CHALLENGE-LAB-V1-032-1"
+    }
+  ],
+  "LAB-V1-125.json": [
+    {
+      "exact_state_key_digest": "337ddd290a1b35b63232c658bfdbb5a6286338f0d443606c2c226997b2faedb9",
+      "stream_id": "STREAM-LAB-V1-032-1",
+      "stream_generation": 1,
+      "previous_verifier_state_digest": "GENESIS-STATE",
+      "current_verifier_state_digest": "49aa2b670f37240b578df82566a464e71c2ef408d4140a152bd1eacdf3cb3421",
+      "head_logical_position": 0,
+      "head_commitment_digest": "810cb859e2e0688a32fc9ddaffe6e64fe2f876e164adafd28f75da4e917f3cb5",
+      "checkpoint_id": "CHECKPOINT-LAB-V1-032-1",
+      "freshness_challenge_id": "CHALLENGE-LAB-V1-032-1"
+    }
+  ],
+  "LAB-V1-126.json": [
+    {
+      "exact_state_key_digest": "337ddd290a1b35b63232c658bfdbb5a6286338f0d443606c2c226997b2faedb9",
+      "stream_id": "STREAM-LAB-V1-032-1",
+      "stream_generation": 1,
+      "previous_verifier_state_digest": "GENESIS-STATE",
+      "current_verifier_state_digest": "49aa2b670f37240b578df82566a464e71c2ef408d4140a152bd1eacdf3cb3421",
+      "head_logical_position": 0,
+      "head_commitment_digest": "810cb859e2e0688a32fc9ddaffe6e64fe2f876e164adafd28f75da4e917f3cb5",
+      "checkpoint_id": "CHECKPOINT-LAB-V1-032-1",
+      "freshness_challenge_id": "CHALLENGE-LAB-V1-032-1"
+    }
+  ],
+  "LAB-V1-127.json": [
+    {
+      "exact_state_key_digest": "337ddd290a1b35b63232c658bfdbb5a6286338f0d443606c2c226997b2faedb9",
+      "stream_id": "STREAM-LAB-V1-032-1",
+      "stream_generation": 1,
+      "previous_verifier_state_digest": "GENESIS-STATE",
+      "current_verifier_state_digest": "49aa2b670f37240b578df82566a464e71c2ef408d4140a152bd1eacdf3cb3421",
+      "head_logical_position": 0,
+      "head_commitment_digest": "810cb859e2e0688a32fc9ddaffe6e64fe2f876e164adafd28f75da4e917f3cb5",
+      "checkpoint_id": "CHECKPOINT-LAB-V1-032-1",
+      "freshness_challenge_id": "CHALLENGE-LAB-V1-032-1"
+    }
+  ],
+  "LAB-V1-128.json": [
+    {
+      "exact_state_key_digest": "337ddd290a1b35b63232c658bfdbb5a6286338f0d443606c2c226997b2faedb9",
+      "stream_id": "STREAM-LAB-V1-032-1",
+      "stream_generation": 1,
+      "previous_verifier_state_digest": "GENESIS-STATE",
+      "current_verifier_state_digest": "49aa2b670f37240b578df82566a464e71c2ef408d4140a152bd1eacdf3cb3421",
+      "head_logical_position": 0,
+      "head_commitment_digest": "810cb859e2e0688a32fc9ddaffe6e64fe2f876e164adafd28f75da4e917f3cb5",
+      "checkpoint_id": "CHECKPOINT-LAB-V1-032-1",
+      "freshness_challenge_id": "CHALLENGE-LAB-V1-032-1"
+    }
+  ],
+  "LAB-V1-129.json": [
+    {
+      "exact_state_key_digest": "337ddd290a1b35b63232c658bfdbb5a6286338f0d443606c2c226997b2faedb9",
+      "stream_id": "STREAM-LAB-V1-032-1",
+      "stream_generation": 1,
+      "previous_verifier_state_digest": "GENESIS-STATE",
+      "current_verifier_state_digest": "49aa2b670f37240b578df82566a464e71c2ef408d4140a152bd1eacdf3cb3421",
+      "head_logical_position": 0,
+      "head_commitment_digest": "810cb859e2e0688a32fc9ddaffe6e64fe2f876e164adafd28f75da4e917f3cb5",
+      "checkpoint_id": "CHECKPOINT-LAB-V1-032-1",
+      "freshness_challenge_id": "CHALLENGE-LAB-V1-032-1"
+    }
+  ],
+  "LAB-V1-130.json": [
+    {
+      "exact_state_key_digest": "337ddd290a1b35b63232c658bfdbb5a6286338f0d443606c2c226997b2faedb9",
+      "stream_id": "STREAM-LAB-V1-032-1",
+      "stream_generation": 1,
+      "previous_verifier_state_digest": "GENESIS-STATE",
+      "current_verifier_state_digest": "49aa2b670f37240b578df82566a464e71c2ef408d4140a152bd1eacdf3cb3421",
+      "head_logical_position": 0,
+      "head_commitment_digest": "810cb859e2e0688a32fc9ddaffe6e64fe2f876e164adafd28f75da4e917f3cb5",
+      "checkpoint_id": "CHECKPOINT-LAB-V1-032-1",
+      "freshness_challenge_id": "CHALLENGE-LAB-V1-032-1"
+    }
+  ],
+  "LAB-V1-131.json": [
+    {
+      "exact_state_key_digest": "337ddd290a1b35b63232c658bfdbb5a6286338f0d443606c2c226997b2faedb9",
+      "stream_id": "STREAM-LAB-V1-032-1",
+      "stream_generation": 1,
+      "previous_verifier_state_digest": "GENESIS-STATE",
+      "current_verifier_state_digest": "49aa2b670f37240b578df82566a464e71c2ef408d4140a152bd1eacdf3cb3421",
+      "head_logical_position": 0,
+      "head_commitment_digest": "810cb859e2e0688a32fc9ddaffe6e64fe2f876e164adafd28f75da4e917f3cb5",
+      "checkpoint_id": "CHECKPOINT-LAB-V1-032-1",
+      "freshness_challenge_id": "CHALLENGE-LAB-V1-032-1"
+    }
+  ],
+  "LAB-V1-132.json": [
+    {
+      "exact_state_key_digest": "337ddd290a1b35b63232c658bfdbb5a6286338f0d443606c2c226997b2faedb9",
+      "stream_id": "STREAM-LAB-V1-032-1",
+      "stream_generation": 1,
+      "previous_verifier_state_digest": "GENESIS-STATE",
+      "current_verifier_state_digest": "49aa2b670f37240b578df82566a464e71c2ef408d4140a152bd1eacdf3cb3421",
+      "head_logical_position": 0,
+      "head_commitment_digest": "810cb859e2e0688a32fc9ddaffe6e64fe2f876e164adafd28f75da4e917f3cb5",
+      "checkpoint_id": "CHECKPOINT-LAB-V1-032-1",
+      "freshness_challenge_id": "CHALLENGE-LAB-V1-032-1"
+    }
+  ],
+  "LAB-V1-133.json": [
+    {
+      "exact_state_key_digest": "337ddd290a1b35b63232c658bfdbb5a6286338f0d443606c2c226997b2faedb9",
+      "stream_id": "STREAM-LAB-V1-032-1",
+      "stream_generation": 1,
+      "previous_verifier_state_digest": "GENESIS-STATE",
+      "current_verifier_state_digest": "49aa2b670f37240b578df82566a464e71c2ef408d4140a152bd1eacdf3cb3421",
+      "head_logical_position": 0,
+      "head_commitment_digest": "810cb859e2e0688a32fc9ddaffe6e64fe2f876e164adafd28f75da4e917f3cb5",
+      "checkpoint_id": "CHECKPOINT-LAB-V1-032-1",
+      "freshness_challenge_id": "CHALLENGE-LAB-V1-032-1"
+    }
+  ],
+  "LAB-V1-134.json": [
+    {
+      "exact_state_key_digest": "337ddd290a1b35b63232c658bfdbb5a6286338f0d443606c2c226997b2faedb9",
+      "stream_id": "STREAM-LAB-V1-032-1",
+      "stream_generation": 1,
+      "previous_verifier_state_digest": "GENESIS-STATE",
+      "current_verifier_state_digest": "49aa2b670f37240b578df82566a464e71c2ef408d4140a152bd1eacdf3cb3421",
+      "head_logical_position": 0,
+      "head_commitment_digest": "810cb859e2e0688a32fc9ddaffe6e64fe2f876e164adafd28f75da4e917f3cb5",
+      "checkpoint_id": "CHECKPOINT-LAB-V1-032-1",
+      "freshness_challenge_id": "CHALLENGE-LAB-V1-032-1"
+    }
+  ],
+  "LAB-V1-135.json": [
+    {
+      "exact_state_key_digest": "337ddd290a1b35b63232c658bfdbb5a6286338f0d443606c2c226997b2faedb9",
+      "stream_id": "STREAM-LAB-V1-032-1",
+      "stream_generation": 1,
+      "previous_verifier_state_digest": "GENESIS-STATE",
+      "current_verifier_state_digest": "49aa2b670f37240b578df82566a464e71c2ef408d4140a152bd1eacdf3cb3421",
+      "head_logical_position": 0,
+      "head_commitment_digest": "810cb859e2e0688a32fc9ddaffe6e64fe2f876e164adafd28f75da4e917f3cb5",
+      "checkpoint_id": "CHECKPOINT-LAB-V1-032-1",
+      "freshness_challenge_id": "CHALLENGE-LAB-V1-032-1"
+    }
+  ],
+  "LAB-V1-136.json": [
+    {
+      "exact_state_key_digest": "337ddd290a1b35b63232c658bfdbb5a6286338f0d443606c2c226997b2faedb9",
+      "stream_id": "STREAM-LAB-V1-032-1",
+      "stream_generation": 1,
+      "previous_verifier_state_digest": "GENESIS-STATE",
+      "current_verifier_state_digest": "49aa2b670f37240b578df82566a464e71c2ef408d4140a152bd1eacdf3cb3421",
+      "head_logical_position": 0,
+      "head_commitment_digest": "810cb859e2e0688a32fc9ddaffe6e64fe2f876e164adafd28f75da4e917f3cb5",
+      "checkpoint_id": "CHECKPOINT-LAB-V1-032-1",
+      "freshness_challenge_id": "CHALLENGE-LAB-V1-032-1"
+    }
+  ],
+  "LAB-V1-137.json": [
+    {
+      "exact_state_key_digest": "337ddd290a1b35b63232c658bfdbb5a6286338f0d443606c2c226997b2faedb9",
+      "stream_id": "STREAM-LAB-V1-032-1",
+      "stream_generation": 1,
+      "previous_verifier_state_digest": "GENESIS-STATE",
+      "current_verifier_state_digest": "49aa2b670f37240b578df82566a464e71c2ef408d4140a152bd1eacdf3cb3421",
+      "head_logical_position": 0,
+      "head_commitment_digest": "810cb859e2e0688a32fc9ddaffe6e64fe2f876e164adafd28f75da4e917f3cb5",
+      "checkpoint_id": "CHECKPOINT-LAB-V1-032-1",
+      "freshness_challenge_id": "CHALLENGE-LAB-V1-032-1"
+    }
+  ],
+  "LAB-V1-138.json": [
+    {
+      "exact_state_key_digest": "337ddd290a1b35b63232c658bfdbb5a6286338f0d443606c2c226997b2faedb9",
+      "stream_id": "STREAM-LAB-V1-032-1",
+      "stream_generation": 1,
+      "previous_verifier_state_digest": "GENESIS-STATE",
+      "current_verifier_state_digest": "49aa2b670f37240b578df82566a464e71c2ef408d4140a152bd1eacdf3cb3421",
+      "head_logical_position": 0,
+      "head_commitment_digest": "810cb859e2e0688a32fc9ddaffe6e64fe2f876e164adafd28f75da4e917f3cb5",
+      "checkpoint_id": "CHECKPOINT-LAB-V1-032-1",
+      "freshness_challenge_id": "CHALLENGE-LAB-V1-032-1"
+    }
+  ],
+  "LAB-V1-139.json": [
+    {
+      "exact_state_key_digest": "337ddd290a1b35b63232c658bfdbb5a6286338f0d443606c2c226997b2faedb9",
+      "stream_id": "STREAM-LAB-V1-032-1",
+      "stream_generation": 1,
+      "previous_verifier_state_digest": "GENESIS-STATE",
+      "current_verifier_state_digest": "49aa2b670f37240b578df82566a464e71c2ef408d4140a152bd1eacdf3cb3421",
+      "head_logical_position": 0,
+      "head_commitment_digest": "810cb859e2e0688a32fc9ddaffe6e64fe2f876e164adafd28f75da4e917f3cb5",
+      "checkpoint_id": "CHECKPOINT-LAB-V1-032-1",
+      "freshness_challenge_id": "CHALLENGE-LAB-V1-032-1"
+    }
+  ],
+  "LAB-V1-140.json": [
+    {
+      "exact_state_key_digest": "337ddd290a1b35b63232c658bfdbb5a6286338f0d443606c2c226997b2faedb9",
+      "stream_id": "STREAM-LAB-V1-032-1",
+      "stream_generation": 1,
+      "previous_verifier_state_digest": "GENESIS-STATE",
+      "current_verifier_state_digest": "49aa2b670f37240b578df82566a464e71c2ef408d4140a152bd1eacdf3cb3421",
+      "head_logical_position": 0,
+      "head_commitment_digest": "810cb859e2e0688a32fc9ddaffe6e64fe2f876e164adafd28f75da4e917f3cb5",
+      "checkpoint_id": "CHECKPOINT-LAB-V1-032-1",
+      "freshness_challenge_id": "CHALLENGE-LAB-V1-032-1"
+    }
+  ],
+  "LAB-V1-141.json": [
+    {
+      "exact_state_key_digest": "337ddd290a1b35b63232c658bfdbb5a6286338f0d443606c2c226997b2faedb9",
+      "stream_id": "STREAM-LAB-V1-032-1",
+      "stream_generation": 1,
+      "previous_verifier_state_digest": "GENESIS-STATE",
+      "current_verifier_state_digest": "49aa2b670f37240b578df82566a464e71c2ef408d4140a152bd1eacdf3cb3421",
+      "head_logical_position": 0,
+      "head_commitment_digest": "810cb859e2e0688a32fc9ddaffe6e64fe2f876e164adafd28f75da4e917f3cb5",
+      "checkpoint_id": "CHECKPOINT-LAB-V1-032-1",
+      "freshness_challenge_id": "CHALLENGE-LAB-V1-032-1"
+    }
+  ],
+  "LAB-V1-142.json": [
+    {
+      "exact_state_key_digest": "337ddd290a1b35b63232c658bfdbb5a6286338f0d443606c2c226997b2faedb9",
+      "stream_id": "STREAM-LAB-V1-032-1",
+      "stream_generation": 1,
+      "previous_verifier_state_digest": "GENESIS-STATE",
+      "current_verifier_state_digest": "49aa2b670f37240b578df82566a464e71c2ef408d4140a152bd1eacdf3cb3421",
+      "head_logical_position": 0,
+      "head_commitment_digest": "810cb859e2e0688a32fc9ddaffe6e64fe2f876e164adafd28f75da4e917f3cb5",
+      "checkpoint_id": "CHECKPOINT-LAB-V1-032-1",
+      "freshness_challenge_id": "CHALLENGE-LAB-V1-032-1"
+    }
+  ],
+  "LAB-V1-143.json": [
+    {
+      "exact_state_key_digest": "337ddd290a1b35b63232c658bfdbb5a6286338f0d443606c2c226997b2faedb9",
+      "stream_id": "STREAM-LAB-V1-032-1",
+      "stream_generation": 1,
+      "previous_verifier_state_digest": "GENESIS-STATE",
+      "current_verifier_state_digest": "49aa2b670f37240b578df82566a464e71c2ef408d4140a152bd1eacdf3cb3421",
+      "head_logical_position": 0,
+      "head_commitment_digest": "810cb859e2e0688a32fc9ddaffe6e64fe2f876e164adafd28f75da4e917f3cb5",
+      "checkpoint_id": "CHECKPOINT-LAB-V1-032-1",
+      "freshness_challenge_id": "CHALLENGE-LAB-V1-032-1"
+    }
+  ],
+  "LAB-V1-144.json": [
+    {
+      "exact_state_key_digest": "337ddd290a1b35b63232c658bfdbb5a6286338f0d443606c2c226997b2faedb9",
+      "stream_id": "STREAM-LAB-V1-032-1",
+      "stream_generation": 1,
+      "previous_verifier_state_digest": "GENESIS-STATE",
+      "current_verifier_state_digest": "49aa2b670f37240b578df82566a464e71c2ef408d4140a152bd1eacdf3cb3421",
+      "head_logical_position": 0,
+      "head_commitment_digest": "810cb859e2e0688a32fc9ddaffe6e64fe2f876e164adafd28f75da4e917f3cb5",
+      "checkpoint_id": "CHECKPOINT-LAB-V1-032-1",
+      "freshness_challenge_id": "CHALLENGE-LAB-V1-032-1"
+    }
+  ],
+  "LAB-V1-145.json": [
+    {
+      "exact_state_key_digest": "337ddd290a1b35b63232c658bfdbb5a6286338f0d443606c2c226997b2faedb9",
+      "stream_id": "STREAM-LAB-V1-032-1",
+      "stream_generation": 1,
+      "previous_verifier_state_digest": "GENESIS-STATE",
+      "current_verifier_state_digest": "49aa2b670f37240b578df82566a464e71c2ef408d4140a152bd1eacdf3cb3421",
+      "head_logical_position": 0,
+      "head_commitment_digest": "810cb859e2e0688a32fc9ddaffe6e64fe2f876e164adafd28f75da4e917f3cb5",
+      "checkpoint_id": "CHECKPOINT-LAB-V1-032-1",
+      "freshness_challenge_id": "CHALLENGE-LAB-V1-032-1"
+    }
+  ],
+  "LAB-V1-146.json": [
+    {
+      "exact_state_key_digest": "337ddd290a1b35b63232c658bfdbb5a6286338f0d443606c2c226997b2faedb9",
+      "stream_id": "STREAM-LAB-V1-032-1",
+      "stream_generation": 1,
+      "previous_verifier_state_digest": "GENESIS-STATE",
+      "current_verifier_state_digest": "49aa2b670f37240b578df82566a464e71c2ef408d4140a152bd1eacdf3cb3421",
+      "head_logical_position": 0,
+      "head_commitment_digest": "810cb859e2e0688a32fc9ddaffe6e64fe2f876e164adafd28f75da4e917f3cb5",
+      "checkpoint_id": "CHECKPOINT-LAB-V1-032-1",
+      "freshness_challenge_id": "CHALLENGE-LAB-V1-032-1"
+    }
   ]
 }
