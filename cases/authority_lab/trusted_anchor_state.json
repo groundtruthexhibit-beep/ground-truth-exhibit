@@ -325281,7 +325281,7 @@
           ],
           "credential_or_key_generation": 1,
           "credential_or_key_id": "KEY-ANCHOR_ADAPTER-ADAPTER-ADAPTER-OBS-LAB-V1-032-1",
-          "end_event_order": 2,
+          "end_event_order": 3,
           "freshness_challenge_id": "CHALLENGE-LAB-V1-032-1",
           "identity_basis": "IDENTITY-ADAPTER-ADAPTER-OBS-LAB-V1-032-1",
           "independence_domain": "INDEPENDENCE-CONTROL-ANCHOR-SOURCE-LAB-V1-032-1",

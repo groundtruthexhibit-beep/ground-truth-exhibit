@@ -694,7 +694,56 @@
               "verifier_state_digest": "49aa2b670f37240b578df82566a464e71c2ef408d4140a152bd1eacdf3cb3421"
             }
           ],
-          "witness_source_admissions": []
+          "witness_source_admissions": [
+            {
+              "anchor_digest": "a4dbb29e927d153ae75fe25fa11194593c9b9e4ffcbd5026a0d4e6cfac0da6f1",
+              "authority_generation": 1,
+              "boundary": "AUTH-BOUNDARY-1",
+              "boundary_epoch": "B1",
+              "control_domain": "DOMAIN-A",
+              "covered_scope_families": [
+                "VERIFIER_STATE_CURRENTNESS"
+              ],
+              "end_event_order": 3,
+              "head_commitment_digest": "810cb859e2e0688a32fc9ddaffe6e64fe2f876e164adafd28f75da4e917f3cb5",
+              "lifecycle_state": "ACTIVE",
+              "lineage": "LINEAGE-AUTH-BOUNDARY-1",
+              "ordering_source_id": "ORDER-AUTH-BOUNDARY-1",
+              "relationship": "WITNESS_SOURCE_ADMISSION",
+              "source_id": "ROOT-AUTH-BOUNDARY-1",
+              "source_lineage": "WITNESS-LINEAGE-DOMAIN-A",
+              "start_event_order": 1,
+              "witness_generation": 1,
+              "witness_id": "WITNESS-1",
+              "witness_identity_basis": "WITNESS-IDENTITY-1",
+              "witness_source_generation": 1,
+              "witness_source_id": "WITNESS-SOURCE-DOMAIN-A"
+            },
+            {
+              "anchor_digest": "a4dbb29e927d153ae75fe25fa11194593c9b9e4ffcbd5026a0d4e6cfac0da6f1",
+              "authority_generation": 1,
+              "boundary": "AUTH-BOUNDARY-1",
+              "boundary_epoch": "B1",
+              "control_domain": "DOMAIN-B",
+              "covered_scope_families": [
+                "VERIFIER_STATE_CURRENTNESS"
+              ],
+              "end_event_order": 3,
+              "head_commitment_digest": "810cb859e2e0688a32fc9ddaffe6e64fe2f876e164adafd28f75da4e917f3cb5",
+              "lifecycle_state": "ACTIVE",
+              "lineage": "LINEAGE-AUTH-BOUNDARY-1",
+              "ordering_source_id": "ORDER-AUTH-BOUNDARY-1",
+              "relationship": "WITNESS_SOURCE_ADMISSION",
+              "source_id": "ROOT-AUTH-BOUNDARY-1",
+              "source_lineage": "WITNESS-LINEAGE-DOMAIN-B",
+              "start_event_order": 1,
+              "witness_generation": 1,
+              "witness_id": "WITNESS-2",
+              "witness_identity_basis": "WITNESS-IDENTITY-2",
+              "witness_source_generation": 1,
+              "witness_source_id": "WITNESS-SOURCE-DOMAIN-B"
+            }
+          ]
         }
       },
       "execution_context": {
