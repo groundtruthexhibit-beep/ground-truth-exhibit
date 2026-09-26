@@ -668,6 +668,14 @@ class AuthorityLabTests(unittest.TestCase):
         changed["expected_outcome"] = AuthorityOutcome.AUTHORIZED.value
         self.assertIs(baseline, actual(changed))
 
+    def test_identical_canonical_input_replays_deterministically(self) -> None:
+        payload = fixture("LAB-V1-464")
+        results = [evaluate(OracleInput.from_fixture(deepcopy(payload))) for _ in range(5)]
+        baseline = results[0]
+        self.assertTrue(all(result == baseline for result in results[1:]))
+        self.assertIs(AuthorityOutcome.AUTHORIZED, baseline.outcome)
+        self.assertEqual("CURRENT_AUTHORITY_ESTABLISHED", baseline.reasons[0].code)
+
     def test_derivative_and_aggregate_artifacts_do_not_inherit_authority(self) -> None:
         self.assertIs(AuthorityOutcome.UNAVAILABLE, actual(fixture("LAB-V0-011")))
         self.assertIs(AuthorityOutcome.UNAVAILABLE, actual(fixture("LAB-V0-012")))
