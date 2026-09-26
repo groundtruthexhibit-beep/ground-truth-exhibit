@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import subprocess
 import sys
+import tempfile
 import unittest
 from copy import deepcopy
 from pathlib import Path
@@ -45,6 +47,7 @@ from authority_lab.oracle import (
     human_approval_envelope_digest,
     human_approval_request_digest,
     tool_connector_context_digest,
+    t3_execution_event_digest,
 )
 from authority_lab.runner import discover, format_trace, load_fixture, run_fixture, run_path
 
@@ -59,6 +62,86 @@ def fixture(case_id: str) -> dict:
 
 def actual(payload: dict) -> AuthorityOutcome:
     return evaluate(OracleInput.from_fixture(payload)).outcome
+
+
+def _test_digest(domain: str, value: dict) -> str:
+    body = json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+    return hashlib.sha256(f"{domain}\0{body}".encode()).hexdigest()
+
+
+def refresh_t3_execution_event(payload: dict) -> None:
+    """Reissue protected T3 state after an explicitly authorized test transition."""
+    contexts = payload["_trusted_anchor_context"]
+    facts = payload["t3"]["facts"]
+    observation = facts["evidence_binding"]["value"]
+    freshness = facts["freshness"]["value"]
+    objective = facts["objective_identity"]["value"]
+    contract = facts["decision_contract_identity"]["value"]
+    active = payload["t1"]["authority_state"]
+    if payload["t3"].get("reestablishment", {}).get("state") == "KNOWN":
+        active = payload["t3"]["reestablishment"]["value"]["current"]
+    anchor_set = sorted(({
+        "verifier_id": item["verifier_id"],
+        "verifier_generation": item["verifier_generation"],
+        "verifier_state_digest": item["verifier_state_digest"],
+        "anchor_id": item["anchor_id"],
+        "anchor_generation": item["anchor_generation"],
+        "anchor_position": item["anchor_position"],
+        "anchor_digest": item["anchor_digest"],
+    } for item in contexts), key=lambda item: (item["anchor_id"], item["anchor_generation"]))
+    anchor_set_digest = _test_digest("authority-lab-v1/t3-anchor-set", {"anchors": anchor_set})
+    for protected in contexts:
+        approval = protected["human_approval_authority_context"]
+        delegation = protected["delegation_authority_context"]
+        tool = protected["tool_connector_authority_context"]
+        approval_policy = approval["approval_policy"]
+        delegation_policy = delegation["delegation_policy"]
+        tool_policy = tool["tool_connector_policy"]
+        policy_set = {
+            "approval": [approval_policy["policy_id"], approval_policy["policy_generation"]],
+            "delegation": [delegation_policy["policy_id"], delegation_policy["policy_generation"]],
+            "tool": [tool_policy["policy_id"], tool_policy["policy_generation"]],
+            "control_plane": [protected["control_plane_policy"]["policy_id"], protected["control_plane_policy"]["policy_generation"]],
+            "required_domains": [protected["required_domain_policy"]["policy_id"], protected["required_domain_policy"]["policy_generation"]],
+        }
+        tool_context = tool["execution_contexts"][0] if len(tool["execution_contexts"]) == 1 else None
+        tool_use = tool["protected_terminal_uses"][0] if len(tool["protected_terminal_uses"]) == 1 else None
+        delegation_use = delegation["delegation_terminal_uses"][0] if len(delegation["delegation_terminal_uses"]) == 1 else None
+        approval_binding = facts.get("human_approval_binding", {}).get("value")
+        approval_use = approval_binding.get("approval_use") if isinstance(approval_binding, dict) else None
+        event = protected["t3_execution_event"]
+        chain_id = delegation_use["chain_id"] if delegation_use else "DIRECT"
+        event.update(
+            event_order=observation["t3_anchor"]["event_order"],
+            t3_anchor_id=observation["t3_anchor"]["anchor_id"],
+            subject_id=payload["authority_tuple"]["subject"],
+            subject_identity_basis=payload["authority_tuple"]["identity_basis"],
+            executor_id=tool_policy["executor_id"], artifact=payload["authority_tuple"]["artifact"],
+            effect=tool_policy["effect"], boundary=observation["boundary"],
+            boundary_epoch=observation["boundary_epoch"],
+            execution_context=facts["execution_context"]["value"],
+            objective_id=objective["objective_id"], objective_generation=objective["objective_generation"],
+            decision_contract_id=contract["contract_id"], decision_contract_version=contract["contract_version"],
+            delegation_chain_id=chain_id,
+            delegation_use_id=f"DELEGATION-USE-{chain_id}" if delegation_use else "NONE",
+            approval_policy_id=approval_policy["policy_id"] if approval_policy["requirement"] == "REQUIRED" else "NONE",
+            approval_use_id=approval_use["use_id"] if approval_use else "NONE",
+            tool_context_id=tool_context["context_id"] if tool_context else "NONE",
+            tool_context_generation=tool_context["context_generation"] if tool_context else 0,
+            tool_context_digest=tool_context["context_digest"] if tool_context else "NONE",
+            tool_use_id=tool_use["use_id"] if tool_use else "NONE",
+            grant_id=active["grant_id"], consumption_state=facts["consumption_state"]["value"],
+            terminal_use_id=tool_use["use_id"] if tool_use else active["grant_id"],
+            verifier_id="T3-VERIFIER-SET", verifier_generation=max(item["verifier_generation"] for item in anchor_set),
+            verifier_state_digest=anchor_set_digest, anchor_id="T3-ANCHOR-SET",
+            anchor_generation=max(item["anchor_generation"] for item in anchor_set),
+            anchor_position=max(item["anchor_position"] for item in anchor_set), anchor_digest=anchor_set_digest,
+            policy_set_digest=_test_digest("authority-lab-v1/t3-policy-set", policy_set),
+            source_id=observation["source_id"], authority_generation=observation["authority_generation"],
+            lineage=observation["lineage"], ordering_source_id=observation["ordering_source_id"],
+            freshness_challenge_id=freshness["freshness_challenge_id"], lifecycle_state="ACTIVE",
+        )
+        event["execution_event_digest"] = t3_execution_event_digest(event)
 
 
 def reissue_observation_commitment(payload: dict) -> None:
@@ -169,6 +252,7 @@ def reissue_observation_commitment(payload: dict) -> None:
             ordering_source_id=anchor["ordering_source_id"],
             freshness_challenge_id=anchor["freshness_challenge_id"],
         )
+    refresh_t3_execution_event(payload)
 
 
 def rebind_objective_binding(payload: dict, *, suffix: str) -> dict:
@@ -359,6 +443,7 @@ def reestablish_grant(
                 "current": deepcopy(current),
             },
         }
+    refresh_t3_execution_event(payload)
     return payload
 
 
@@ -368,9 +453,9 @@ class AuthorityLabTests(unittest.TestCase):
         self.assertIs(AuthorityOutcome.UNAVAILABLE, result.outcome)
         self.assertIn(reason_code, {reason.code for reason in result.reasons})
 
-    def test_v1_contains_four_hundred_eleven_deterministic_fixtures(self) -> None:
+    def test_v1_contains_four_hundred_forty_three_deterministic_fixtures(self) -> None:
         paths = discover(CASES)
-        self.assertEqual(411, len(paths))
+        self.assertEqual(443, len(paths))
         self.assertEqual(paths, discover(CASES))
 
     def test_every_v0_fixture_matches_its_expected_outcome(self) -> None:
@@ -379,6 +464,72 @@ class AuthorityLabTests(unittest.TestCase):
 
     def test_fresh_positive_is_authorized(self) -> None:
         self.assertIs(AuthorityOutcome.AUTHORIZED, actual(fixture("LAB-V0-001")))
+
+    def test_t3_hostile_matrix_matches_independent_expectations(self) -> None:
+        for number in range(412, 444):
+            with self.subTest(case_id=number):
+                self.assertIs(HarnessStatus.PASS, run_path(CASES / f"LAB-V1-{number:03}.json").status)
+
+    def test_approval_and_delegation_local_heads_cannot_precede_t3(self) -> None:
+        for case_id in ("LAB-V1-412", "LAB-V1-413"):
+            with self.subTest(case_id=case_id):
+                self.assert_unavailable_with_reason(fixture(case_id), "T3_AUTHORITY_CONVERGENCE_UNAVAILABLE")
+
+    def test_candidate_cached_authorized_result_is_not_authority(self) -> None:
+        self.assert_unavailable_with_reason(fixture("LAB-V1-426"), "T3_AUTHORITY_CONVERGENCE_UNAVAILABLE")
+
+    def test_candidate_cannot_supply_trusted_t3_event(self) -> None:
+        payload = json.loads((CASES / "LAB-V1-337.json").read_text())
+        payload["_trusted_t3_execution_event"] = {}
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "candidate.json"
+            path.write_text(json.dumps(payload))
+            with self.assertRaisesRegex(ValueError, "trusted T3"):
+                load_fixture(path)
+
+    def test_t3_event_digest_commits_to_every_member(self) -> None:
+        payload = fixture("LAB-V1-436")
+        event = payload["_trusted_anchor_context"][0]["t3_execution_event"]
+        original = t3_execution_event_digest(event)
+        for field in event:
+            if field == "execution_event_digest":
+                continue
+            changed = deepcopy(event)
+            changed[field] = changed[field] + 1 if isinstance(changed[field], int) else changed[field] + "-CHANGED"
+            self.assertNotEqual(original, t3_execution_event_digest(changed), field)
+
+    def test_duplicate_and_conflicting_t3_events_fail_closed(self) -> None:
+        for case_id in ("LAB-V1-430", "LAB-V1-431", "LAB-V1-433"):
+            with self.subTest(case_id=case_id):
+                self.assertIs(AuthorityOutcome.UNAVAILABLE, actual(fixture(case_id)))
+        payload = fixture("LAB-V1-058")
+        competing = payload["_trusted_anchor_context"][1]["t3_execution_event"]
+        competing["execution_event_id"] = "COMPETING-T3-EVENT"
+        competing["execution_event_digest"] = t3_execution_event_digest(competing)
+        self.assert_unavailable_with_reason(payload, "T3_EXECUTION_EVENT_CONFLICTING")
+
+    def test_t3_positive_paths_remain_reachable(self) -> None:
+        for case_id in range(436, 444):
+            with self.subTest(case_id=case_id):
+                self.assertIs(AuthorityOutcome.AUTHORIZED, actual(fixture(f"LAB-V1-{case_id:03}")))
+
+    def test_protected_t3_record_is_strictly_typed(self) -> None:
+        payload = fixture("LAB-V1-436")
+        payload["_trusted_anchor_context"][0]["t3_execution_event"]["trusted"] = True
+        with self.assertRaises(ValueError):
+            OracleInput.from_fixture(payload)
+
+    def test_t3_refresh_requires_protected_underlying_transition(self) -> None:
+        payload = fixture("LAB-V1-436")
+        payload["_trusted_anchor_context"][0]["t3_execution_event"]["event_order"] = 4
+        event = payload["_trusted_anchor_context"][0]["t3_execution_event"]
+        event["execution_event_digest"] = t3_execution_event_digest(event)
+        self.assert_unavailable_with_reason(payload, "T3_AUTHORITY_CONVERGENCE_UNAVAILABLE")
+
+    def test_current_revocation_at_t3_remains_denied(self) -> None:
+        for case_id in ("LAB-V1-414", "LAB-V1-415", "LAB-V1-428"):
+            with self.subTest(case_id=case_id):
+                self.assertIs(AuthorityOutcome.DENIED, actual(fixture(case_id)))
 
     def test_second_fresh_positive_is_authorized(self) -> None:
         self.assertIs(AuthorityOutcome.AUTHORIZED, actual(fixture("LAB-V0-010")))

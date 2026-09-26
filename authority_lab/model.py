@@ -123,6 +123,7 @@ RESERVED_TOOL_CONNECTOR_FACTS = frozenset({
     "tool_connector_identity", "credential_identity", "permission_scope",
     "backend_identity", "connector_identity", "execution_target_identity",
 })
+RESERVED_T3_EXECUTION_FACTS = frozenset({"t3_execution_event"})
 
 OBJECTIVE_BINDING_FACTS = (
     "objective_identity",
@@ -2508,6 +2509,22 @@ TRUSTED_TOOL_CONNECTOR_TERMINAL_USE_FIELDS = frozenset({
     "authority_generation", "freshness_challenge_id", "lifecycle_state",
 })
 
+TRUSTED_T3_EXECUTION_EVENT_FIELDS = frozenset({
+    "relationship", "execution_event_id", "execution_event_generation",
+    "execution_event_digest", "event_order", "t3_anchor_id", "subject_id",
+    "subject_identity_basis", "executor_id", "artifact", "effect",
+    "boundary", "boundary_epoch", "execution_context", "objective_id",
+    "objective_generation", "decision_contract_id", "decision_contract_version",
+    "delegation_chain_id", "delegation_use_id", "approval_policy_id",
+    "approval_use_id", "tool_context_id", "tool_context_generation",
+    "tool_context_digest", "tool_use_id", "grant_id", "consumption_state",
+    "terminal_use_id", "verifier_id", "verifier_generation",
+    "verifier_state_digest", "anchor_id", "anchor_generation",
+    "anchor_position", "anchor_digest", "policy_set_digest", "source_id",
+    "authority_generation", "lineage", "ordering_source_id",
+    "freshness_challenge_id", "lifecycle_state",
+})
+
 
 def _trusted_exact_record(value: Any, fields: frozenset[str], name: str) -> Mapping[str, Any]:
     if not isinstance(value, Mapping):
@@ -2887,6 +2904,15 @@ def validate_trusted_anchor_context(value: Mapping[str, Any]) -> Mapping[str, An
     )
     result["tool_connector_authority_context"] = _trusted_tool_connector_context(
         value.get("tool_connector_authority_context")
+    )
+    result["t3_execution_event"] = _trusted_control_record(
+        value.get("t3_execution_event"), TRUSTED_T3_EXECUTION_EVENT_FIELDS,
+        "trusted t3_execution_event",
+        integer_fields=frozenset({
+            "execution_event_generation", "event_order", "objective_generation",
+            "tool_context_generation", "verifier_generation", "anchor_generation",
+            "anchor_position", "authority_generation",
+        }),
     )
     reconciliation = value.get("cross_domain_reconciliation")
     result["cross_domain_reconciliation"] = (

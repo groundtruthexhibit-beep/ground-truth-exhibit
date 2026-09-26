@@ -40,6 +40,7 @@ from .model import (
     RELATIONAL_T3_FACTS,
     RESERVED_HUMAN_APPROVAL_FACTS,
     RESERVED_TOOL_CONNECTOR_FACTS,
+    RESERVED_T3_EXECUTION_FACTS,
     Reason,
     exact_value_equal,
 )
@@ -98,6 +99,14 @@ def tool_connector_context_digest(context: Mapping[str, Any]) -> str:
             for field, value in context.items()
             if field != "context_digest"
         },
+    )
+
+
+def t3_execution_event_digest(event: Mapping[str, Any]) -> str:
+    """Canonical identity of the protected terminal authority-consumption event."""
+    return _canonical_digest(
+        "authority-lab-v1/t3-execution-event",
+        {field: value for field, value in event.items() if field != "execution_event_digest"},
     )
 
 
@@ -2811,6 +2820,135 @@ def _tool_result(
     )
 
 
+def _t3_result(case: OracleInput, code: str, detail: str) -> OracleResult:
+    return _unavailable(case, code, detail, ("evidence_binding", "binding_ordering"))
+
+
+def _evaluate_t3_execution_event(
+    case: OracleInput,
+    active_state: AuthorityStateBinding,
+) -> OracleResult | None:
+    """Converge all authority heads on one harness-owned terminal event."""
+    if RESERVED_T3_EXECUTION_FACTS.intersection(case.facts):
+        return _t3_result(case, "T3_EXECUTION_EVENT_SELF_ASSERTED", "Candidate event or cached authority outcome cannot establish T3.")
+    events = tuple(item["t3_execution_event"] for item in case.trusted_anchor_context)
+    if not events:
+        return _t3_result(case, "T3_EXECUTION_EVENT_UNAVAILABLE", "Protected T3 execution event is unavailable.")
+    event = events[0]
+    if any(item != event for item in events[1:]):
+        return _t3_result(case, "T3_EXECUTION_EVENT_CONFLICTING", "Protected anchor views select conflicting terminal events.")
+    observation = case.observation_binding
+    freshness = case.observation_freshness
+    root = case.t3_binding_facts.authority_root
+    objective = case.t3_binding_facts.objective_identity
+    contract = case.t3_binding_facts.decision_contract_identity
+    if None in (observation, freshness, root, objective, contract):
+        return _t3_result(case, "T3_AUTHORITY_CONVERGENCE_UNAVAILABLE", "Terminal event cannot join current protected authority heads.")
+    assert observation is not None and freshness is not None and root is not None
+    assert objective is not None and contract is not None
+    if event["execution_event_digest"] != t3_execution_event_digest(event):
+        return _t3_result(case, "T3_EXECUTION_EVENT_DIGEST_UNAVAILABLE", "Terminal event digest is not canonical.")
+
+    approval = case.trusted_anchor_context[0]["human_approval_authority_context"]
+    delegation = case.trusted_anchor_context[0]["delegation_authority_context"]
+    tool = case.trusted_anchor_context[0]["tool_connector_authority_context"]
+    approval_policy = approval["approval_policy"]
+    delegation_policy = delegation["delegation_policy"]
+    tool_policy = tool["tool_connector_policy"]
+    policy_set = {
+        "approval": [approval_policy["policy_id"], approval_policy["policy_generation"]],
+        "delegation": [delegation_policy["policy_id"], delegation_policy["policy_generation"]],
+        "tool": [tool_policy["policy_id"], tool_policy["policy_generation"]],
+        "control_plane": [
+            case.trusted_anchor_context[0]["control_plane_policy"]["policy_id"],
+            case.trusted_anchor_context[0]["control_plane_policy"]["policy_generation"],
+        ],
+        "required_domains": [
+            case.trusted_anchor_context[0]["required_domain_policy"]["policy_id"],
+            case.trusted_anchor_context[0]["required_domain_policy"]["policy_generation"],
+        ],
+    }
+    policy_digest = _canonical_digest("authority-lab-v1/t3-policy-set", policy_set)
+    tool_records = tuple(tool["execution_contexts"])
+    tool_uses = tuple(tool["protected_terminal_uses"])
+    tool_context = tool_records[0] if len(tool_records) == 1 else None
+    tool_use = tool_uses[0] if len(tool_uses) == 1 else None
+    delegation_uses = tuple(delegation["delegation_terminal_uses"])
+    delegation_use = delegation_uses[0] if len(delegation_uses) == 1 else None
+    approval_binding = case.human_approval_binding
+    approval_use = approval_binding["approval_use"] if approval_binding is not None else None
+    anchor_set = sorted(
+        ({
+            "verifier_id": item["verifier_id"],
+            "verifier_generation": item["verifier_generation"],
+            "verifier_state_digest": item["verifier_state_digest"],
+            "anchor_id": item["anchor_id"],
+            "anchor_generation": item["anchor_generation"],
+            "anchor_position": item["anchor_position"],
+            "anchor_digest": item["anchor_digest"],
+        } for item in case.trusted_anchor_context),
+        key=lambda item: (item["anchor_id"], item["anchor_generation"]),
+    )
+    anchor_set_digest = _canonical_digest("authority-lab-v1/t3-anchor-set", {"anchors": anchor_set})
+    chain_id = delegation_use["chain_id"] if delegation_use is not None else "DIRECT"
+    expected = {
+        "relationship": "T3_EXECUTION_EVENT",
+        "event_order": observation.t3_anchor.event_order,
+        "t3_anchor_id": observation.t3_anchor.anchor_id,
+        "subject_id": case.authority_tuple.subject,
+        "subject_identity_basis": case.authority_tuple.identity_basis,
+        "executor_id": tool_policy["executor_id"],
+        "artifact": case.authority_tuple.artifact,
+        "effect": tool_policy["effect"],
+        "boundary": root.boundary,
+        "boundary_epoch": root.boundary_epoch,
+        "execution_context": case.facts["execution_context"].value,
+        "objective_id": objective.objective_id,
+        "objective_generation": objective.objective_generation,
+        "decision_contract_id": contract.contract_id,
+        "decision_contract_version": contract.contract_version,
+        "delegation_chain_id": chain_id,
+        "delegation_use_id": (
+            f"DELEGATION-USE-{chain_id}" if delegation_use is not None else "NONE"
+        ),
+        "approval_policy_id": approval_policy["policy_id"] if approval_policy["requirement"] == "REQUIRED" else "NONE",
+        "approval_use_id": approval_use["use_id"] if approval_use is not None else "NONE",
+        "tool_context_id": tool_context["context_id"] if tool_context is not None else "NONE",
+        "tool_context_generation": tool_context["context_generation"] if tool_context is not None else 0,
+        "tool_context_digest": tool_context["context_digest"] if tool_context is not None else "NONE",
+        "tool_use_id": tool_use["use_id"] if tool_use is not None else "NONE",
+        "grant_id": active_state.grant_id,
+        "consumption_state": case.facts["consumption_state"].value,
+        "terminal_use_id": tool_use["use_id"] if tool_use is not None else active_state.grant_id,
+        "verifier_id": "T3-VERIFIER-SET",
+        "verifier_generation": max(item["verifier_generation"] for item in anchor_set),
+        "verifier_state_digest": anchor_set_digest,
+        "anchor_id": "T3-ANCHOR-SET",
+        "anchor_generation": max(item["anchor_generation"] for item in anchor_set),
+        "anchor_position": max(item["anchor_position"] for item in anchor_set),
+        "anchor_digest": anchor_set_digest,
+        "policy_set_digest": policy_digest,
+        "source_id": root.root_id,
+        "authority_generation": root.authority_generation,
+        "lineage": root.lineage,
+        "ordering_source_id": root.ordering_source_id,
+        "freshness_challenge_id": freshness.freshness_challenge_id,
+        "lifecycle_state": "ACTIVE",
+    }
+    if any(not exact_value_equal(event[name], value) for name, value in expected.items()):
+        return _t3_result(case, "T3_AUTHORITY_CONVERGENCE_UNAVAILABLE", "Protected authority heads do not converge on the exact canonical terminal event.")
+    t3 = event["event_order"]
+    if freshness.head_event_order != t3:
+        return _t3_result(case, "T3_AUTHORITY_CONVERGENCE_UNAVAILABLE", "Observation freshness does not select canonical T3.")
+    if tool_use is not None and tool_use["use_event_order"] != t3:
+        return _t3_result(case, "T3_AUTHORITY_CONVERGENCE_UNAVAILABLE", "Tool use references a different terminal event.")
+    if delegation_use is not None and delegation_use["use_event_order"] != t3:
+        return _t3_result(case, "T3_AUTHORITY_CONVERGENCE_UNAVAILABLE", "Delegation use does not cover canonical T3.")
+    if approval_use is not None and approval_use["use_event_order"] != t3:
+        return _t3_result(case, "T3_AUTHORITY_CONVERGENCE_UNAVAILABLE", "Approval use does not cover canonical T3.")
+    return None
+
+
 def _evaluate_tool_connector_authority(
     case: OracleInput,
     active_state: AuthorityStateBinding,
@@ -4014,6 +4152,10 @@ def evaluate(case: OracleInput) -> OracleResult:
     observation_result = _evaluate_observation(case)
     if observation_result.outcome is not AuthorityOutcome.AUTHORIZED:
         return observation_result
+
+    t3_result = _evaluate_t3_execution_event(case, active_state)
+    if t3_result is not None:
+        return t3_result
 
     delegation_result, protected_terminal_grant = _evaluate_delegation_authority(
         case, active_state

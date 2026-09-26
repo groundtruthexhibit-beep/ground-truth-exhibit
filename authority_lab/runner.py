@@ -40,6 +40,8 @@ def load_fixture(path: str | Path) -> dict[str, Any]:
         raise ValueError("fixture cannot supply harness-owned trusted human approval state")
     if "_trusted_tool_connector_context" in value:
         raise ValueError("fixture cannot supply harness-owned trusted tool connector state")
+    if "_trusted_t3_execution_event" in value:
+        raise ValueError("fixture cannot supply harness-owned trusted T3 execution event")
     manifest_path = fixture_path.parent / "trusted_commitment_state.json"
     if value.get("schema_version") == "authority-lab-v1" and manifest_path.exists():
         with manifest_path.open("r", encoding="utf-8") as handle:
@@ -186,6 +188,12 @@ def _observation_trace(case: OracleInput) -> tuple[str, ...]:
     )
     lines.append(f"trusted_commitment_states: {len(case.trusted_commitment_context)}")
     lines.append(f"trusted_anchor_states: {len(case.trusted_anchor_context)}")
+    lines.extend(
+        "t3_execution_event: "
+        f"{item['t3_execution_event']['execution_event_id']}@"
+        f"{item['t3_execution_event']['event_order']}"
+        for item in case.trusted_anchor_context
+    )
     approval_requirements = tuple(
         item["human_approval_authority_context"]["approval_policy"]["requirement"]
         for item in case.trusted_anchor_context
