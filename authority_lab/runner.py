@@ -36,6 +36,8 @@ def load_fixture(path: str | Path) -> dict[str, Any]:
         raise ValueError("fixture cannot supply harness-owned trusted control-plane state")
     if "_trusted_delegation_context" in value:
         raise ValueError("fixture cannot supply harness-owned trusted delegation state")
+    if "_trusted_human_approval_context" in value:
+        raise ValueError("fixture cannot supply harness-owned trusted human approval state")
     manifest_path = fixture_path.parent / "trusted_commitment_state.json"
     if value.get("schema_version") == "authority-lab-v1" and manifest_path.exists():
         with manifest_path.open("r", encoding="utf-8") as handle:
@@ -182,6 +184,12 @@ def _observation_trace(case: OracleInput) -> tuple[str, ...]:
     )
     lines.append(f"trusted_commitment_states: {len(case.trusted_commitment_context)}")
     lines.append(f"trusted_anchor_states: {len(case.trusted_anchor_context)}")
+    approval_requirements = tuple(
+        item["human_approval_authority_context"]["approval_policy"]["requirement"]
+        for item in case.trusted_anchor_context
+    )
+    lines.append(f"protected_human_approval_policies: {len(approval_requirements)}")
+    lines.append(f"human_approval_requirements: {approval_requirements}")
     lines.extend(
         "anchor_domain: "
         f"{item['domain_view']['domain_id']} adapter="

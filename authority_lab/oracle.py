@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
@@ -36,9 +38,54 @@ from .model import (
     OracleInput,
     OracleResult,
     RELATIONAL_T3_FACTS,
+    RESERVED_HUMAN_APPROVAL_FACTS,
     Reason,
     exact_value_equal,
 )
+
+
+def _canonical_digest(domain: str, value: Mapping[str, Any]) -> str:
+    payload = json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+    return hashlib.sha256(f"{domain}\0{payload}".encode("utf-8")).hexdigest()
+
+
+def human_approval_effect_digest(binding: Mapping[str, Any]) -> str:
+    """Canonical exact effect identity; display text and approval claims are excluded."""
+    fields = (
+        "artifact", "effect", "subject_id", "subject_identity_basis", "executor_id",
+        "delegation_chain_id", "tool_backend_id", "credential_generation",
+        "execution_context", "boundary", "boundary_epoch", "objective_id",
+        "objective_generation", "decision_contract_id", "decision_contract_version",
+        "grant_id", "session_id", "session_generation", "transformation_id",
+    )
+    return _canonical_digest(
+        "authority-lab-v1/human-approval-effect",
+        {field: binding[field] for field in fields},
+    )
+
+
+def human_approval_request_digest(binding: Mapping[str, Any]) -> str:
+    return _canonical_digest(
+        "authority-lab-v1/human-approval-request",
+        {
+            "request_id": binding["request_id"],
+            "request_generation": binding["request_generation"],
+            "effect_digest": human_approval_effect_digest(binding),
+            "display_digest": binding["display_digest"],
+        },
+    )
+
+
+def human_approval_envelope_digest(envelope: Mapping[str, Any]) -> str:
+    """Digest every signed approval-envelope member except the digest itself."""
+    return _canonical_digest(
+        "authority-lab-v1/human-approval-envelope",
+        {
+            field: value
+            for field, value in envelope.items()
+            if field != "canonical_payload_digest"
+        },
+    )
 
 
 TUPLE_FACT_BINDINGS = (
@@ -2373,6 +2420,376 @@ def _evaluate_delegation_authority(
     return None, terminal
 
 
+def _approval_result(
+    case: OracleInput, outcome: AuthorityOutcome, code: str, detail: str
+) -> OracleResult:
+    return OracleResult(
+        outcome, (Reason(code, detail, ("human_approval_binding",)),), _engaged(case)
+    )
+
+
+def _evaluate_human_approval(
+    case: OracleInput,
+    active_state: AuthorityStateBinding,
+    protected_terminal_grant: Mapping[str, Any] | None,
+) -> OracleResult | None:
+    """Join a typed approval/use relation to independently protected approval authority."""
+    contexts = tuple(
+        item["human_approval_authority_context"]
+        for item in case.trusted_anchor_context
+    )
+    if not contexts:
+        return _approval_result(
+            case, AuthorityOutcome.UNAVAILABLE, "HUMAN_APPROVAL_POLICY_UNAVAILABLE",
+            "Protected human-approval policy state is unavailable.",
+        )
+    first = contexts[0]
+    if any(item != first for item in contexts[1:]):
+        return _approval_result(
+            case, AuthorityOutcome.UNAVAILABLE, "HUMAN_APPROVAL_POLICY_CONFLICTING",
+            "Protected human-approval policy contexts conflict.",
+        )
+    policy = first["approval_policy"]
+    root = case.t3_binding_facts.authority_root
+    objective = case.t3_binding_facts.objective_identity
+    contract = case.t3_binding_facts.decision_contract_identity
+    freshness = case.observation_freshness
+    observation = case.observation_binding
+    if root is None or objective is None or contract is None or freshness is None or observation is None:
+        return _approval_result(
+            case, AuthorityOutcome.UNAVAILABLE, "HUMAN_APPROVAL_POLICY_UNAVAILABLE",
+            "Approval policy cannot join the current authority and observation context.",
+        )
+    if (
+        policy["relationship"] != "HUMAN_APPROVAL_POLICY"
+        or policy["selection_rule"] != "ALL_APPLICABLE"
+        or policy["source_id"] != root.root_id
+        or policy["authority_generation"] != root.authority_generation
+        or policy["ordering_source_id"] != root.ordering_source_id
+        or policy["boundary"] != root.boundary
+        or policy["boundary_epoch"] != root.boundary_epoch
+        or policy["objective_id"] != objective.objective_id
+        or policy["objective_generation"] != objective.objective_generation
+        or policy["decision_contract_id"] != contract.contract_id
+        or policy["decision_contract_version"] != contract.contract_version
+        or policy["freshness_challenge_id"] != freshness.freshness_challenge_id
+    ):
+        return _approval_result(
+            case, AuthorityOutcome.UNAVAILABLE, "HUMAN_APPROVAL_POLICY_UNAVAILABLE",
+            "Approval policy is not exact, current, root-issued, and applicable.",
+        )
+    if policy["lifecycle_state"] in {"REVOKED", "REJECTED", "PROHIBITED"}:
+        return _approval_result(
+            case, AuthorityOutcome.DENIED, "HUMAN_APPROVAL_POLICY_PROHIBITED",
+            "The current authoritative approval policy is revoked or prohibited.",
+        )
+    if policy["lifecycle_state"] != "ACTIVE":
+        return _approval_result(
+            case, AuthorityOutcome.UNAVAILABLE, "HUMAN_APPROVAL_POLICY_UNAVAILABLE",
+            "Approval policy lifecycle is not current.",
+        )
+
+    reserved = RESERVED_HUMAN_APPROVAL_FACTS.intersection(case.facts)
+    if reserved:
+        return _approval_result(
+            case, AuthorityOutcome.UNAVAILABLE, "HUMAN_APPROVAL_RELATIONSHIP_UNAVAILABLE",
+            "Generic approval facts cannot establish typed human approval authority.",
+        )
+    binding = case.human_approval_binding
+    if policy["requirement"] == "NONE":
+        if binding is not None:
+            return _approval_result(
+                case, AuthorityOutcome.UNAVAILABLE, "HUMAN_APPROVAL_POLICY_CONFLICTING",
+                "Candidate approval evidence conflicts with the selected no-approval policy.",
+            )
+        return None
+    if policy["requirement"] != "REQUIRED" or binding is None:
+        return _approval_result(
+            case, AuthorityOutcome.UNAVAILABLE, "HUMAN_APPROVAL_REQUIRED",
+            "The selected policy requires a typed current human approval relation.",
+        )
+
+    chain_id = (
+        protected_terminal_grant["chain_id"]
+        if protected_terminal_grant is not None else "DIRECT"
+    )
+    expected_policy_values = {
+        "policy_id": binding["policy_id"],
+        "policy_generation": binding["policy_generation"],
+        "artifact": binding["artifact"],
+        "effect": binding["effect"],
+        "subject_id": binding["subject_id"],
+        "executor_id": binding["executor_id"],
+        "delegation_chain_id": binding["delegation_chain_id"],
+        "tool_backend_id": binding["tool_backend_id"],
+        "credential_generation": binding["credential_generation"],
+        "execution_context": binding["execution_context"],
+        "boundary": binding["boundary"],
+        "boundary_epoch": binding["boundary_epoch"],
+        "objective_id": binding["objective_id"],
+        "objective_generation": binding["objective_generation"],
+        "decision_contract_id": binding["decision_contract_id"],
+        "decision_contract_version": binding["decision_contract_version"],
+        "grant_id": binding["grant_id"],
+        "session_id": binding["session_id"],
+        "session_generation": binding["session_generation"],
+        "transformation_id": binding["transformation_id"],
+    }
+    if any(policy[name] != value for name, value in expected_policy_values.items()):
+        return _approval_result(
+            case, AuthorityOutcome.UNAVAILABLE, "HUMAN_APPROVAL_SCOPE_UNAVAILABLE",
+            "Approval policy does not admit the exact requested effect and context.",
+        )
+    if (
+        binding["relationship"] != "EXACT_HUMAN_APPROVAL"
+        or binding["artifact"] != case.authority_tuple.artifact
+        or binding["subject_id"] != case.authority_tuple.subject
+        or binding["subject_identity_basis"] != case.authority_tuple.identity_basis
+        or binding["executor_id"] != case.authority_tuple.subject
+        or binding["delegation_chain_id"] != chain_id
+        or binding["execution_context"] != case.facts["execution_context"].value
+        or binding["boundary"] != case.facts["applicable_boundary"].value
+        or binding["boundary_epoch"] != case.authority_tuple.boundary_epoch
+        or binding["grant_id"] != active_state.grant_id
+        or binding["objective_id"] != objective.objective_id
+        or binding["objective_generation"] != objective.objective_generation
+        or binding["decision_contract_id"] != contract.contract_id
+        or binding["decision_contract_version"] != contract.contract_version
+        or binding["effect_digest"] != human_approval_effect_digest(binding)
+        or binding["request_digest"] != human_approval_request_digest(binding)
+    ):
+        return _approval_result(
+            case, AuthorityOutcome.UNAVAILABLE, "HUMAN_APPROVAL_EFFECT_UNAVAILABLE",
+            "Approval is not bound to the exact canonical current execution effect.",
+        )
+
+    heads = first["approval_ordering_heads"]
+    if len(heads) != 1:
+        return _approval_result(
+            case, AuthorityOutcome.UNAVAILABLE, "HUMAN_APPROVAL_ORDERING_UNAVAILABLE",
+            "Approval authority lacks one unique all-applicable ordering head.",
+        )
+    head = heads[0]
+    envelopes = tuple(binding["approval_envelopes"])
+    envelope_ids = tuple(item["approval_id"] for item in envelopes)
+    if (
+        head["relationship"] != "HUMAN_APPROVAL_ORDERING_HEAD"
+        or head["policy_id"] != policy["policy_id"]
+        or head["policy_generation"] != policy["policy_generation"]
+        or head["request_id"] != binding["request_id"]
+        or head["request_generation"] != binding["request_generation"]
+        or head["request_digest"] != binding["request_digest"]
+        or head["effect_digest"] != binding["effect_digest"]
+        or tuple(head["approval_ids"]) != envelope_ids
+        or head["source_id"] != root.root_id
+        or head["authority_generation"] != root.authority_generation
+        or head["ordering_source_id"] != root.ordering_source_id
+        or head["boundary"] != root.boundary
+        or head["boundary_epoch"] != root.boundary_epoch
+        or head["freshness_challenge_id"] != freshness.freshness_challenge_id
+        or head["lifecycle_state"] != "ACTIVE"
+        or head["head_event_order"] > observation.t3_anchor.event_order
+    ):
+        return _approval_result(
+            case, AuthorityOutcome.UNAVAILABLE, "HUMAN_APPROVAL_ORDERING_UNAVAILABLE",
+            "Approval ordering head is incomplete, stale, or not root-applicable.",
+        )
+
+    verifications = {
+        (item["approval_id"], item["approval_generation"]): item
+        for item in binding["approval_verifications"]
+    }
+    if len(verifications) != len(binding["approval_verifications"]):
+        return _approval_result(
+            case, AuthorityOutcome.UNAVAILABLE, "HUMAN_APPROVAL_CONFLICTING",
+            "Approval verification identities conflict.",
+        )
+
+    admissions = {
+        (item["approver_id"], item["approver_generation"], item["identity_basis"]): item
+        for item in first["approver_admissions"]
+    }
+    lifecycle = {
+        (item["approval_id"], item["approval_generation"]): item
+        for item in first["approval_lifecycle_records"]
+    }
+    use_states = {
+        (item["approval_id"], item["approval_generation"]): item
+        for item in first["approval_use_states"]
+    }
+    if (
+        len(admissions) != len(first["approver_admissions"])
+        or len(lifecycle) != len(first["approval_lifecycle_records"])
+        or len(use_states) != len(first["approval_use_states"])
+    ):
+        return _approval_result(
+            case, AuthorityOutcome.UNAVAILABLE, "HUMAN_APPROVAL_CONFLICTING",
+            "Protected approval identities or current state conflict.",
+        )
+
+    effective_domains: set[str] = set()
+    for envelope in envelopes:
+        record = lifecycle.get((envelope["approval_id"], envelope["approval_generation"]))
+        if record is not None and record["state"] in {"REVOKED", "REJECTED", "PROHIBITED"}:
+            return _approval_result(
+                case, AuthorityOutcome.DENIED, "HUMAN_APPROVAL_REVOKED",
+                "A current applicable human approval is revoked, rejected, or prohibited.",
+            )
+        admission = admissions.get((
+            envelope["approver_id"], envelope["approver_generation"],
+            envelope["approver_identity_basis"],
+        ))
+        if admission is None:
+            return _approval_result(
+                case, AuthorityOutcome.UNAVAILABLE, "HUMAN_APPROVER_ADMISSION_UNAVAILABLE",
+                "The exact approver lacks independent protected admission.",
+            )
+        if (
+            envelope["approval_source_id"] != admission["approval_source_id"]
+            or envelope["approval_source_generation"] != admission["approval_source_generation"]
+            or envelope["role"] not in admission["roles"]
+            or envelope["effective_domain"] != admission["effective_domain"]
+            or admission["source_id"] != root.root_id
+            or admission["authority_generation"] != root.authority_generation
+            or admission["boundary"] != root.boundary
+            or admission["boundary_epoch"] != root.boundary_epoch
+            or admission["ordering_source_id"] != root.ordering_source_id
+            or admission["freshness_challenge_id"] != freshness.freshness_challenge_id
+            or admission["lifecycle_state"] != "ACTIVE"
+            or admission["start_event_order"] > head["head_event_order"]
+            or admission["end_event_order"] < head["head_event_order"]
+        ):
+            return _approval_result(
+                case, AuthorityOutcome.UNAVAILABLE, "HUMAN_APPROVER_ADMISSION_UNAVAILABLE",
+                "Approver identity, role, source, boundary, or currentness is unavailable.",
+            )
+        verification = verifications.get(
+            (envelope["approval_id"], envelope["approval_generation"])
+        )
+        envelope_digest = human_approval_envelope_digest(envelope)
+        if (
+            envelope["canonical_payload_digest"] != envelope_digest
+            or verification is None
+            or verification["relationship"] != "HUMAN_APPROVAL_VERIFICATION"
+            or verification["envelope_digest"] != envelope_digest
+            or verification["verifier_id"] != policy["approval_verifier_id"]
+            or verification["verifier_generation"] != policy["approval_verifier_generation"]
+            or verification["approval_source_id"] != admission["approval_source_id"]
+            or verification["approval_source_generation"] != admission["approval_source_generation"]
+            or verification["disposition"] != envelope["disposition"]
+            or verification["verification_event_order"] > head["head_event_order"]
+            or verification["freshness_challenge_id"] != freshness.freshness_challenge_id
+            or verification["source_id"] != root.root_id
+            or verification["authority_generation"] != root.authority_generation
+            or verification["boundary"] != root.boundary
+            or verification["boundary_epoch"] != root.boundary_epoch
+            or verification["lifecycle_state"] != "ACTIVE"
+        ):
+            return _approval_result(
+                case, AuthorityOutcome.UNAVAILABLE, "HUMAN_APPROVAL_VERIFICATION_UNAVAILABLE",
+                "Approval envelope authenticity is not exactly and currently verified.",
+            )
+        if envelope["disposition"] in {"REJECTED", "PROHIBITED"}:
+            return _approval_result(
+                case, AuthorityOutcome.DENIED, "HUMAN_APPROVAL_REJECTED",
+                "A current exactly verified human decision rejects or prohibits the effect.",
+            )
+        scalar_matches = (
+            envelope["policy_id"] == binding["policy_id"]
+            and envelope["policy_generation"] == binding["policy_generation"]
+            and envelope["request_id"] == binding["request_id"]
+            and envelope["request_generation"] == binding["request_generation"]
+            and envelope["request_digest"] == binding["request_digest"]
+            and envelope["effect_digest"] == binding["effect_digest"]
+            and envelope["artifact"] == binding["artifact"]
+            and envelope["effect"] == binding["effect"]
+            and envelope["subject_id"] == binding["subject_id"]
+            and envelope["executor_id"] == binding["executor_id"]
+            and envelope["delegation_chain_id"] == binding["delegation_chain_id"]
+            and envelope["tool_backend_id"] == binding["tool_backend_id"]
+            and envelope["execution_context"] == binding["execution_context"]
+            and envelope["boundary"] == binding["boundary"]
+            and envelope["boundary_epoch"] == binding["boundary_epoch"]
+            and envelope["session_id"] == binding["session_id"]
+            and envelope["session_generation"] == binding["session_generation"]
+            and envelope["freshness_challenge_id"] == freshness.freshness_challenge_id
+            and envelope["disposition"] == "APPROVED"
+            and envelope["lifecycle_state"] == "ACTIVE"
+            and envelope["use_policy"] == policy["use_policy"]
+            and envelope["maximum_uses"] == policy["maximum_uses"]
+            and envelope["issuance_order"] <= head["head_event_order"]
+            and envelope["expiry_order"] >= head["head_event_order"]
+            and record is not None
+            and record["state"] == "ACTIVE"
+            and record["event_order"] <= head["head_event_order"]
+            and record["source_id"] == root.root_id
+            and record["authority_generation"] == root.authority_generation
+        )
+        if not scalar_matches:
+            return _approval_result(
+                case, AuthorityOutcome.UNAVAILABLE, "HUMAN_APPROVAL_CURRENTNESS_UNAVAILABLE",
+                "Approval content, lifecycle, expiry, scope, or freshness is not exact and current.",
+            )
+        state = use_states.get((envelope["approval_id"], envelope["approval_generation"]))
+        use = binding["approval_use"]
+        if state is None:
+            return _approval_result(
+                case, AuthorityOutcome.UNAVAILABLE, "HUMAN_APPROVAL_USE_STATE_UNAVAILABLE",
+                "Protected durable approval-use state is unavailable.",
+            )
+        if (
+            state["request_id"] != binding["request_id"]
+            or state["request_generation"] != binding["request_generation"]
+            or state["session_id"] != binding["session_id"]
+            or state["session_generation"] != binding["session_generation"]
+            or state["source_id"] != root.root_id
+            or state["authority_generation"] != root.authority_generation
+            or state["boundary"] != root.boundary
+            or state["boundary_epoch"] != root.boundary_epoch
+            or state["freshness_challenge_id"] != freshness.freshness_challenge_id
+            or state["lifecycle_state"] != "ACTIVE"
+            or use["use_position"] != state["next_use_position"]
+            or state["accepted_use_count"] >= policy["maximum_uses"]
+        ):
+            return _approval_result(
+                case, AuthorityOutcome.UNAVAILABLE, "HUMAN_APPROVAL_REPLAY",
+                "Approval is consumed, replayed, rolled back, or outside its bounded-use state.",
+            )
+        effective_domains.add(admission["effective_domain"])
+
+    use = binding["approval_use"]
+    if (
+        use["relationship"] != "EXACT_HUMAN_APPROVAL_USE"
+        or tuple(use["approval_ids"]) != envelope_ids
+        or any(use[name] != binding[name] for name in (
+            "request_id", "request_generation", "request_digest", "effect_digest",
+            "subject_id", "executor_id", "delegation_chain_id", "tool_backend_id",
+            "execution_context", "boundary", "boundary_epoch", "session_id",
+            "session_generation", "grant_id",
+        ))
+        or use["use_event_order"] != head["head_event_order"]
+        or use["freshness_challenge_id"] != freshness.freshness_challenge_id
+        or len(verifications) != len(envelopes)
+    ):
+        return _approval_result(
+            case, AuthorityOutcome.UNAVAILABLE, "HUMAN_APPROVAL_USE_UNAVAILABLE",
+            "Approval use is not exact for the current execution.",
+        )
+    required_roles = set(policy["required_roles"])
+    selected_roles = {item["role"] for item in envelopes}
+    if (
+        len(envelopes) != policy["required_approver_count"]
+        or not required_roles.issubset(selected_roles)
+        or not set(policy["required_effective_domains"]).issubset(effective_domains)
+        or len(effective_domains) < policy["required_approver_count"]
+    ):
+        return _approval_result(
+            case, AuthorityOutcome.UNAVAILABLE, "HUMAN_APPROVER_INDEPENDENCE_UNAVAILABLE",
+            "Required approver roles and independent effective domains are incomplete.",
+        )
+    return None
+
+
 def _evaluate_recovery_and_rotation(
     case: OracleInput,
     binding: ObservationBinding,
@@ -3409,6 +3826,12 @@ def evaluate(case: OracleInput) -> OracleResult:
 
     if t3_binding_result.outcome is not AuthorityOutcome.AUTHORIZED:
         return t3_binding_result
+
+    approval_result = _evaluate_human_approval(
+        case, active_state, protected_terminal_grant
+    )
+    if approval_result is not None:
+        return approval_result
 
     return OracleResult(
         AuthorityOutcome.AUTHORIZED,

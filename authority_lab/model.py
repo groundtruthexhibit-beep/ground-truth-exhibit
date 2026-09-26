@@ -114,7 +114,10 @@ RELATIONAL_T3_FACTS = (
     "binding_source_authority",
     "binding_lifecycle",
     "binding_ordering",
+    "human_approval_binding",
 )
+
+RESERVED_HUMAN_APPROVAL_FACTS = frozenset({"human_approval", "user_said_yes"})
 
 OBJECTIVE_BINDING_FACTS = (
     "objective_identity",
@@ -1917,6 +1920,124 @@ class Mutation:
         )
 
 
+HUMAN_APPROVAL_BINDING_FIELDS = frozenset({
+    "relationship", "policy_id", "policy_generation", "request_id",
+    "request_generation", "request_digest", "effect_digest", "artifact",
+    "effect", "subject_id", "subject_identity_basis", "executor_id",
+    "delegation_chain_id", "tool_backend_id", "credential_generation",
+    "execution_context", "boundary", "boundary_epoch", "objective_id",
+    "objective_generation", "decision_contract_id", "decision_contract_version",
+    "grant_id", "session_id", "session_generation", "transformation_id",
+    "display_digest", "approval_envelopes", "approval_verifications", "approval_use",
+})
+HUMAN_APPROVAL_ENVELOPE_FIELDS = frozenset({
+    "approval_id", "approval_generation", "approver_id", "approver_generation",
+    "approver_identity_basis", "approval_source_id", "approval_source_generation",
+    "role", "effective_domain", "policy_id", "policy_generation", "request_id",
+    "request_generation", "request_digest", "effect_digest", "artifact", "effect",
+    "subject_id", "executor_id", "delegation_chain_id", "tool_backend_id",
+    "execution_context", "boundary", "boundary_epoch", "session_id",
+    "session_generation", "issuance_order", "expiry_order", "lifecycle_state",
+    "disposition", "use_policy", "maximum_uses", "freshness_challenge_id",
+    "canonical_payload_digest", "signature_evidence_id",
+})
+HUMAN_APPROVAL_USE_FIELDS = frozenset({
+    "relationship", "use_id", "approval_ids", "request_id", "request_generation",
+    "request_digest", "effect_digest", "subject_id", "executor_id",
+    "delegation_chain_id", "tool_backend_id", "execution_context", "boundary",
+    "boundary_epoch", "session_id", "session_generation", "grant_id",
+    "use_position", "use_event_order", "freshness_challenge_id",
+})
+HUMAN_APPROVAL_VERIFICATION_FIELDS = frozenset({
+    "relationship", "approval_id", "approval_generation", "envelope_digest",
+    "verifier_id", "verifier_generation", "approval_source_id",
+    "approval_source_generation", "disposition", "verification_event_order",
+    "freshness_challenge_id", "source_id", "authority_generation", "boundary",
+    "boundary_epoch", "lifecycle_state",
+})
+
+
+def _strict_approval_record(
+    value: Any, fields: frozenset[str], name: str,
+    *, integer_fields: frozenset[str] = frozenset(),
+    array_fields: frozenset[str] = frozenset(),
+) -> Mapping[str, Any]:
+    if not isinstance(value, Mapping):
+        raise ValueError(f"{name} must be an object")
+    _require_exact_fields(value, fields, name)
+    result: dict[str, Any] = {}
+    for field in fields:
+        item = value[field]
+        qualified = f"{name}.{field}"
+        if field in integer_fields:
+            result[field] = _exact_generation(item, qualified)
+        elif field in array_fields:
+            if not isinstance(item, (list, tuple)) or not item:
+                raise ValueError(f"{qualified} must be a non-empty array")
+            parts = tuple(_exact_nonempty_string(part, qualified) for part in item)
+            if len(parts) != len(set(parts)):
+                raise ValueError(f"{qualified} must not contain duplicates")
+            result[field] = parts
+        else:
+            result[field] = _exact_nonempty_string(item, qualified)
+    return MappingProxyType(result)
+
+
+def _human_approval_binding(value: Mapping[str, Any]) -> Mapping[str, Any]:
+    scalar_fields = HUMAN_APPROVAL_BINDING_FIELDS - {
+        "approval_envelopes", "approval_verifications", "approval_use"
+    }
+    if not isinstance(value, Mapping):
+        raise ValueError("human_approval_binding must be an object")
+    _require_exact_fields(value, HUMAN_APPROVAL_BINDING_FIELDS, "human_approval_binding")
+    result = dict(_strict_approval_record(
+        {field: value[field] for field in scalar_fields}, scalar_fields,
+        "human_approval_binding",
+        integer_fields=frozenset({
+            "policy_generation", "request_generation", "credential_generation",
+            "objective_generation", "session_generation",
+        }),
+    ))
+    raw_envelopes = value["approval_envelopes"]
+    if not isinstance(raw_envelopes, (list, tuple)) or not raw_envelopes:
+        raise ValueError("human_approval_binding.approval_envelopes must be non-empty")
+    result["approval_envelopes"] = tuple(
+        _strict_approval_record(
+            item, HUMAN_APPROVAL_ENVELOPE_FIELDS, "approval envelope",
+            integer_fields=frozenset({
+                "approval_generation", "approver_generation",
+                "approval_source_generation", "policy_generation",
+                "request_generation", "session_generation", "issuance_order",
+                "expiry_order", "maximum_uses",
+            }),
+        )
+        for item in raw_envelopes
+    )
+    raw_verifications = value["approval_verifications"]
+    if not isinstance(raw_verifications, (list, tuple)) or not raw_verifications:
+        raise ValueError("human_approval_binding.approval_verifications must be non-empty")
+    result["approval_verifications"] = tuple(
+        _strict_approval_record(
+            item, HUMAN_APPROVAL_VERIFICATION_FIELDS, "approval verification",
+            integer_fields=frozenset({
+                "approval_generation", "verifier_generation",
+                "approval_source_generation", "verification_event_order",
+                "authority_generation",
+            }),
+        )
+        for item in raw_verifications
+    )
+    result["approval_use"] = _strict_approval_record(
+        value["approval_use"], HUMAN_APPROVAL_USE_FIELDS, "approval use",
+        integer_fields=frozenset({
+            "request_generation", "session_generation", "use_position",
+            "use_event_order",
+        }),
+        array_fields=frozenset({"approval_ids"}),
+    )
+    return MappingProxyType(result)
+
+
 @dataclass(frozen=True)
 class OracleInput:
     schema_version: str
@@ -1932,6 +2053,7 @@ class OracleInput:
     t3_binding_facts: ObjectiveBindingFacts
     observation_binding: ObservationBinding | None
     observation_freshness: ObservationFreshness | None
+    human_approval_binding: Mapping[str, Any] | None
     trusted_commitment_context: tuple[Mapping[str, Any], ...]
     trusted_anchor_context: tuple[Mapping[str, Any], ...]
     required_facts: tuple[str, ...]
@@ -2027,6 +2149,12 @@ class OracleInput:
             and not isinstance(observation_freshness_fact.value, str)
         ):
             raise ValueError("KNOWN freshness requires a typed object or legacy string")
+        human_approval_binding = None
+        approval_fact = facts.get("human_approval_binding")
+        if approval_fact is not None and approval_fact.state is FactState.KNOWN:
+            if not isinstance(approval_fact.value, Mapping):
+                raise ValueError("KNOWN human_approval_binding requires a typed object")
+            human_approval_binding = _human_approval_binding(approval_fact.value)
         raw_context = fixture.get("_trusted_commitment_context", ())
         if not isinstance(raw_context, (list, tuple)) or not all(
             isinstance(item, Mapping) for item in raw_context
@@ -2051,6 +2179,7 @@ class OracleInput:
             t3_binding_facts=ObjectiveBindingFacts.from_facts(facts),
             observation_binding=observation_binding,
             observation_freshness=observation_freshness,
+            human_approval_binding=human_approval_binding,
             trusted_commitment_context=tuple(MappingProxyType(dict(item)) for item in raw_context),
             trusted_anchor_context=tuple(
                 validate_trusted_anchor_context(item) for item in raw_anchor_context
@@ -2257,6 +2386,43 @@ TRUSTED_DELEGATION_TERMINAL_USE_FIELDS = frozenset({
     "use_event_order", "freshness_challenge_id", "lifecycle_state",
 })
 
+TRUSTED_HUMAN_APPROVAL_POLICY_FIELDS = frozenset({
+    "relationship", "policy_id", "policy_generation", "requirement",
+    "selection_rule", "required_roles", "required_approver_count",
+    "required_effective_domains", "use_policy", "maximum_uses", "artifact",
+    "effect", "subject_id", "executor_id", "delegation_chain_id",
+    "tool_backend_id", "credential_generation", "execution_context", "boundary",
+    "boundary_epoch", "objective_id", "objective_generation",
+    "decision_contract_id", "decision_contract_version", "grant_id", "session_id",
+    "session_generation", "transformation_id", "source_id", "authority_generation",
+    "ordering_source_id", "freshness_challenge_id", "lifecycle_state",
+    "approval_verifier_id", "approval_verifier_generation",
+})
+TRUSTED_HUMAN_APPROVER_FIELDS = frozenset({
+    "relationship", "approver_id", "approver_generation", "identity_basis",
+    "approval_source_id", "approval_source_generation", "roles",
+    "effective_domain", "start_event_order", "end_event_order", "boundary",
+    "boundary_epoch", "source_id", "authority_generation", "ordering_source_id",
+    "freshness_challenge_id", "lifecycle_state",
+})
+TRUSTED_HUMAN_APPROVAL_LIFECYCLE_FIELDS = frozenset({
+    "relationship", "approval_id", "approval_generation", "state", "event_order",
+    "source_id", "authority_generation", "boundary", "boundary_epoch",
+})
+TRUSTED_HUMAN_APPROVAL_HEAD_FIELDS = frozenset({
+    "relationship", "policy_id", "policy_generation", "request_id",
+    "request_generation", "request_digest", "effect_digest", "approval_ids",
+    "head_event_order", "source_id",
+    "authority_generation", "ordering_source_id", "boundary", "boundary_epoch",
+    "freshness_challenge_id", "lifecycle_state",
+})
+TRUSTED_HUMAN_APPROVAL_USE_STATE_FIELDS = frozenset({
+    "relationship", "approval_id", "approval_generation", "request_id",
+    "request_generation", "session_id", "session_generation", "accepted_use_count",
+    "next_use_position", "last_use_id", "source_id", "authority_generation",
+    "boundary", "boundary_epoch", "freshness_challenge_id", "lifecycle_state",
+})
+
 
 def _trusted_exact_record(value: Any, fields: frozenset[str], name: str) -> Mapping[str, Any]:
     if not isinstance(value, Mapping):
@@ -2416,6 +2582,60 @@ def _trusted_delegation_context(value: Any) -> Mapping[str, Any]:
     return MappingProxyType(result)
 
 
+def _trusted_human_approval_context(value: Any) -> Mapping[str, Any]:
+    name = "trusted human_approval_authority_context"
+    fields = {
+        "approval_policy", "approver_admissions", "approval_lifecycle_records",
+        "approval_ordering_heads", "approval_use_states",
+    }
+    if not isinstance(value, Mapping):
+        raise ValueError(f"{name} must be an object")
+    _require_exact_fields(value, fields, name)
+    result: dict[str, Any] = {}
+    result["approval_policy"] = _trusted_control_record(
+        value["approval_policy"], TRUSTED_HUMAN_APPROVAL_POLICY_FIELDS,
+        "trusted human approval policy",
+        integer_fields=frozenset({
+            "policy_generation", "required_approver_count", "maximum_uses",
+            "credential_generation", "objective_generation", "session_generation",
+            "authority_generation", "approval_verifier_generation",
+        }),
+        array_fields=frozenset({"required_roles", "required_effective_domains"}),
+    )
+    specs = (
+        ("approver_admissions", TRUSTED_HUMAN_APPROVER_FIELDS,
+         frozenset({
+             "approver_generation", "approval_source_generation",
+             "start_event_order", "end_event_order", "authority_generation",
+         }), frozenset({"roles"})),
+        ("approval_lifecycle_records", TRUSTED_HUMAN_APPROVAL_LIFECYCLE_FIELDS,
+         frozenset({"approval_generation", "event_order", "authority_generation"}),
+         frozenset()),
+        ("approval_ordering_heads", TRUSTED_HUMAN_APPROVAL_HEAD_FIELDS,
+         frozenset({
+             "policy_generation", "request_generation", "head_event_order",
+             "authority_generation",
+         }), frozenset({"approval_ids"})),
+        ("approval_use_states", TRUSTED_HUMAN_APPROVAL_USE_STATE_FIELDS,
+         frozenset({
+             "approval_generation", "request_generation", "session_generation",
+             "accepted_use_count", "next_use_position", "authority_generation",
+         }), frozenset()),
+    )
+    for field, record_fields, integer_fields, array_fields in specs:
+        raw = value[field]
+        if not isinstance(raw, list):
+            raise ValueError(f"trusted {field} must be an array")
+        result[field] = tuple(
+            _trusted_control_record(
+                item, record_fields, f"trusted {field} record",
+                integer_fields=integer_fields, array_fields=array_fields,
+            )
+            for item in raw
+        )
+    return MappingProxyType(result)
+
+
 def validate_trusted_anchor_context(value: Mapping[str, Any]) -> Mapping[str, Any]:
     """Validate harness-owned adapter/domain authority without trusting fixture input."""
     result = dict(value)
@@ -2522,6 +2742,9 @@ def validate_trusted_anchor_context(value: Mapping[str, Any]) -> Mapping[str, An
     )
     result["delegation_authority_context"] = _trusted_delegation_context(
         value.get("delegation_authority_context")
+    )
+    result["human_approval_authority_context"] = _trusted_human_approval_context(
+        value.get("human_approval_authority_context")
     )
     reconciliation = value.get("cross_domain_reconciliation")
     result["cross_domain_reconciliation"] = (

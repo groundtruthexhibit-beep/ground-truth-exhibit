@@ -41,6 +41,9 @@ from authority_lab.oracle import (
     RELATIONAL_MUTATION_TARGETS,
     STATE_MUTATION_TARGETS,
     evaluate,
+    human_approval_effect_digest,
+    human_approval_envelope_digest,
+    human_approval_request_digest,
 )
 from authority_lab.runner import discover, format_trace, load_fixture, run_fixture, run_path
 
@@ -364,9 +367,9 @@ class AuthorityLabTests(unittest.TestCase):
         self.assertIs(AuthorityOutcome.UNAVAILABLE, result.outcome)
         self.assertIn(reason_code, {reason.code for reason in result.reasons})
 
-    def test_v1_contains_two_hundred_eighty_seven_deterministic_fixtures(self) -> None:
+    def test_v1_contains_three_hundred_forty_two_deterministic_fixtures(self) -> None:
         paths = discover(CASES)
-        self.assertEqual(287, len(paths))
+        self.assertEqual(342, len(paths))
         self.assertEqual(paths, discover(CASES))
 
     def test_every_v0_fixture_matches_its_expected_outcome(self) -> None:
@@ -2300,6 +2303,135 @@ class AuthorityLabTests(unittest.TestCase):
         ):
             with self.subTest(case_id=case_id):
                 self.assertIs(AuthorityOutcome.AUTHORIZED, actual(fixture(case_id)))
+
+    def test_human_approval_hostile_matrix_matches_independent_expectations(self) -> None:
+        authorized = {309, 315, 334, 337, 338, 339, 340, 341, 342}
+        denied = {313, 314, 332}
+        for number in range(288, 343):
+            case_id = f"LAB-V1-{number:03d}"
+            expected = (
+                AuthorityOutcome.AUTHORIZED
+                if number in authorized
+                else AuthorityOutcome.DENIED
+                if number in denied
+                else AuthorityOutcome.UNAVAILABLE
+            )
+            with self.subTest(case_id=case_id):
+                self.assertIs(expected, actual(fixture(case_id)))
+
+    def test_generic_yes_and_unadmitted_approvers_fail_closed(self) -> None:
+        self.assert_unavailable_with_reason(
+            fixture("LAB-V1-288"), "HUMAN_APPROVAL_RELATIONSHIP_UNAVAILABLE"
+        )
+        for case_id in ("LAB-V1-289", "LAB-V1-290", "LAB-V1-291"):
+            with self.subTest(case_id=case_id):
+                self.assertIs(AuthorityOutcome.UNAVAILABLE, actual(fixture(case_id)))
+
+    def test_approval_is_exactly_bound_to_effect_and_execution_context(self) -> None:
+        for case_id in (
+            "LAB-V1-292", "LAB-V1-293", "LAB-V1-294", "LAB-V1-295",
+            "LAB-V1-296", "LAB-V1-297", "LAB-V1-298", "LAB-V1-299",
+            "LAB-V1-300", "LAB-V1-301", "LAB-V1-302", "LAB-V1-303",
+            "LAB-V1-304",
+        ):
+            with self.subTest(case_id=case_id):
+                self.assertIs(AuthorityOutcome.UNAVAILABLE, actual(fixture(case_id)))
+
+    def test_approval_lifecycle_and_durable_use_state_fail_closed(self) -> None:
+        for case_id in (
+            "LAB-V1-305", "LAB-V1-306", "LAB-V1-307", "LAB-V1-308",
+            "LAB-V1-310", "LAB-V1-311", "LAB-V1-312", "LAB-V1-316",
+            "LAB-V1-317", "LAB-V1-318", "LAB-V1-319",
+        ):
+            with self.subTest(case_id=case_id):
+                self.assertIs(AuthorityOutcome.UNAVAILABLE, actual(fixture(case_id)))
+        for case_id in ("LAB-V1-313", "LAB-V1-314"):
+            with self.subTest(case_id=case_id):
+                self.assertIs(AuthorityOutcome.DENIED, actual(fixture(case_id)))
+
+    def test_approval_transformation_and_delayed_execution_require_revalidation(self) -> None:
+        for case_id in range(320, 330):
+            with self.subTest(case_id=case_id):
+                self.assertIs(
+                    AuthorityOutcome.UNAVAILABLE,
+                    actual(fixture(f"LAB-V1-{case_id:03d}")),
+                )
+
+    def test_human_approval_cannot_override_other_authority_failures(self) -> None:
+        expected = {
+            "LAB-V1-330": AuthorityOutcome.UNAVAILABLE,
+            "LAB-V1-331": AuthorityOutcome.UNAVAILABLE,
+            "LAB-V1-332": AuthorityOutcome.DENIED,
+        }
+        for case_id, outcome in expected.items():
+            with self.subTest(case_id=case_id):
+                self.assertIs(outcome, actual(fixture(case_id)))
+
+    def test_multi_human_policy_counts_effective_domains(self) -> None:
+        self.assertIs(AuthorityOutcome.UNAVAILABLE, actual(fixture("LAB-V1-333")))
+        self.assertIs(AuthorityOutcome.AUTHORIZED, actual(fixture("LAB-V1-334")))
+        self.assertIs(AuthorityOutcome.UNAVAILABLE, actual(fixture("LAB-V1-335")))
+
+    def test_approval_positive_paths_remain_reachable(self) -> None:
+        for case_id in (
+            "LAB-V1-309", "LAB-V1-315", "LAB-V1-337", "LAB-V1-338",
+            "LAB-V1-339", "LAB-V1-340", "LAB-V1-341", "LAB-V1-342",
+        ):
+            with self.subTest(case_id=case_id):
+                self.assertIs(AuthorityOutcome.AUTHORIZED, actual(fixture(case_id)))
+
+    def test_candidate_cannot_supply_trusted_human_approval_context(self) -> None:
+        path = CASES / "LAB-V1-338.json"
+        raw = json.loads(path.read_text(encoding="utf-8"))
+        raw["_trusted_human_approval_context"] = {}
+        with patch("authority_lab.runner.Path.open") as opened:
+            opened.return_value.__enter__.return_value.read.return_value = json.dumps(raw)
+            opened.return_value.__enter__.return_value.__iter__.return_value = iter(())
+            with self.assertRaisesRegex(ValueError, "trusted human approval"):
+                load_fixture(path)
+
+    def test_human_approval_protected_records_are_strictly_typed(self) -> None:
+        payload = fixture("LAB-V1-338")
+        parsed = OracleInput.from_fixture(deepcopy(payload))
+        context = parsed.trusted_anchor_context[0]["human_approval_authority_context"]
+        self.assertIsInstance(context["approval_policy"]["required_roles"], tuple)
+        self.assertIsInstance(context["approver_admissions"], tuple)
+        payload["_trusted_anchor_context"][0]["human_approval_authority_context"][
+            "approval_policy"
+        ]["trusted"] = True
+        with self.assertRaisesRegex(ValueError, "contain exactly"):
+            OracleInput.from_fixture(payload)
+
+    def test_approval_digests_bind_effect_not_display_authority(self) -> None:
+        binding = fixture("LAB-V1-338")["t3"]["facts"]["human_approval_binding"]["value"]
+        effect = human_approval_effect_digest(binding)
+        request = human_approval_request_digest(binding)
+        changed = deepcopy(binding)
+        changed["display_digest"] = "UNTRUSTED-DISPLAY-CHANGE"
+        self.assertEqual(effect, human_approval_effect_digest(changed))
+        self.assertNotEqual(request, human_approval_request_digest(changed))
+        changed = deepcopy(binding)
+        changed["effect"] = "DELETE"
+        self.assertNotEqual(effect, human_approval_effect_digest(changed))
+
+    def test_candidate_recomputation_cannot_replace_protected_approved_request(self) -> None:
+        payload = fixture("LAB-V1-338")
+        binding = payload["t3"]["facts"]["human_approval_binding"]["value"]
+        binding["display_digest"] = "ATTACKER-REPLACED-DISPLAY"
+        binding["effect_digest"] = human_approval_effect_digest(binding)
+        binding["request_digest"] = human_approval_request_digest(binding)
+        for envelope, verification in zip(
+            binding["approval_envelopes"], binding["approval_verifications"]
+        ):
+            envelope["effect_digest"] = binding["effect_digest"]
+            envelope["request_digest"] = binding["request_digest"]
+            envelope["canonical_payload_digest"] = human_approval_envelope_digest(envelope)
+            verification["envelope_digest"] = envelope["canonical_payload_digest"]
+        binding["approval_use"]["effect_digest"] = binding["effect_digest"]
+        binding["approval_use"]["request_digest"] = binding["request_digest"]
+        self.assert_unavailable_with_reason(
+            payload, "HUMAN_APPROVAL_ORDERING_UNAVAILABLE"
+        )
 
     def test_grant_shopping_and_conflict_fail_closed(self) -> None:
         for case_id in ("LAB-V1-283", "LAB-V1-284"):
