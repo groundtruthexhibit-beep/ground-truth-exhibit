@@ -453,9 +453,9 @@ class AuthorityLabTests(unittest.TestCase):
         self.assertIs(AuthorityOutcome.UNAVAILABLE, result.outcome)
         self.assertIn(reason_code, {reason.code for reason in result.reasons})
 
-    def test_v1_contains_four_hundred_forty_three_deterministic_fixtures(self) -> None:
+    def test_v1_contains_four_hundred_sixty_six_deterministic_fixtures(self) -> None:
         paths = discover(CASES)
-        self.assertEqual(443, len(paths))
+        self.assertEqual(466, len(paths))
         self.assertEqual(paths, discover(CASES))
 
     def test_every_v0_fixture_matches_its_expected_outcome(self) -> None:
@@ -2733,6 +2733,43 @@ class AuthorityLabTests(unittest.TestCase):
         for case_id in ("LAB-V1-098", "LAB-V1-099", "LAB-V1-102", "LAB-V1-111", "LAB-V1-112"):
             with self.subTest(case_id=case_id):
                 self.assertIs(AuthorityOutcome.AUTHORIZED, actual(fixture(case_id)))
+
+    def test_composite_adversarial_control_continuity_matrix(self) -> None:
+        unavailable = (
+            "LAB-V1-444", "LAB-V1-447", "LAB-V1-449", "LAB-V1-450",
+            "LAB-V1-451", "LAB-V1-452", "LAB-V1-453", "LAB-V1-454",
+            "LAB-V1-457", "LAB-V1-458", "LAB-V1-459", "LAB-V1-460",
+            "LAB-V1-461",
+        )
+        denied = ("LAB-V1-446", "LAB-V1-456", "LAB-V1-462", "LAB-V1-463")
+        authorized = (
+            "LAB-V1-445", "LAB-V1-448", "LAB-V1-455", "LAB-V1-464",
+            "LAB-V1-465", "LAB-V1-466",
+        )
+        for expected, case_ids in (
+            (AuthorityOutcome.UNAVAILABLE, unavailable),
+            (AuthorityOutcome.DENIED, denied),
+            (AuthorityOutcome.AUTHORIZED, authorized),
+        ):
+            for case_id in case_ids:
+                with self.subTest(case_id=case_id):
+                    self.assertIs(expected, actual(fixture(case_id)))
+
+    def test_full_composite_positive_joins_all_authority_layers_at_t3(self) -> None:
+        payload = fixture("LAB-V1-464")
+        required = set(payload["t3"]["required_facts"])
+        self.assertIn("human_approval_binding", required)
+        self.assertIn("delegation_binding", required)
+        self.assertIn("tool_connector_use_binding", required)
+        anchor = payload["_trusted_anchor_context"][0]
+        self.assertNotEqual("NONE", anchor["t3_execution_event"]["approval_use_id"])
+        self.assertEqual(
+            anchor["t3_execution_event"]["event_order"],
+            anchor["tool_connector_authority_context"]["protected_terminal_uses"][0][
+                "use_event_order"
+            ],
+        )
+        self.assertIs(AuthorityOutcome.AUTHORIZED, actual(payload))
 
     def test_fixture_files_are_valid_json_objects(self) -> None:
         for path in discover(CASES):

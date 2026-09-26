@@ -5752,5 +5752,304 @@
       "stream_generation": 1,
       "stream_id": "STREAM-LAB-V1-032-1"
     }
+  ],
+  "LAB-V1-444.json": [
+    {
+      "checkpoint_id": "CHECKPOINT-LAB-V0-010-1",
+      "current_verifier_state_digest": "9c15fce53f7c19774c24852468b4db1fa96b02cd71ff3bf4fc677360d3041d93",
+      "exact_state_key_digest": "84ddcde51fb3c33fe5ad969da45c58b6d241446dcd16010e0929a2d5d17e263c",
+      "freshness_challenge_id": "CHALLENGE-LAB-V0-010-1",
+      "head_commitment_digest": "d4c48719083f36acdb0b057a3df19e8fe868151f8ae8ad6b2c36a307425d9132",
+      "head_logical_position": 0,
+      "previous_verifier_state_digest": "GENESIS-STATE",
+      "stream_generation": 1,
+      "stream_id": "STREAM-LAB-V0-010-1"
+    }
+  ],
+  "LAB-V1-445.json": [
+    {
+      "checkpoint_id": "CHECKPOINT-LAB-V0-010-1",
+      "current_verifier_state_digest": "9c15fce53f7c19774c24852468b4db1fa96b02cd71ff3bf4fc677360d3041d93",
+      "exact_state_key_digest": "84ddcde51fb3c33fe5ad969da45c58b6d241446dcd16010e0929a2d5d17e263c",
+      "freshness_challenge_id": "CHALLENGE-LAB-V0-010-1",
+      "head_commitment_digest": "d4c48719083f36acdb0b057a3df19e8fe868151f8ae8ad6b2c36a307425d9132",
+      "head_logical_position": 0,
+      "previous_verifier_state_digest": "GENESIS-STATE",
+      "stream_generation": 1,
+      "stream_id": "STREAM-LAB-V0-010-1"
+    }
+  ],
+  "LAB-V1-446.json": [
+    {
+      "checkpoint_id": "CHECKPOINT-LAB-V0-010-1",
+      "current_verifier_state_digest": "9c15fce53f7c19774c24852468b4db1fa96b02cd71ff3bf4fc677360d3041d93",
+      "exact_state_key_digest": "84ddcde51fb3c33fe5ad969da45c58b6d241446dcd16010e0929a2d5d17e263c",
+      "freshness_challenge_id": "CHALLENGE-LAB-V0-010-1",
+      "head_commitment_digest": "d4c48719083f36acdb0b057a3df19e8fe868151f8ae8ad6b2c36a307425d9132",
+      "head_logical_position": 0,
+      "previous_verifier_state_digest": "GENESIS-STATE",
+      "stream_generation": 1,
+      "stream_id": "STREAM-LAB-V0-010-1"
+    }
+  ],
+  "LAB-V1-447.json": [
+    {
+      "checkpoint_id": "CHECKPOINT-LAB-V0-010-1",
+      "current_verifier_state_digest": "9c15fce53f7c19774c24852468b4db1fa96b02cd71ff3bf4fc677360d3041d93",
+      "exact_state_key_digest": "84ddcde51fb3c33fe5ad969da45c58b6d241446dcd16010e0929a2d5d17e263c",
+      "freshness_challenge_id": "CHALLENGE-LAB-V0-010-1",
+      "head_commitment_digest": "d4c48719083f36acdb0b057a3df19e8fe868151f8ae8ad6b2c36a307425d9132",
+      "head_logical_position": 0,
+      "previous_verifier_state_digest": "GENESIS-STATE",
+      "stream_generation": 1,
+      "stream_id": "STREAM-LAB-V0-010-1"
+    }
+  ],
+  "LAB-V1-448.json": [
+    {
+      "checkpoint_id": "CHECKPOINT-LAB-V1-032-1",
+      "current_verifier_state_digest": "49aa2b670f37240b578df82566a464e71c2ef408d4140a152bd1eacdf3cb3421",
+      "exact_state_key_digest": "337ddd290a1b35b63232c658bfdbb5a6286338f0d443606c2c226997b2faedb9",
+      "freshness_challenge_id": "CHALLENGE-LAB-V1-032-1",
+      "head_commitment_digest": "810cb859e2e0688a32fc9ddaffe6e64fe2f876e164adafd28f75da4e917f3cb5",
+      "head_logical_position": 0,
+      "previous_verifier_state_digest": "GENESIS-STATE",
+      "stream_generation": 1,
+      "stream_id": "STREAM-LAB-V1-032-1"
+    }
+  ],
+  "LAB-V1-449.json": [
+    {
+      "checkpoint_id": "CHECKPOINT-LAB-V0-010-1",
+      "current_verifier_state_digest": "9c15fce53f7c19774c24852468b4db1fa96b02cd71ff3bf4fc677360d3041d93",
+      "exact_state_key_digest": "84ddcde51fb3c33fe5ad969da45c58b6d241446dcd16010e0929a2d5d17e263c",
+      "freshness_challenge_id": "CHALLENGE-LAB-V0-010-1",
+      "head_commitment_digest": "d4c48719083f36acdb0b057a3df19e8fe868151f8ae8ad6b2c36a307425d9132",
+      "head_logical_position": 0,
+      "previous_verifier_state_digest": "GENESIS-STATE",
+      "stream_generation": 1,
+      "stream_id": "STREAM-LAB-V0-010-1"
+    }
+  ],
+  "LAB-V1-450.json": [
+    {
+      "checkpoint_id": "CHECKPOINT-LAB-V1-032-1",
+      "current_verifier_state_digest": "49aa2b670f37240b578df82566a464e71c2ef408d4140a152bd1eacdf3cb3421",
+      "exact_state_key_digest": "337ddd290a1b35b63232c658bfdbb5a6286338f0d443606c2c226997b2faedb9",
+      "freshness_challenge_id": "CHALLENGE-LAB-V1-032-1",
+      "head_commitment_digest": "810cb859e2e0688a32fc9ddaffe6e64fe2f876e164adafd28f75da4e917f3cb5",
+      "head_logical_position": 0,
+      "previous_verifier_state_digest": "GENESIS-STATE",
+      "stream_generation": 1,
+      "stream_id": "STREAM-LAB-V1-032-1"
+    }
+  ],
+  "LAB-V1-451.json": [
+    {
+      "checkpoint_id": "CHECKPOINT-LAB-V0-010-1",
+      "current_verifier_state_digest": "9c15fce53f7c19774c24852468b4db1fa96b02cd71ff3bf4fc677360d3041d93",
+      "exact_state_key_digest": "84ddcde51fb3c33fe5ad969da45c58b6d241446dcd16010e0929a2d5d17e263c",
+      "freshness_challenge_id": "CHALLENGE-LAB-V0-010-1",
+      "head_commitment_digest": "d4c48719083f36acdb0b057a3df19e8fe868151f8ae8ad6b2c36a307425d9132",
+      "head_logical_position": 0,
+      "previous_verifier_state_digest": "GENESIS-STATE",
+      "stream_generation": 1,
+      "stream_id": "STREAM-LAB-V0-010-1"
+    }
+  ],
+  "LAB-V1-452.json": [
+    {
+      "checkpoint_id": "CHECKPOINT-LAB-V1-032-1",
+      "current_verifier_state_digest": "49aa2b670f37240b578df82566a464e71c2ef408d4140a152bd1eacdf3cb3421",
+      "exact_state_key_digest": "337ddd290a1b35b63232c658bfdbb5a6286338f0d443606c2c226997b2faedb9",
+      "freshness_challenge_id": "CHALLENGE-LAB-V1-032-1",
+      "head_commitment_digest": "810cb859e2e0688a32fc9ddaffe6e64fe2f876e164adafd28f75da4e917f3cb5",
+      "head_logical_position": 0,
+      "previous_verifier_state_digest": "GENESIS-STATE",
+      "stream_generation": 1,
+      "stream_id": "STREAM-LAB-V1-032-1"
+    }
+  ],
+  "LAB-V1-453.json": [
+    {
+      "checkpoint_id": "CHECKPOINT-LAB-V1-032-1",
+      "current_verifier_state_digest": "49aa2b670f37240b578df82566a464e71c2ef408d4140a152bd1eacdf3cb3421",
+      "exact_state_key_digest": "337ddd290a1b35b63232c658bfdbb5a6286338f0d443606c2c226997b2faedb9",
+      "freshness_challenge_id": "CHALLENGE-LAB-V1-032-1",
+      "head_commitment_digest": "810cb859e2e0688a32fc9ddaffe6e64fe2f876e164adafd28f75da4e917f3cb5",
+      "head_logical_position": 0,
+      "previous_verifier_state_digest": "GENESIS-STATE",
+      "stream_generation": 1,
+      "stream_id": "STREAM-LAB-V1-032-1"
+    }
+  ],
+  "LAB-V1-454.json": [
+    {
+      "checkpoint_id": "CHECKPOINT-LAB-V0-010-1",
+      "current_verifier_state_digest": "9c15fce53f7c19774c24852468b4db1fa96b02cd71ff3bf4fc677360d3041d93",
+      "exact_state_key_digest": "84ddcde51fb3c33fe5ad969da45c58b6d241446dcd16010e0929a2d5d17e263c",
+      "freshness_challenge_id": "CHALLENGE-LAB-V0-010-1",
+      "head_commitment_digest": "d4c48719083f36acdb0b057a3df19e8fe868151f8ae8ad6b2c36a307425d9132",
+      "head_logical_position": 0,
+      "previous_verifier_state_digest": "GENESIS-STATE",
+      "stream_generation": 1,
+      "stream_id": "STREAM-LAB-V0-010-1"
+    }
+  ],
+  "LAB-V1-455.json": [
+    {
+      "checkpoint_id": "CHECKPOINT-LAB-V0-010-1",
+      "current_verifier_state_digest": "9c15fce53f7c19774c24852468b4db1fa96b02cd71ff3bf4fc677360d3041d93",
+      "exact_state_key_digest": "84ddcde51fb3c33fe5ad969da45c58b6d241446dcd16010e0929a2d5d17e263c",
+      "freshness_challenge_id": "CHALLENGE-LAB-V0-010-1",
+      "head_commitment_digest": "d4c48719083f36acdb0b057a3df19e8fe868151f8ae8ad6b2c36a307425d9132",
+      "head_logical_position": 0,
+      "previous_verifier_state_digest": "GENESIS-STATE",
+      "stream_generation": 1,
+      "stream_id": "STREAM-LAB-V0-010-1"
+    }
+  ],
+  "LAB-V1-456.json": [
+    {
+      "checkpoint_id": "CHECKPOINT-LAB-V0-010-1",
+      "current_verifier_state_digest": "9c15fce53f7c19774c24852468b4db1fa96b02cd71ff3bf4fc677360d3041d93",
+      "exact_state_key_digest": "84ddcde51fb3c33fe5ad969da45c58b6d241446dcd16010e0929a2d5d17e263c",
+      "freshness_challenge_id": "CHALLENGE-LAB-V0-010-1",
+      "head_commitment_digest": "d4c48719083f36acdb0b057a3df19e8fe868151f8ae8ad6b2c36a307425d9132",
+      "head_logical_position": 0,
+      "previous_verifier_state_digest": "GENESIS-STATE",
+      "stream_generation": 1,
+      "stream_id": "STREAM-LAB-V0-010-1"
+    }
+  ],
+  "LAB-V1-457.json": [
+    {
+      "checkpoint_id": "CHECKPOINT-LAB-V0-010-1",
+      "current_verifier_state_digest": "9c15fce53f7c19774c24852468b4db1fa96b02cd71ff3bf4fc677360d3041d93",
+      "exact_state_key_digest": "84ddcde51fb3c33fe5ad969da45c58b6d241446dcd16010e0929a2d5d17e263c",
+      "freshness_challenge_id": "CHALLENGE-LAB-V0-010-1",
+      "head_commitment_digest": "d4c48719083f36acdb0b057a3df19e8fe868151f8ae8ad6b2c36a307425d9132",
+      "head_logical_position": 0,
+      "previous_verifier_state_digest": "GENESIS-STATE",
+      "stream_generation": 1,
+      "stream_id": "STREAM-LAB-V0-010-1"
+    }
+  ],
+  "LAB-V1-458.json": [
+    {
+      "checkpoint_id": "CHECKPOINT-LAB-V0-010-1",
+      "current_verifier_state_digest": "9c15fce53f7c19774c24852468b4db1fa96b02cd71ff3bf4fc677360d3041d93",
+      "exact_state_key_digest": "84ddcde51fb3c33fe5ad969da45c58b6d241446dcd16010e0929a2d5d17e263c",
+      "freshness_challenge_id": "CHALLENGE-LAB-V0-010-1",
+      "head_commitment_digest": "d4c48719083f36acdb0b057a3df19e8fe868151f8ae8ad6b2c36a307425d9132",
+      "head_logical_position": 0,
+      "previous_verifier_state_digest": "GENESIS-STATE",
+      "stream_generation": 1,
+      "stream_id": "STREAM-LAB-V0-010-1"
+    }
+  ],
+  "LAB-V1-459.json": [
+    {
+      "checkpoint_id": "CHECKPOINT-LAB-V0-010-1",
+      "current_verifier_state_digest": "9c15fce53f7c19774c24852468b4db1fa96b02cd71ff3bf4fc677360d3041d93",
+      "exact_state_key_digest": "84ddcde51fb3c33fe5ad969da45c58b6d241446dcd16010e0929a2d5d17e263c",
+      "freshness_challenge_id": "CHALLENGE-LAB-V0-010-1",
+      "head_commitment_digest": "d4c48719083f36acdb0b057a3df19e8fe868151f8ae8ad6b2c36a307425d9132",
+      "head_logical_position": 0,
+      "previous_verifier_state_digest": "GENESIS-STATE",
+      "stream_generation": 1,
+      "stream_id": "STREAM-LAB-V0-010-1"
+    }
+  ],
+  "LAB-V1-460.json": [
+    {
+      "checkpoint_id": "CHECKPOINT-LAB-V1-032-1",
+      "current_verifier_state_digest": "49aa2b670f37240b578df82566a464e71c2ef408d4140a152bd1eacdf3cb3421",
+      "exact_state_key_digest": "337ddd290a1b35b63232c658bfdbb5a6286338f0d443606c2c226997b2faedb9",
+      "freshness_challenge_id": "CHALLENGE-LAB-V1-032-1",
+      "head_commitment_digest": "810cb859e2e0688a32fc9ddaffe6e64fe2f876e164adafd28f75da4e917f3cb5",
+      "head_logical_position": 0,
+      "previous_verifier_state_digest": "GENESIS-STATE",
+      "stream_generation": 1,
+      "stream_id": "STREAM-LAB-V1-032-1"
+    }
+  ],
+  "LAB-V1-461.json": [
+    {
+      "checkpoint_id": "CHECKPOINT-LAB-V0-010-1",
+      "current_verifier_state_digest": "9c15fce53f7c19774c24852468b4db1fa96b02cd71ff3bf4fc677360d3041d93",
+      "exact_state_key_digest": "84ddcde51fb3c33fe5ad969da45c58b6d241446dcd16010e0929a2d5d17e263c",
+      "freshness_challenge_id": "CHALLENGE-LAB-V0-010-1",
+      "head_commitment_digest": "d4c48719083f36acdb0b057a3df19e8fe868151f8ae8ad6b2c36a307425d9132",
+      "head_logical_position": 0,
+      "previous_verifier_state_digest": "GENESIS-STATE",
+      "stream_generation": 1,
+      "stream_id": "STREAM-LAB-V0-010-1"
+    }
+  ],
+  "LAB-V1-462.json": [
+    {
+      "checkpoint_id": "CHECKPOINT-LAB-V0-010-1",
+      "current_verifier_state_digest": "9c15fce53f7c19774c24852468b4db1fa96b02cd71ff3bf4fc677360d3041d93",
+      "exact_state_key_digest": "84ddcde51fb3c33fe5ad969da45c58b6d241446dcd16010e0929a2d5d17e263c",
+      "freshness_challenge_id": "CHALLENGE-LAB-V0-010-1",
+      "head_commitment_digest": "d4c48719083f36acdb0b057a3df19e8fe868151f8ae8ad6b2c36a307425d9132",
+      "head_logical_position": 0,
+      "previous_verifier_state_digest": "GENESIS-STATE",
+      "stream_generation": 1,
+      "stream_id": "STREAM-LAB-V0-010-1"
+    }
+  ],
+  "LAB-V1-463.json": [
+    {
+      "checkpoint_id": "CHECKPOINT-LAB-V0-010-1",
+      "current_verifier_state_digest": "9c15fce53f7c19774c24852468b4db1fa96b02cd71ff3bf4fc677360d3041d93",
+      "exact_state_key_digest": "84ddcde51fb3c33fe5ad969da45c58b6d241446dcd16010e0929a2d5d17e263c",
+      "freshness_challenge_id": "CHALLENGE-LAB-V0-010-1",
+      "head_commitment_digest": "d4c48719083f36acdb0b057a3df19e8fe868151f8ae8ad6b2c36a307425d9132",
+      "head_logical_position": 0,
+      "previous_verifier_state_digest": "GENESIS-STATE",
+      "stream_generation": 1,
+      "stream_id": "STREAM-LAB-V0-010-1"
+    }
+  ],
+  "LAB-V1-464.json": [
+    {
+      "checkpoint_id": "CHECKPOINT-LAB-V0-010-1",
+      "current_verifier_state_digest": "9c15fce53f7c19774c24852468b4db1fa96b02cd71ff3bf4fc677360d3041d93",
+      "exact_state_key_digest": "84ddcde51fb3c33fe5ad969da45c58b6d241446dcd16010e0929a2d5d17e263c",
+      "freshness_challenge_id": "CHALLENGE-LAB-V0-010-1",
+      "head_commitment_digest": "d4c48719083f36acdb0b057a3df19e8fe868151f8ae8ad6b2c36a307425d9132",
+      "head_logical_position": 0,
+      "previous_verifier_state_digest": "GENESIS-STATE",
+      "stream_generation": 1,
+      "stream_id": "STREAM-LAB-V0-010-1"
+    }
+  ],
+  "LAB-V1-465.json": [
+    {
+      "checkpoint_id": "CHECKPOINT-LAB-V0-010-1",
+      "current_verifier_state_digest": "9c15fce53f7c19774c24852468b4db1fa96b02cd71ff3bf4fc677360d3041d93",
+      "exact_state_key_digest": "84ddcde51fb3c33fe5ad969da45c58b6d241446dcd16010e0929a2d5d17e263c",
+      "freshness_challenge_id": "CHALLENGE-LAB-V0-010-1",
+      "head_commitment_digest": "d4c48719083f36acdb0b057a3df19e8fe868151f8ae8ad6b2c36a307425d9132",
+      "head_logical_position": 0,
+      "previous_verifier_state_digest": "GENESIS-STATE",
+      "stream_generation": 1,
+      "stream_id": "STREAM-LAB-V0-010-1"
+    }
+  ],
+  "LAB-V1-466.json": [
+    {
+      "checkpoint_id": "CHECKPOINT-LAB-V1-032-1",
+      "current_verifier_state_digest": "49aa2b670f37240b578df82566a464e71c2ef408d4140a152bd1eacdf3cb3421",
+      "exact_state_key_digest": "337ddd290a1b35b63232c658bfdbb5a6286338f0d443606c2c226997b2faedb9",
+      "freshness_challenge_id": "CHALLENGE-LAB-V1-032-1",
+      "head_commitment_digest": "810cb859e2e0688a32fc9ddaffe6e64fe2f876e164adafd28f75da4e917f3cb5",
+      "head_logical_position": 0,
+      "previous_verifier_state_digest": "GENESIS-STATE",
+      "stream_generation": 1,
+      "stream_id": "STREAM-LAB-V1-032-1"
+    }
   ]
 }
