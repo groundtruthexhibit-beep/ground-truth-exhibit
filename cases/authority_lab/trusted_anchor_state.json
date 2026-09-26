@@ -115,7 +115,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V0-001-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V0-002.json": [
@@ -234,7 +235,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V0-002-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V0-003.json": [
@@ -353,7 +355,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V0-003-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V0-004.json": [
@@ -472,7 +475,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V0-004-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V0-005.json": [
@@ -591,7 +595,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V0-005-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V0-006.json": [
@@ -710,7 +715,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V0-006-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V0-007.json": [
@@ -829,7 +835,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V0-007-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V0-008.json": [
@@ -948,7 +955,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V0-008-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V0-009.json": [
@@ -1067,7 +1075,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V0-009-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V0-010.json": [
@@ -1186,7 +1195,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V0-010-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V0-011.json": [
@@ -1305,7 +1315,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V0-011-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V0-012.json": [
@@ -1424,7 +1435,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V0-012-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-013.json": [
@@ -1543,7 +1555,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-013-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-014.json": [
@@ -1662,7 +1675,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-014-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-015.json": [
@@ -1781,7 +1795,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-015-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-016.json": [
@@ -1900,7 +1915,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-016-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-017.json": [
@@ -2019,7 +2035,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-017-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-018.json": [
@@ -2138,7 +2155,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-018-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-019.json": [
@@ -2257,7 +2275,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-019-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-020.json": [
@@ -2376,7 +2395,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-020-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-021.json": [
@@ -2495,7 +2515,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-021-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-022.json": [
@@ -2614,7 +2635,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-022-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-023.json": [
@@ -2733,7 +2755,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-023-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-024.json": [
@@ -2852,7 +2875,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-024-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-025.json": [
@@ -2971,7 +2995,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-025-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-026.json": [
@@ -3090,7 +3115,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-026-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-027.json": [
@@ -3209,7 +3235,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-027-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-028.json": [
@@ -3328,7 +3355,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-028-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-029.json": [
@@ -3447,7 +3475,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-029-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-030.json": [
@@ -3566,7 +3595,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-030-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-031.json": [
@@ -3685,7 +3715,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-031-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-032.json": [
@@ -3804,7 +3835,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-032-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-033.json": [
@@ -3923,7 +3955,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-033-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-034.json": [
@@ -4042,7 +4075,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-034-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-035.json": [
@@ -4161,7 +4195,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-035-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-036.json": [
@@ -4280,7 +4315,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-036-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-037.json": [
@@ -4399,7 +4435,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-037-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-038.json": [
@@ -4518,7 +4555,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-038-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-039.json": [
@@ -4637,7 +4675,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-039-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-040.json": [
@@ -4756,7 +4795,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-040-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-041.json": [
@@ -4875,7 +4915,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-041-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-042.json": [
@@ -4994,7 +5035,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-042-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-043.json": [
@@ -5113,7 +5155,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-043-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-044.json": [
@@ -5232,7 +5275,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-044-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-045.json": [
@@ -5351,7 +5395,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-045-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-046.json": [
@@ -5470,7 +5515,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-046-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-047.json": [
@@ -5589,7 +5635,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-047-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-048.json": [
@@ -5708,7 +5755,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-048-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-049.json": [],
@@ -5828,7 +5876,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-050-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-051.json": [
@@ -5947,7 +5996,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-051-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-052.json": [
@@ -6066,7 +6116,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-052-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-053.json": [
@@ -6185,7 +6236,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-053-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-054.json": [
@@ -6304,7 +6356,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-054-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-055.json": [
@@ -6423,7 +6476,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-055-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-056.json": [
@@ -6542,7 +6596,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-056-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-057.json": [
@@ -6661,7 +6716,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-057-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     },
     {
       "exact_anchor_key_digest": "292625c9477e69d34dfbf7c943cbfcd17a78a8ec81db61863d5779add8854b1b",
@@ -6778,7 +6834,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-057-2"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-058.json": [
@@ -6897,7 +6954,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-058-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     },
     {
       "exact_anchor_key_digest": "9dd0d95744bce78a10081f74eb82159219dc900feeaf315f2c5ef554bc87576d",
@@ -7014,7 +7072,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-058-2"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-059.json": [
@@ -7133,7 +7192,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-059-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     },
     {
       "exact_anchor_key_digest": "a2386cde0fb288d0e28e6dc161da3e68a5f0686a680b2bdfea13c2bf9070d149",
@@ -7250,7 +7310,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-059-2"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-060.json": [
@@ -7369,7 +7430,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-060-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-061.json": [
@@ -7488,7 +7550,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-061-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-062.json": [
@@ -7607,7 +7670,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-062-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-063.json": [
@@ -7726,7 +7790,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-063-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-064.json": [
@@ -7845,7 +7910,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-064-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-065.json": [
@@ -7964,7 +8030,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-065-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-066.json": [
@@ -8083,7 +8150,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-066-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-067.json": [
@@ -8202,7 +8270,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-067-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-068.json": [
@@ -8321,7 +8390,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-068-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-069.json": [
@@ -8440,7 +8510,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-069-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-070.json": [
@@ -8559,7 +8630,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-070-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-071.json": [
@@ -8678,7 +8750,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-071-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-072.json": [
@@ -8797,7 +8870,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-072-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-073.json": [
@@ -8916,7 +8990,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-073-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-074.json": [
@@ -9035,7 +9110,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-074-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-075.json": [
@@ -9154,7 +9230,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-075-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-076.json": [
@@ -9273,7 +9350,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-076-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-077.json": [
@@ -9392,7 +9470,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-077-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-078.json": [
@@ -9511,7 +9590,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-078-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-079.json": [
@@ -9630,7 +9710,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-079-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-080.json": [
@@ -9749,7 +9830,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-080-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-081.json": [
@@ -9868,7 +9950,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-081-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-082.json": [
@@ -9987,7 +10070,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-082-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-083.json": [
@@ -10106,7 +10190,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-083-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     },
     {
       "exact_anchor_key_digest": "6d52e5009816d38c65cbaf75057c5917fb9c5bd35e6d1ef755208f1d1f8c8f91",
@@ -10223,7 +10308,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-083-2"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-084.json": [
@@ -10342,7 +10428,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-084-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-085.json": [
@@ -10461,7 +10548,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-085-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-086.json": [
@@ -10580,7 +10668,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-086-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-087.json": [
@@ -10699,7 +10788,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-087-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     },
     {
       "exact_anchor_key_digest": "670c8f84cea85f28484e25c4510e816fdba051bfadee3fc48adfa3be44bcadd7",
@@ -10816,7 +10906,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-087-2"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-088.json": [
@@ -10935,7 +11026,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-088-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-089.json": [
@@ -11054,7 +11146,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-089-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-090.json": [
@@ -11173,7 +11266,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-090-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-091.json": [
@@ -11292,7 +11386,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-091-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-092.json": [
@@ -11411,7 +11506,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-092-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-093.json": [
@@ -11530,7 +11626,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-093-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-094.json": [
@@ -11649,7 +11746,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-094-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-095.json": [
@@ -11768,7 +11866,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-095-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-096.json": [
@@ -11887,7 +11986,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-096-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-097.json": [
@@ -12006,7 +12106,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-097-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-098.json": [
@@ -12125,7 +12226,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-098-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-099.json": [
@@ -12244,7 +12346,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-099-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-100.json": [
@@ -12363,7 +12466,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-100-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-101.json": [
@@ -12482,7 +12586,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-101-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-102.json": [
@@ -12601,7 +12706,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-102-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-103.json": [
@@ -12720,7 +12826,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-103-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-104.json": [
@@ -12839,7 +12946,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-104-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-105.json": [
@@ -12958,7 +13066,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-105-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-106.json": [
@@ -13077,7 +13186,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-106-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-107.json": [
@@ -13196,7 +13306,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-107-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-108.json": [
@@ -13315,7 +13426,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-108-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-109.json": [],
@@ -13435,7 +13547,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-110-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-111.json": [
@@ -13554,7 +13667,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-111-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-112.json": [
@@ -13673,7 +13787,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-112-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-113.json": [
@@ -13792,7 +13907,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-032-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-114.json": [
@@ -13911,7 +14027,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-032-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-115.json": [
@@ -14030,7 +14147,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-032-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-116.json": [
@@ -14149,7 +14267,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-032-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-117.json": [
@@ -14268,7 +14387,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-032-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-118.json": [
@@ -14387,7 +14507,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-032-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-119.json": [
@@ -14509,7 +14630,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-032-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-120.json": [
@@ -14631,7 +14753,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-032-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-121.json": [],
@@ -14753,7 +14876,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-032-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-123.json": [
@@ -14874,7 +14998,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-032-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-124.json": [
@@ -14995,7 +15120,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-032-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-125.json": [
@@ -15116,7 +15242,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-032-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-126.json": [
@@ -15235,7 +15362,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-032-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-127.json": [
@@ -15356,7 +15484,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-032-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-128.json": [
@@ -15476,7 +15605,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-032-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-129.json": [
@@ -15596,7 +15726,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-032-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-130.json": [
@@ -15715,7 +15846,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-032-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-131.json": [
@@ -15834,7 +15966,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-032-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-132.json": [
@@ -15953,7 +16086,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-032-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-133.json": [
@@ -16113,7 +16247,8 @@
           "source_lineage": "WITNESS-LINEAGE-SHARED",
           "upstream_dependency": "WITNESS-SOURCE-SHARED"
         }
-      ]
+      ],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-134.json": [
@@ -16273,7 +16408,8 @@
           "source_lineage": "WITNESS-LINEAGE-DOMAIN-B",
           "upstream_dependency": "WITNESS-SOURCE-DOMAIN-B"
         }
-      ]
+      ],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-135.json": [
@@ -16433,7 +16569,8 @@
           "source_lineage": "WITNESS-LINEAGE-DOMAIN-B",
           "upstream_dependency": "WITNESS-SOURCE-DOMAIN-B"
         }
-      ]
+      ],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-136.json": [
@@ -16593,7 +16730,8 @@
           "source_lineage": "WITNESS-LINEAGE-SHARED",
           "upstream_dependency": "WITNESS-SOURCE-SHARED"
         }
-      ]
+      ],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-137.json": [
@@ -16712,7 +16850,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-032-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-138.json": [],
@@ -16832,7 +16971,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-032-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-140.json": [
@@ -16954,7 +17094,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-032-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-141.json": [],
@@ -17076,7 +17217,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-032-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-143.json": [
@@ -17195,7 +17337,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-032-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-144.json": [],
@@ -17317,7 +17460,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-032-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-146.json": [
@@ -17436,7 +17580,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-032-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-147.json": [
@@ -17555,7 +17700,8 @@
       "verifier_rotation_required": false,
       "verifier_state_digest": "49aa2b670f37240b578df82566a464e71c2ef408d4140a152bd1eacdf3cb3421",
       "witness_conflict": false,
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-148.json": [
@@ -17674,7 +17820,8 @@
       "verifier_rotation_required": false,
       "verifier_state_digest": "49aa2b670f37240b578df82566a464e71c2ef408d4140a152bd1eacdf3cb3421",
       "witness_conflict": false,
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-149.json": [
@@ -17794,7 +17941,8 @@
       "verifier_rotation_required": false,
       "verifier_state_digest": "49aa2b670f37240b578df82566a464e71c2ef408d4140a152bd1eacdf3cb3421",
       "witness_conflict": false,
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     },
     {
       "adapter_admission": {
@@ -17912,7 +18060,8 @@
       "verifier_rotation_required": false,
       "verifier_state_digest": "49aa2b670f37240b578df82566a464e71c2ef408d4140a152bd1eacdf3cb3421",
       "witness_conflict": false,
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-150.json": [
@@ -18031,7 +18180,8 @@
       "verifier_rotation_required": false,
       "verifier_state_digest": "49aa2b670f37240b578df82566a464e71c2ef408d4140a152bd1eacdf3cb3421",
       "witness_conflict": false,
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-151.json": [
@@ -18150,7 +18300,8 @@
       "verifier_rotation_required": false,
       "verifier_state_digest": "49aa2b670f37240b578df82566a464e71c2ef408d4140a152bd1eacdf3cb3421",
       "witness_conflict": false,
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-152.json": [
@@ -18284,7 +18435,8 @@
       "verifier_rotation_required": false,
       "verifier_state_digest": "49aa2b670f37240b578df82566a464e71c2ef408d4140a152bd1eacdf3cb3421",
       "witness_conflict": false,
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-153.json": [
@@ -18444,7 +18596,8 @@
           "source_lineage": "WITNESS-LINEAGE-DOMAIN-B",
           "upstream_dependency": "WITNESS-SOURCE-DOMAIN-B"
         }
-      ]
+      ],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-154.json": [
@@ -18604,7 +18757,8 @@
           "source_lineage": "WITNESS-LINEAGE-DOMAIN-B",
           "upstream_dependency": "WITNESS-SOURCE-DOMAIN-B"
         }
-      ]
+      ],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-155.json": [
@@ -18764,7 +18918,8 @@
           "source_lineage": "WITNESS-LINEAGE-SHARED",
           "upstream_dependency": "WITNESS-SOURCE-SHARED"
         }
-      ]
+      ],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-156.json": [
@@ -18924,7 +19079,8 @@
           "source_lineage": "WITNESS-LINEAGE-DOMAIN-A",
           "upstream_dependency": "WITNESS-SOURCE-DOMAIN-A"
         }
-      ]
+      ],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-157.json": [
@@ -19084,7 +19240,8 @@
           "source_lineage": "WITNESS-LINEAGE-DOMAIN-B",
           "upstream_dependency": "WITNESS-SOURCE-DOMAIN-B"
         }
-      ]
+      ],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-158.json": [
@@ -19244,7 +19401,8 @@
           "source_lineage": "WITNESS-LINEAGE-DOMAIN-B",
           "upstream_dependency": "WITNESS-SOURCE-DOMAIN-B"
         }
-      ]
+      ],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-159.json": [
@@ -19404,7 +19562,8 @@
           "source_lineage": "WITNESS-LINEAGE-DOMAIN-B",
           "upstream_dependency": "WITNESS-SOURCE-DOMAIN-B"
         }
-      ]
+      ],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-160.json": [
@@ -19564,7 +19723,8 @@
           "source_lineage": "WITNESS-LINEAGE-DOMAIN-B",
           "upstream_dependency": "WITNESS-SOURCE-DOMAIN-B"
         }
-      ]
+      ],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-161.json": [
@@ -19724,7 +19884,8 @@
           "source_lineage": "WITNESS-LINEAGE-DOMAIN-B",
           "upstream_dependency": "WITNESS-SOURCE-DOMAIN-B"
         }
-      ]
+      ],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-162.json": [
@@ -19884,7 +20045,8 @@
           "source_lineage": "WITNESS-LINEAGE-DOMAIN-B",
           "upstream_dependency": "WITNESS-SOURCE-DOMAIN-B"
         }
-      ]
+      ],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-163.json": [
@@ -20003,7 +20165,8 @@
       "verifier_rotation_required": false,
       "verifier_state_digest": "49aa2b670f37240b578df82566a464e71c2ef408d4140a152bd1eacdf3cb3421",
       "witness_conflict": false,
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-164.json": [
@@ -20163,7 +20326,8 @@
           "source_lineage": "WITNESS-LINEAGE-DOMAIN-B",
           "upstream_dependency": "WITNESS-SOURCE-DOMAIN-B"
         }
-      ]
+      ],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-165.json": [
@@ -20343,7 +20507,8 @@
           "source_lineage": "WITNESS-LINEAGE-DOMAIN-A",
           "upstream_dependency": "WITNESS-SOURCE-DOMAIN-A"
         }
-      ]
+      ],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-166.json": [
@@ -20462,7 +20627,8 @@
       "verifier_rotation_required": false,
       "verifier_state_digest": "49aa2b670f37240b578df82566a464e71c2ef408d4140a152bd1eacdf3cb3421",
       "witness_conflict": false,
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     },
     {
       "adapter_admission": {
@@ -20579,7 +20745,8 @@
       "verifier_rotation_required": false,
       "verifier_state_digest": "49aa2b670f37240b578df82566a464e71c2ef408d4140a152bd1eacdf3cb3421",
       "witness_conflict": false,
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-167.json": [
@@ -20739,7 +20906,8 @@
           "source_lineage": "WITNESS-LINEAGE-DOMAIN-B",
           "upstream_dependency": "WITNESS-SOURCE-DOMAIN-B"
         }
-      ]
+      ],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-168.json": [
@@ -20899,7 +21067,8 @@
           "source_lineage": "WITNESS-LINEAGE-DOMAIN-B",
           "upstream_dependency": "WITNESS-SOURCE-DOMAIN-B"
         }
-      ]
+      ],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-169.json": [
@@ -21019,7 +21188,8 @@
       "verifier_rotation_required": false,
       "verifier_state_digest": "49aa2b670f37240b578df82566a464e71c2ef408d4140a152bd1eacdf3cb3421",
       "witness_conflict": false,
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-170.json": [
@@ -21139,7 +21309,8 @@
       "verifier_rotation_required": false,
       "verifier_state_digest": "49aa2b670f37240b578df82566a464e71c2ef408d4140a152bd1eacdf3cb3421",
       "witness_conflict": false,
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     },
     {
       "adapter_admission": {
@@ -21257,7 +21428,8 @@
       "verifier_rotation_required": false,
       "verifier_state_digest": "49aa2b670f37240b578df82566a464e71c2ef408d4140a152bd1eacdf3cb3421",
       "witness_conflict": false,
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-171.json": [
@@ -21377,7 +21549,8 @@
       "verifier_rotation_required": false,
       "verifier_state_digest": "49aa2b670f37240b578df82566a464e71c2ef408d4140a152bd1eacdf3cb3421",
       "witness_conflict": false,
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     },
     {
       "adapter_admission": {
@@ -21495,7 +21668,8 @@
       "verifier_rotation_required": false,
       "verifier_state_digest": "49aa2b670f37240b578df82566a464e71c2ef408d4140a152bd1eacdf3cb3421",
       "witness_conflict": false,
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-172.json": [
@@ -21615,7 +21789,8 @@
       "verifier_rotation_required": false,
       "verifier_state_digest": "49aa2b670f37240b578df82566a464e71c2ef408d4140a152bd1eacdf3cb3421",
       "witness_conflict": false,
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     },
     {
       "adapter_admission": {
@@ -21733,7 +21908,8 @@
       "verifier_rotation_required": false,
       "verifier_state_digest": "49aa2b670f37240b578df82566a464e71c2ef408d4140a152bd1eacdf3cb3421",
       "witness_conflict": false,
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-173.json": [
@@ -21853,7 +22029,8 @@
       "verifier_rotation_required": false,
       "verifier_state_digest": "49aa2b670f37240b578df82566a464e71c2ef408d4140a152bd1eacdf3cb3421",
       "witness_conflict": false,
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-174.json": [
@@ -21996,7 +22173,8 @@
       "verifier_rotation_required": false,
       "verifier_state_digest": "49aa2b670f37240b578df82566a464e71c2ef408d4140a152bd1eacdf3cb3421",
       "witness_conflict": false,
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     },
     {
       "adapter_admission": {
@@ -22137,7 +22315,8 @@
       "verifier_rotation_required": false,
       "verifier_state_digest": "49aa2b670f37240b578df82566a464e71c2ef408d4140a152bd1eacdf3cb3421",
       "witness_conflict": false,
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-175.json": [
@@ -22280,7 +22459,8 @@
       "verifier_rotation_required": false,
       "verifier_state_digest": "49aa2b670f37240b578df82566a464e71c2ef408d4140a152bd1eacdf3cb3421",
       "witness_conflict": false,
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     },
     {
       "adapter_admission": {
@@ -22421,7 +22601,8 @@
       "verifier_rotation_required": false,
       "verifier_state_digest": "49aa2b670f37240b578df82566a464e71c2ef408d4140a152bd1eacdf3cb3421",
       "witness_conflict": false,
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-176.json": [
@@ -22570,7 +22751,7 @@
           "identity_basis": "WITNESS-IDENTITY-2",
           "independence_domain": "INDEPENDENCE-DOMAIN-B",
           "lifecycle_state": "ACTIVE",
-          "member_generation": 1,
+          "member_generation": 2,
           "member_id": "WITNESS-2",
           "member_kind": "WITNESS_SOURCE",
           "membership_epoch": 1,
@@ -22578,10 +22759,11 @@
           "relationship": "SOURCE_DOMAIN_MEMBERSHIP",
           "rollback_domain": "ROLLBACK-DOMAIN-B",
           "source_id": "ROOT-AUTH-BOUNDARY-1",
-          "source_lineage": "WITNESS-LINEAGE-DOMAIN-B",
+          "source_lineage": "UNAUTHORIZED-NEW-LINEAGE",
           "upstream_dependency": "WITNESS-SOURCE-DOMAIN-B"
         }
-      ]
+      ],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-177.json": [
@@ -22730,7 +22912,7 @@
           "identity_basis": "WITNESS-IDENTITY-2",
           "independence_domain": "INDEPENDENCE-DOMAIN-B",
           "lifecycle_state": "ACTIVE",
-          "member_generation": 1,
+          "member_generation": 2,
           "member_id": "WITNESS-2",
           "member_kind": "WITNESS_SOURCE",
           "membership_epoch": 1,
@@ -22740,6 +22922,27 @@
           "source_id": "ROOT-AUTH-BOUNDARY-1",
           "source_lineage": "AUTHORIZED-NEW-LINEAGE",
           "upstream_dependency": "WITNESS-SOURCE-DOMAIN-B"
+        }
+      ],
+      "source_domain_transitions": [
+        {
+          "relationship": "SOURCE_DOMAIN_MEMBERSHIP_TRANSITION",
+          "transition_id": "WITNESS-HANDOFF-177",
+          "member_kind": "WITNESS_SOURCE",
+          "old_member_id": "WITNESS-2",
+          "old_member_generation": 1,
+          "new_member_id": "WITNESS-2",
+          "new_member_generation": 2,
+          "old_source_lineage": "AUTHORIZED-NEW-LINEAGE",
+          "new_source_lineage": "AUTHORIZED-NEW-LINEAGE",
+          "independence_domain": "INDEPENDENCE-DOMAIN-B",
+          "boundary": "AUTH-BOUNDARY-1",
+          "boundary_epoch": "B1",
+          "source_id": "ROOT-AUTH-BOUNDARY-1",
+          "authority_generation": 1,
+          "ordering_source_id": "ORDER-AUTH-BOUNDARY-1",
+          "freshness_challenge_id": "CHALLENGE-LAB-V1-032-1",
+          "lifecycle_state": "ACTIVE"
         }
       ]
     }
@@ -22861,7 +23064,8 @@
       "verifier_rotation_required": false,
       "verifier_state_digest": "49aa2b670f37240b578df82566a464e71c2ef408d4140a152bd1eacdf3cb3421",
       "witness_conflict": false,
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     },
     {
       "adapter_admission": {
@@ -22979,7 +23183,8 @@
       "verifier_rotation_required": false,
       "verifier_state_digest": "49aa2b670f37240b578df82566a464e71c2ef408d4140a152bd1eacdf3cb3421",
       "witness_conflict": false,
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-179.json": [
@@ -23099,7 +23304,8 @@
       "verifier_rotation_required": false,
       "verifier_state_digest": "49aa2b670f37240b578df82566a464e71c2ef408d4140a152bd1eacdf3cb3421",
       "witness_conflict": false,
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     },
     {
       "adapter_admission": {
@@ -23217,7 +23423,8 @@
       "verifier_rotation_required": false,
       "verifier_state_digest": "49aa2b670f37240b578df82566a464e71c2ef408d4140a152bd1eacdf3cb3421",
       "witness_conflict": false,
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-180.json": [
@@ -23336,7 +23543,8 @@
       "verifier_rotation_required": false,
       "verifier_state_digest": "49aa2b670f37240b578df82566a464e71c2ef408d4140a152bd1eacdf3cb3421",
       "witness_conflict": false,
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-181.json": [
@@ -23455,7 +23663,8 @@
       "verifier_rotation_required": false,
       "verifier_state_digest": "49aa2b670f37240b578df82566a464e71c2ef408d4140a152bd1eacdf3cb3421",
       "witness_conflict": false,
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-182.json": [
@@ -23574,7 +23783,8 @@
       "verifier_rotation_required": false,
       "verifier_state_digest": "49aa2b670f37240b578df82566a464e71c2ef408d4140a152bd1eacdf3cb3421",
       "witness_conflict": false,
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-183.json": [
@@ -23695,7 +23905,8 @@
       "verifier_rotation_required": false,
       "verifier_state_digest": "49aa2b670f37240b578df82566a464e71c2ef408d4140a152bd1eacdf3cb3421",
       "witness_conflict": false,
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-184.json": [
@@ -23816,7 +24027,8 @@
       "verifier_rotation_required": false,
       "verifier_state_digest": "49aa2b670f37240b578df82566a464e71c2ef408d4140a152bd1eacdf3cb3421",
       "witness_conflict": false,
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ],
   "LAB-V1-185.json": [
@@ -23965,7 +24177,7 @@
           "identity_basis": "WITNESS-IDENTITY-2",
           "independence_domain": "INDEPENDENCE-DOMAIN-B",
           "lifecycle_state": "ACTIVE",
-          "member_generation": 1,
+          "member_generation": 2,
           "member_id": "WITNESS-2",
           "member_kind": "WITNESS_SOURCE",
           "membership_epoch": 1,
@@ -23973,8 +24185,29 @@
           "relationship": "SOURCE_DOMAIN_MEMBERSHIP",
           "rollback_domain": "ROLLBACK-DOMAIN-B",
           "source_id": "ROOT-AUTH-BOUNDARY-1",
-          "source_lineage": "WITNESS-LINEAGE-DOMAIN-B",
+          "source_lineage": "HANDOFF-NEW-LINEAGE",
           "upstream_dependency": "WITNESS-SOURCE-DOMAIN-B"
+        }
+      ],
+      "source_domain_transitions": [
+        {
+          "relationship": "SOURCE_DOMAIN_MEMBERSHIP_TRANSITION",
+          "transition_id": "WITNESS-HANDOFF-185",
+          "member_kind": "WITNESS_SOURCE",
+          "old_member_id": "WITNESS-2",
+          "old_member_generation": 1,
+          "new_member_id": "WITNESS-2",
+          "new_member_generation": 2,
+          "old_source_lineage": "WITNESS-LINEAGE-DOMAIN-B",
+          "new_source_lineage": "HANDOFF-NEW-LINEAGE",
+          "independence_domain": "INDEPENDENCE-DOMAIN-B",
+          "boundary": "AUTH-BOUNDARY-1",
+          "boundary_epoch": "B1",
+          "source_id": "ROOT-AUTH-BOUNDARY-1",
+          "authority_generation": 1,
+          "ordering_source_id": "ORDER-AUTH-BOUNDARY-1",
+          "freshness_challenge_id": "CHALLENGE-LAB-V1-032-1",
+          "lifecycle_state": "ACTIVE"
         }
       ]
     }
@@ -24095,7 +24328,8 @@
           "upstream_dependency": "ANCHOR-SOURCE-LAB-V1-032-1"
         }
       ],
-      "witness_source_memberships": []
+      "witness_source_memberships": [],
+      "source_domain_transitions": []
     }
   ]
 }

@@ -659,7 +659,7 @@
               "source_id": "ROOT-AUTH-BOUNDARY-1",
               "source_lineage": "AUTHORIZED-NEW-LINEAGE",
               "start_event_order": 1,
-              "witness_generation": 1,
+              "witness_generation": 2,
               "witness_id": "WITNESS-2",
               "witness_identity_basis": "WITNESS-IDENTITY-2",
               "witness_source_generation": 1,

@@ -1398,6 +1398,30 @@ def _evaluate_protected_anchor_domains(
                 or witness["end_event_order"] < binding.t3_anchor.event_order
             ):
                 return _observation_unavailable(case, "WITNESS_COVERAGE_UNAVAILABLE", "Witness identity, source, scope, interval, freshness, or boundary is not exact.", ("evidence_binding", "freshness"))
+            if member["member_generation"] > 1:
+                transitions = [
+                    item for item in contexts[0]["source_domain_transitions"]
+                    if item["member_kind"] == "WITNESS_SOURCE"
+                    and item["new_member_id"] == member["member_id"]
+                    and item["new_member_generation"] == member["member_generation"]
+                ]
+                if len(transitions) != 1:
+                    return _observation_unavailable(case, "WITNESS_HANDOFF_UNAVAILABLE", "Witness replacement lacks one exact authoritative predecessor transition.", ("evidence_binding",))
+                transition = transitions[0]
+                if (
+                    transition["relationship"] != "SOURCE_DOMAIN_MEMBERSHIP_TRANSITION"
+                    or transition["old_member_generation"] != member["member_generation"] - 1
+                    or transition["new_source_lineage"] != member["source_lineage"]
+                    or transition["independence_domain"] != member["independence_domain"]
+                    or transition["boundary"] != root.boundary
+                    or transition["boundary_epoch"] != root.boundary_epoch
+                    or transition["source_id"] != root.root_id
+                    or transition["authority_generation"] != root.authority_generation
+                    or transition["ordering_source_id"] != root.ordering_source_id
+                    or transition["freshness_challenge_id"] != anchor["freshness_challenge_id"]
+                    or transition["lifecycle_state"] != "ACTIVE"
+                ):
+                    return _observation_unavailable(case, "WITNESS_HANDOFF_UNAVAILABLE", "Witness source-lineage transition is stale, ambiguous, or unauthorized.", ("evidence_binding", "binding_ordering"))
             effective_domains.add(member["independence_domain"])
         if len(effective_domains) < contexts[0].get("required_witness_domains", 0):
             return _observation_unavailable(case, "WITNESS_SOURCE_CONTINUITY_UNAVAILABLE", "Witness multiplicity does not establish protected independent domains.", ("evidence_binding",))

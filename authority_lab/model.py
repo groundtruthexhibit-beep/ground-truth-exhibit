@@ -2131,6 +2131,14 @@ TRUSTED_RECONCILIATION_FIELDS = frozenset({
     "freshness_challenge_id", "lifecycle_state",
 })
 
+TRUSTED_SOURCE_TRANSITION_FIELDS = frozenset({
+    "relationship", "transition_id", "member_kind", "old_member_id",
+    "old_member_generation", "new_member_id", "new_member_generation",
+    "old_source_lineage", "new_source_lineage", "independence_domain",
+    "boundary", "boundary_epoch", "source_id", "authority_generation",
+    "ordering_source_id", "freshness_challenge_id", "lifecycle_state",
+})
+
 
 def _trusted_exact_record(value: Any, fields: frozenset[str], name: str) -> Mapping[str, Any]:
     if not isinstance(value, Mapping):
@@ -2167,6 +2175,13 @@ def validate_trusted_anchor_context(value: Mapping[str, Any]) -> Mapping[str, An
     result["witness_source_memberships"] = tuple(
         _trusted_exact_record(item, TRUSTED_SOURCE_MEMBERSHIP_FIELDS, "trusted witness membership")
         for item in witnesses
+    )
+    transitions = value.get("source_domain_transitions")
+    if not isinstance(transitions, list):
+        raise ValueError("trusted source_domain_transitions must be an array")
+    result["source_domain_transitions"] = tuple(
+        _trusted_exact_record(item, TRUSTED_SOURCE_TRANSITION_FIELDS, "trusted source transition")
+        for item in transitions
     )
     reconciliation = value.get("cross_domain_reconciliation")
     result["cross_domain_reconciliation"] = (

@@ -2047,12 +2047,14 @@ class AuthorityLabTests(unittest.TestCase):
         for case_id in (
             "LAB-V1-153", "LAB-V1-154", "LAB-V1-156", "LAB-V1-158",
             "LAB-V1-159", "LAB-V1-160", "LAB-V1-161", "LAB-V1-164",
-            "LAB-V1-176",
         ):
             with self.subTest(case_id=case_id):
                 self.assert_unavailable_with_reason(
                     fixture(case_id), "WITNESS_COVERAGE_UNAVAILABLE"
                 )
+        self.assert_unavailable_with_reason(
+            fixture("LAB-V1-176"), "WITNESS_HANDOFF_UNAVAILABLE"
+        )
 
     def test_required_domain_and_candidate_shopping_fail_closed(self) -> None:
         for case_id in ("LAB-V1-166", "LAB-V1-169", "LAB-V1-173"):
