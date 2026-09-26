@@ -34,6 +34,8 @@ def load_fixture(path: str | Path) -> dict[str, Any]:
         raise ValueError("fixture cannot supply harness-owned trusted anchor state")
     if "_trusted_control_plane_context" in value:
         raise ValueError("fixture cannot supply harness-owned trusted control-plane state")
+    if "_trusted_delegation_context" in value:
+        raise ValueError("fixture cannot supply harness-owned trusted delegation state")
     manifest_path = fixture_path.parent / "trusted_commitment_state.json"
     if value.get("schema_version") == "authority-lab-v1" and manifest_path.exists():
         with manifest_path.open("r", encoding="utf-8") as handle:
@@ -194,6 +196,14 @@ def _observation_trace(case: OracleInput) -> tuple[str, ...]:
         f"{','.join(item['control_plane_policy']['required_roles'])} "
         f"members={len(item['control_plane_memberships'])} "
         f"appraisal_roots={len(item['independence_appraisal_roots'])}"
+        for item in case.trusted_anchor_context
+    )
+    lines.extend(
+        "delegation_authority: "
+        f"policy={item['delegation_authority_context']['delegation_policy']['policy_id']} "
+        f"principals={len(item['delegation_authority_context']['delegation_principals'])} "
+        f"grants={len(item['delegation_authority_context']['delegation_grants'])} "
+        f"heads={len(item['delegation_authority_context']['delegation_ordering_heads'])}"
         for item in case.trusted_anchor_context
     )
     lines.extend(

@@ -2186,6 +2186,77 @@ TRUSTED_ROLE_CONSOLIDATION_FIELDS = frozenset({
     "lifecycle_state",
 })
 
+TRUSTED_DELEGATION_POLICY_FIELDS = frozenset({
+    "relationship", "policy_id", "policy_generation", "selection_rule",
+    "boundary", "boundary_epoch", "source_id", "authority_generation",
+    "ordering_source_id", "freshness_challenge_id", "lifecycle_state",
+    "maximum_chain_depth",
+})
+
+TRUSTED_DELEGATION_PRINCIPAL_FIELDS = frozenset({
+    "relationship", "principal_id", "principal_generation", "identity_basis",
+    "principal_kind", "roles", "objective_id", "objective_generation",
+    "decision_contract_id", "decision_contract_version", "boundary",
+    "boundary_epoch", "execution_context", "root_id", "source_id",
+    "authority_generation", "lineage", "ordering_source_id",
+    "start_event_order", "end_event_order", "freshness_challenge_id",
+    "lifecycle_state",
+})
+
+TRUSTED_DELEGATION_SCOPE_FIELDS = frozenset({
+    "actions", "artifacts", "tools", "semantic_scopes", "boundaries",
+    "subject_classes", "valid_from_order", "valid_until_order", "maximum_depth",
+})
+
+TRUSTED_DELEGATION_GRANT_FIELDS = frozenset({
+    "relationship", "grant_id", "grant_generation", "chain_id",
+    "parent_grant_id", "parent_grant_generation", "delegator_id",
+    "delegator_generation", "delegator_identity_basis", "delegate_id",
+    "delegate_generation", "delegate_identity_basis", "root_id", "source_id",
+    "authority_generation", "lineage", "objective_id", "objective_generation",
+    "decision_contract_id", "decision_contract_version", "action_scope",
+    "delegable_scope", "boundary", "boundary_epoch", "execution_context",
+    "created_event_order", "effective_start_order", "effective_end_order",
+    "hop_depth", "maximum_depth", "further_delegation", "lifecycle_state",
+    "ordering_head_id", "terminal_execution_grant_id",
+})
+
+TRUSTED_DELEGATION_LIFECYCLE_FIELDS = frozenset({
+    "relationship", "record_id", "target_kind", "target_id",
+    "target_generation", "state", "event_id", "event_order", "source_id",
+    "authority_generation", "lineage", "boundary", "boundary_epoch",
+})
+
+TRUSTED_DELEGATION_ORDERING_FIELDS = frozenset({
+    "relationship", "ordering_head_id", "chain_id", "root_id",
+    "head_grant_id", "head_grant_generation", "head_event_order", "source_id",
+    "authority_generation", "lineage", "boundary", "boundary_epoch",
+    "freshness_challenge_id", "lifecycle_state",
+})
+
+TRUSTED_DELEGATION_PRINCIPAL_TRANSITION_FIELDS = frozenset({
+    "relationship", "transition_id", "old_principal_id", "old_principal_generation",
+    "new_principal_id", "new_principal_generation", "event_order", "reason",
+    "source_id", "authority_generation", "lineage", "boundary", "boundary_epoch",
+    "lifecycle_state",
+})
+
+TRUSTED_DELEGATION_GRANT_TRANSITION_FIELDS = frozenset({
+    "relationship", "transition_id", "old_grant_id", "old_grant_generation",
+    "new_grant_id", "new_grant_generation", "event_order", "reason",
+    "source_id", "authority_generation", "lineage", "boundary", "boundary_epoch",
+    "lifecycle_state",
+})
+
+TRUSTED_DELEGATION_TERMINAL_USE_FIELDS = frozenset({
+    "relationship", "chain_id", "terminal_grant_id", "terminal_grant_generation",
+    "execution_grant_id", "subject_id", "subject_generation",
+    "subject_identity_basis", "artifact", "effect", "tool", "boundary",
+    "boundary_epoch", "execution_context", "consumption_state", "objective_id",
+    "objective_generation", "decision_contract_id", "decision_contract_version",
+    "use_event_order", "freshness_challenge_id", "lifecycle_state",
+})
+
 
 def _trusted_exact_record(value: Any, fields: frozenset[str], name: str) -> Mapping[str, Any]:
     if not isinstance(value, Mapping):
@@ -2232,6 +2303,117 @@ def _trusted_control_record(
         else:
             parsed[field] = _exact_nonempty_string(item, qualified)
     return MappingProxyType(parsed)
+
+
+def _trusted_delegation_scope(value: Any, name: str) -> Mapping[str, Any]:
+    if not isinstance(value, Mapping):
+        raise ValueError(f"{name} must be an object")
+    _require_exact_fields(value, TRUSTED_DELEGATION_SCOPE_FIELDS, name)
+    parsed: dict[str, Any] = {}
+    for field in TRUSTED_DELEGATION_SCOPE_FIELDS:
+        item = value[field]
+        qualified = f"{name}.{field}"
+        if field in {"valid_from_order", "valid_until_order", "maximum_depth"}:
+            parsed[field] = _exact_generation(item, qualified)
+        else:
+            if not isinstance(item, (list, tuple)) or not item:
+                raise ValueError(f"{qualified} must be a non-empty array")
+            values = tuple(_exact_nonempty_string(part, qualified) for part in item)
+            if len(values) != len(set(values)):
+                raise ValueError(f"{qualified} must not contain duplicates")
+            parsed[field] = values
+    return MappingProxyType(parsed)
+
+
+def _trusted_delegation_grant(value: Any) -> Mapping[str, Any]:
+    name = "trusted delegation grant"
+    if not isinstance(value, Mapping):
+        raise ValueError(f"{name} must be an object")
+    _require_exact_fields(value, TRUSTED_DELEGATION_GRANT_FIELDS, name)
+    parsed: dict[str, Any] = {}
+    integer_fields = {
+        "grant_generation", "parent_grant_generation", "delegator_generation",
+        "delegate_generation", "authority_generation", "objective_generation",
+        "created_event_order", "effective_start_order", "effective_end_order",
+        "hop_depth", "maximum_depth",
+    }
+    for field in TRUSTED_DELEGATION_GRANT_FIELDS:
+        item = value[field]
+        qualified = f"{name}.{field}"
+        if field in integer_fields:
+            parsed[field] = _exact_generation(item, qualified)
+        elif field == "further_delegation":
+            if not isinstance(item, bool):
+                raise ValueError(f"{qualified} must be boolean")
+            parsed[field] = item
+        elif field in {"action_scope", "delegable_scope"}:
+            parsed[field] = _trusted_delegation_scope(item, qualified)
+        else:
+            parsed[field] = _exact_nonempty_string(item, qualified)
+    return MappingProxyType(parsed)
+
+
+def _trusted_delegation_context(value: Any) -> Mapping[str, Any]:
+    name = "trusted delegation_authority_context"
+    fields = {
+        "delegation_policy", "delegation_principals", "delegation_grants",
+        "delegation_lifecycle_records", "delegation_ordering_heads",
+        "delegation_principal_transitions", "delegation_grant_transitions",
+        "delegation_terminal_uses",
+    }
+    if not isinstance(value, Mapping):
+        raise ValueError(f"{name} must be an object")
+    _require_exact_fields(value, fields, name)
+    result: dict[str, Any] = {}
+    result["delegation_policy"] = _trusted_control_record(
+        value["delegation_policy"], TRUSTED_DELEGATION_POLICY_FIELDS,
+        "trusted delegation policy",
+        integer_fields=frozenset({
+            "policy_generation", "authority_generation", "maximum_chain_depth",
+        }),
+    )
+    specs = (
+        ("delegation_principals", TRUSTED_DELEGATION_PRINCIPAL_FIELDS,
+         frozenset({
+             "principal_generation", "objective_generation", "authority_generation",
+             "start_event_order", "end_event_order",
+         }), frozenset({"roles"})),
+        ("delegation_lifecycle_records", TRUSTED_DELEGATION_LIFECYCLE_FIELDS,
+         frozenset({"target_generation", "event_order", "authority_generation"}), frozenset()),
+        ("delegation_ordering_heads", TRUSTED_DELEGATION_ORDERING_FIELDS,
+         frozenset({"head_grant_generation", "head_event_order", "authority_generation"}), frozenset()),
+        ("delegation_principal_transitions", TRUSTED_DELEGATION_PRINCIPAL_TRANSITION_FIELDS,
+         frozenset({
+             "old_principal_generation", "new_principal_generation", "event_order",
+             "authority_generation",
+         }), frozenset()),
+        ("delegation_grant_transitions", TRUSTED_DELEGATION_GRANT_TRANSITION_FIELDS,
+         frozenset({
+             "old_grant_generation", "new_grant_generation", "event_order",
+             "authority_generation",
+         }), frozenset()),
+        ("delegation_terminal_uses", TRUSTED_DELEGATION_TERMINAL_USE_FIELDS,
+         frozenset({
+             "terminal_grant_generation", "subject_generation", "objective_generation",
+             "use_event_order",
+         }), frozenset()),
+    )
+    for field, record_fields, integer_fields, array_fields in specs:
+        raw = value[field]
+        if not isinstance(raw, list):
+            raise ValueError(f"trusted {field} must be an array")
+        result[field] = tuple(
+            _trusted_control_record(
+                item, record_fields, f"trusted {field} record",
+                integer_fields=integer_fields, array_fields=array_fields,
+            )
+            for item in raw
+        )
+    grants = value["delegation_grants"]
+    if not isinstance(grants, list):
+        raise ValueError("trusted delegation_grants must be an array")
+    result["delegation_grants"] = tuple(_trusted_delegation_grant(item) for item in grants)
+    return MappingProxyType(result)
 
 
 def validate_trusted_anchor_context(value: Mapping[str, Any]) -> Mapping[str, Any]:
@@ -2337,6 +2519,9 @@ def validate_trusted_anchor_context(value: Mapping[str, Any]) -> Mapping[str, An
             array_fields=frozenset({"roles", "member_keys", "effective_domain"}),
         )
         for item in consolidations
+    )
+    result["delegation_authority_context"] = _trusted_delegation_context(
+        value.get("delegation_authority_context")
     )
     reconciliation = value.get("cross_domain_reconciliation")
     result["cross_domain_reconciliation"] = (

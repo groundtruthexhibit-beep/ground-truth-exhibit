@@ -364,9 +364,9 @@ class AuthorityLabTests(unittest.TestCase):
         self.assertIs(AuthorityOutcome.UNAVAILABLE, result.outcome)
         self.assertIn(reason_code, {reason.code for reason in result.reasons})
 
-    def test_v1_contains_two_hundred_thirty_four_deterministic_fixtures(self) -> None:
+    def test_v1_contains_two_hundred_eighty_seven_deterministic_fixtures(self) -> None:
         paths = discover(CASES)
-        self.assertEqual(234, len(paths))
+        self.assertEqual(287, len(paths))
         self.assertEqual(paths, discover(CASES))
 
     def test_every_v0_fixture_matches_its_expected_outcome(self) -> None:
@@ -2210,6 +2210,103 @@ class AuthorityLabTests(unittest.TestCase):
             opened.return_value.__enter__.return_value.__iter__.return_value = iter(())
             with self.assertRaisesRegex(ValueError, "trusted control-plane"):
                 load_fixture(path)
+
+    def test_original_arbitrary_delegator_reproducer_is_closed(self) -> None:
+        payload = fixture("LAB-V0-010")
+        payload["t3"]["facts"]["delegation_binding"]["value"]["delegator"] = (
+            "UNAUTHORIZED-AGENT-X"
+        )
+        self.assert_unavailable_with_reason(
+            payload, "DELEGATION_SOURCE_AUTHORITY_UNAVAILABLE"
+        )
+
+    def test_candidate_cannot_supply_trusted_delegation_context(self) -> None:
+        path = CASES / "LAB-V0-010.json"
+        raw = json.loads(path.read_text(encoding="utf-8"))
+        raw["_trusted_delegation_context"] = {}
+        with patch("authority_lab.runner.Path.open") as opened:
+            opened.return_value.__enter__.return_value.read.return_value = json.dumps(raw)
+            opened.return_value.__enter__.return_value.__iter__.return_value = iter(())
+            with self.assertRaisesRegex(ValueError, "trusted delegation"):
+                load_fixture(path)
+
+    def test_delegation_protected_records_are_strictly_typed(self) -> None:
+        payload = fixture("LAB-V0-010")
+        parsed = OracleInput.from_fixture(deepcopy(payload))
+        context = parsed.trusted_anchor_context[0]["delegation_authority_context"]
+        self.assertIsInstance(context["delegation_principals"], tuple)
+        self.assertIsInstance(
+            context["delegation_grants"][0]["action_scope"]["actions"], tuple
+        )
+        payload["_trusted_anchor_context"][0]["delegation_authority_context"][
+            "delegation_policy"
+        ]["trusted"] = True
+        with self.assertRaisesRegex(ValueError, "contain exactly"):
+            OracleInput.from_fixture(payload)
+
+    def test_delegation_hostile_matrix_matches_independent_expectations(self) -> None:
+        authorized = {252, 253, 258, 262, 269, 271, 277, 278, 282, 286, 287}
+        denied = {247, 273, 285}
+        for number in range(235, 288):
+            case_id = f"LAB-V1-{number:03d}"
+            expected = (
+                AuthorityOutcome.AUTHORIZED
+                if number in authorized
+                else AuthorityOutcome.DENIED
+                if number in denied
+                else AuthorityOutcome.UNAVAILABLE
+            )
+            with self.subTest(case_id=case_id):
+                self.assertIs(expected, actual(fixture(case_id)))
+
+    def test_action_authority_does_not_imply_delegation_authority(self) -> None:
+        self.assert_unavailable_with_reason(
+            fixture("LAB-V1-241"), "DELEGABLE_SCOPE_UNAVAILABLE"
+        )
+
+    def test_delegation_cycles_and_partial_chains_fail_closed(self) -> None:
+        for case_id in (
+            "LAB-V1-254", "LAB-V1-255", "LAB-V1-256",
+            "LAB-V1-263", "LAB-V1-264",
+        ):
+            with self.subTest(case_id=case_id):
+                self.assertIs(AuthorityOutcome.UNAVAILABLE, actual(fixture(case_id)))
+
+    def test_delegation_scope_widening_fails_closed(self) -> None:
+        for case_id in ("LAB-V1-259", "LAB-V1-260", "LAB-V1-261", "LAB-V1-281"):
+            with self.subTest(case_id=case_id):
+                self.assert_unavailable_with_reason(
+                    fixture(case_id), "DELEGATION_SCOPE_WIDENING"
+                )
+
+    def test_delegation_lifecycle_and_successor_semantics(self) -> None:
+        for case_id in ("LAB-V1-246", "LAB-V1-248", "LAB-V1-249"):
+            with self.subTest(case_id=case_id):
+                self.assertIs(AuthorityOutcome.UNAVAILABLE, actual(fixture(case_id)))
+        self.assertIs(AuthorityOutcome.DENIED, actual(fixture("LAB-V1-247")))
+        for case_id in ("LAB-V1-250", "LAB-V1-251", "LAB-V1-276"):
+            with self.subTest(case_id=case_id):
+                self.assert_unavailable_with_reason(
+                    fixture(case_id), "DELEGATION_SUCCESSOR_AUTHORITY_UNAVAILABLE"
+                )
+        for case_id in ("LAB-V1-252", "LAB-V1-277", "LAB-V1-287"):
+            with self.subTest(case_id=case_id):
+                self.assertIs(AuthorityOutcome.AUTHORIZED, actual(fixture(case_id)))
+
+    def test_valid_multihop_service_account_and_planner_paths_reach_authorized(self) -> None:
+        for case_id in (
+            "LAB-V1-253", "LAB-V1-269", "LAB-V1-271",
+            "LAB-V1-278", "LAB-V1-282",
+        ):
+            with self.subTest(case_id=case_id):
+                self.assertIs(AuthorityOutcome.AUTHORIZED, actual(fixture(case_id)))
+
+    def test_grant_shopping_and_conflict_fail_closed(self) -> None:
+        for case_id in ("LAB-V1-283", "LAB-V1-284"):
+            with self.subTest(case_id=case_id):
+                self.assert_unavailable_with_reason(
+                    fixture(case_id), "DELEGATION_ORDERING_UNAVAILABLE"
+                )
 
     def test_positive_commitment_and_successor_paths_remain_authorized(self) -> None:
         for case_id in ("LAB-V1-098", "LAB-V1-099", "LAB-V1-102", "LAB-V1-111", "LAB-V1-112"):

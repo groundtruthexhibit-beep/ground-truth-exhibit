@@ -1863,6 +1863,516 @@ def _evaluate_control_plane_independence(
     return None
 
 
+def _delegation_result(
+    case: OracleInput,
+    outcome: AuthorityOutcome,
+    code: str,
+    detail: str,
+) -> OracleResult:
+    return OracleResult(outcome, (Reason(code, detail, ("delegation_binding",)),), _engaged(case))
+
+
+def _scope_is_subset(child: Mapping[str, Any], parent: Mapping[str, Any]) -> bool:
+    for field in (
+        "actions", "artifacts", "tools", "semantic_scopes", "boundaries",
+        "subject_classes",
+    ):
+        if not set(child[field]).issubset(set(parent[field])):
+            return False
+    return (
+        child["valid_from_order"] >= parent["valid_from_order"]
+        and child["valid_until_order"] <= parent["valid_until_order"]
+        and child["maximum_depth"] <= parent["maximum_depth"]
+    )
+
+
+def _evaluate_delegation_authority(
+    case: OracleInput,
+    active_state: Any,
+) -> tuple[OracleResult | None, Mapping[str, Any] | None]:
+    """Validate a protected root-closed delegation chain and return its terminal edge."""
+    contexts = tuple(
+        item["delegation_authority_context"] for item in case.trusted_anchor_context
+    )
+    if not contexts:
+        return (
+            _delegation_result(
+                case, AuthorityOutcome.UNAVAILABLE,
+                "DELEGATION_AUTHORITY_CONTEXT_UNAVAILABLE",
+                "Harness-owned delegation authority context is unavailable.",
+            ),
+            None,
+        )
+    if active_state.subject_mode == "DIRECT":
+        protected_fields = (
+            "delegation_principals", "delegation_grants",
+            "delegation_lifecycle_records", "delegation_ordering_heads",
+            "delegation_principal_transitions", "delegation_grant_transitions",
+            "delegation_terminal_uses",
+        )
+        if any(context[field] for context in contexts for field in protected_fields):
+            return (
+                _delegation_result(
+                    case, AuthorityOutcome.UNAVAILABLE, "DELEGATION_CONFLICTING",
+                    "Direct authority has incompatible protected delegated-authority state.",
+                ),
+                None,
+            )
+        return None, None
+    first = contexts[0]
+    if any(context != first for context in contexts[1:]):
+        return (
+            _delegation_result(
+                case, AuthorityOutcome.UNAVAILABLE, "DELEGATION_CONFLICTING",
+                "Protected delegation authority contexts conflict.",
+            ),
+            None,
+        )
+    policy = first["delegation_policy"]
+    root = case.t3_binding_facts.authority_root
+    binding = case.observation_binding
+    freshness = case.observation_freshness
+    if root is None or binding is None or freshness is None:
+        return (
+            _delegation_result(
+                case, AuthorityOutcome.UNAVAILABLE,
+                "DELEGATION_ROOT_AUTHORITY_UNAVAILABLE",
+                "Delegation cannot be joined to the current root and observation interval.",
+            ),
+            None,
+        )
+    if (
+        policy["relationship"] != "DELEGATION_AUTHORITY_POLICY"
+        or policy["selection_rule"] != "ALL_APPLICABLE"
+        or policy["boundary"] != root.boundary
+        or policy["boundary_epoch"] != root.boundary_epoch
+        or policy["source_id"] != root.root_id
+        or policy["authority_generation"] != root.authority_generation
+        or policy["ordering_source_id"] != root.ordering_source_id
+        or policy["freshness_challenge_id"] != freshness.freshness_challenge_id
+        or policy["lifecycle_state"] != "ACTIVE"
+    ):
+        return (
+            _delegation_result(
+                case, AuthorityOutcome.UNAVAILABLE,
+                "DELEGATION_ROOT_AUTHORITY_UNAVAILABLE",
+                "Delegation policy lacks an exact current applicable root join.",
+            ),
+            None,
+        )
+
+    principals = first["delegation_principals"]
+    grants = first["delegation_grants"]
+    lifecycles = first["delegation_lifecycle_records"]
+    heads = first["delegation_ordering_heads"]
+    uses = first["delegation_terminal_uses"]
+    candidate = case.facts["delegation_binding"].value
+
+    if active_state.subject_mode != "DELEGATED" or not isinstance(candidate, Mapping):
+        return (
+            _delegation_result(
+                case, AuthorityOutcome.UNAVAILABLE,
+                "DELEGATION_RELATIONSHIP_UNAVAILABLE",
+                "The evaluated subject relationship is not an exact delegated relationship.",
+            ),
+            None,
+        )
+    if len(heads) != 1:
+        return (
+            _delegation_result(
+                case, AuthorityOutcome.UNAVAILABLE, "DELEGATION_ORDERING_UNAVAILABLE",
+                "Delegation authority lacks one unique current ordering head.",
+            ),
+            None,
+        )
+    head = heads[0]
+    if (
+        head["relationship"] != "DELEGATION_ORDERING_HEAD"
+        or head["root_id"] != root.root_id
+        or head["source_id"] != root.root_id
+        or head["authority_generation"] != root.authority_generation
+        or head["lineage"] != root.lineage
+        or head["boundary"] != root.boundary
+        or head["boundary_epoch"] != root.boundary_epoch
+        or head["freshness_challenge_id"] != freshness.freshness_challenge_id
+        or head["lifecycle_state"] != "ACTIVE"
+        or head["head_event_order"] > binding.t3_anchor.event_order
+    ):
+        return (
+            _delegation_result(
+                case, AuthorityOutcome.UNAVAILABLE, "DELEGATION_ORDERING_UNAVAILABLE",
+                "Delegation ordering head is not exactly current and root-applicable.",
+            ),
+            None,
+        )
+
+    grant_by_key: dict[tuple[str, int], Mapping[str, Any]] = {}
+    for grant in grants:
+        key = (grant["grant_id"], grant["grant_generation"])
+        if key in grant_by_key:
+            return (
+                _delegation_result(
+                    case, AuthorityOutcome.UNAVAILABLE, "DELEGATION_CONFLICTING",
+                    "Protected delegation grant identities conflict.",
+                ),
+                None,
+            )
+        grant_by_key[key] = grant
+    key = (head["head_grant_id"], head["head_grant_generation"])
+    chain_reversed: list[Mapping[str, Any]] = []
+    seen_grants: set[tuple[str, int]] = set()
+    seen_principals: set[tuple[str, int, str]] = set()
+    while True:
+        if key in seen_grants:
+            return (
+                _delegation_result(
+                    case, AuthorityOutcome.UNAVAILABLE, "DELEGATION_CHAIN_CYCLE",
+                    "Delegation chain repeats a protected grant.",
+                ),
+                None,
+            )
+        grant = grant_by_key.get(key)
+        if grant is None:
+            return (
+                _delegation_result(
+                    case, AuthorityOutcome.UNAVAILABLE, "DELEGATION_CHAIN_INCOMPLETE",
+                    "Delegation chain is missing a required edge.",
+                ),
+                None,
+            )
+        seen_grants.add(key)
+        delegate_node = (
+            grant["delegate_id"], grant["delegate_generation"],
+            grant["delegate_identity_basis"],
+        )
+        if delegate_node in seen_principals:
+            return (
+                _delegation_result(
+                    case, AuthorityOutcome.UNAVAILABLE, "DELEGATION_CHAIN_CYCLE",
+                    "Delegation chain repeats a principal authority node.",
+                ),
+                None,
+            )
+        seen_principals.add(delegate_node)
+        if (
+            grant["delegator_id"] == grant["delegate_id"]
+            and grant["delegator_generation"] == grant["delegate_generation"]
+        ):
+            return (
+                _delegation_result(
+                    case, AuthorityOutcome.UNAVAILABLE, "DELEGATION_CHAIN_CYCLE",
+                    "Self-delegation cannot bootstrap authority.",
+                ),
+                None,
+            )
+        chain_reversed.append(grant)
+        if grant["parent_grant_id"] == "ROOT_AUTHORITY":
+            break
+        key = (grant["parent_grant_id"], grant["parent_grant_generation"])
+        if len(chain_reversed) > policy["maximum_chain_depth"]:
+            return (
+                _delegation_result(
+                    case, AuthorityOutcome.UNAVAILABLE, "DELEGATION_CHAIN_INCOMPLETE",
+                    "Delegation chain exceeds the root-authorized maximum depth.",
+                ),
+                None,
+            )
+    chain = tuple(reversed(chain_reversed))
+    if len(chain) > policy["maximum_chain_depth"]:
+        return (
+            _delegation_result(
+                case, AuthorityOutcome.UNAVAILABLE, "DELEGATION_CHAIN_INCOMPLETE",
+                "Delegation chain exceeds policy depth.",
+            ),
+            None,
+        )
+
+    principal_transitions = first["delegation_principal_transitions"]
+    grant_transitions = first["delegation_grant_transitions"]
+    chain_nodes = {
+        (grant["delegator_id"], grant["delegator_generation"])
+        for grant in chain
+    } | {
+        (grant["delegate_id"], grant["delegate_generation"])
+        for grant in chain
+    }
+    for transition in principal_transitions:
+        old_node = (
+            transition["old_principal_id"], transition["old_principal_generation"]
+        )
+        new_node = (
+            transition["new_principal_id"], transition["new_principal_generation"]
+        )
+        if (
+            old_node not in chain_nodes
+            and new_node not in chain_nodes
+        ) or transition["event_order"] > head["head_event_order"]:
+            continue
+        exact_grant_transitions = tuple(
+            item for item in grant_transitions
+            if item["event_order"] == transition["event_order"]
+            and item["source_id"] == root.root_id
+            and item["authority_generation"] == root.authority_generation
+            and item["lineage"] == root.lineage
+            and item["boundary"] == root.boundary
+            and item["boundary_epoch"] == root.boundary_epoch
+            and item["lifecycle_state"] == "ACTIVE"
+        )
+        if new_node not in chain_nodes or len(exact_grant_transitions) != 1:
+            return (
+                _delegation_result(
+                    case, AuthorityOutcome.UNAVAILABLE,
+                    "DELEGATION_SUCCESSOR_AUTHORITY_UNAVAILABLE",
+                    "A principal transition lacks one exact successor-specific grant transition.",
+                ),
+                None,
+            )
+
+    principal_by_key = {
+        (item["principal_id"], item["principal_generation"], item["identity_basis"]): item
+        for item in principals
+    }
+    if len(principal_by_key) != len(principals):
+        return (
+            _delegation_result(
+                case, AuthorityOutcome.UNAVAILABLE,
+                "DELEGATION_PRINCIPAL_ADMISSION_UNAVAILABLE",
+                "Protected principal admissions are ambiguous.",
+            ),
+            None,
+        )
+    lifecycle_by_target: dict[tuple[str, str, int], list[Mapping[str, Any]]] = {}
+    for record in lifecycles:
+        lifecycle_by_target.setdefault(
+            (record["target_kind"], record["target_id"], record["target_generation"]), []
+        ).append(record)
+
+    previous: Mapping[str, Any] | None = None
+    for index, grant in enumerate(chain):
+        if (
+            grant["relationship"] != "DELEGATION_GRANT"
+            or grant["chain_id"] != head["chain_id"]
+            or grant["root_id"] != root.root_id
+            or grant["source_id"] != root.root_id
+            or grant["authority_generation"] != root.authority_generation
+            or grant["lineage"] != root.lineage
+            or grant["boundary"] != root.boundary
+            or grant["boundary_epoch"] != root.boundary_epoch
+            or grant["created_event_order"] > grant["effective_start_order"]
+            or grant["effective_start_order"] > head["head_event_order"]
+            or grant["effective_end_order"] < head["head_event_order"]
+            or grant["hop_depth"] != index
+            or grant["maximum_depth"] > policy["maximum_chain_depth"]
+        ):
+            return (
+                _delegation_result(
+                    case, AuthorityOutcome.UNAVAILABLE, "DELEGATION_CURRENTNESS_UNAVAILABLE",
+                    "A delegation edge is stale, misordered, or outside the applicable root context.",
+                ),
+                None,
+            )
+        delegator_key = (
+            grant["delegator_id"], grant["delegator_generation"],
+            grant["delegator_identity_basis"],
+        )
+        delegate_key = (
+            grant["delegate_id"], grant["delegate_generation"],
+            grant["delegate_identity_basis"],
+        )
+        delegator = principal_by_key.get(delegator_key)
+        delegate = principal_by_key.get(delegate_key)
+        if delegator is None:
+            return (
+                _delegation_result(
+                    case, AuthorityOutcome.UNAVAILABLE,
+                    "DELEGATION_SOURCE_AUTHORITY_UNAVAILABLE",
+                    "The exact delegator lacks independent protected admission.",
+                ),
+                None,
+            )
+        if delegate is None:
+            return (
+                _delegation_result(
+                    case, AuthorityOutcome.UNAVAILABLE, "DELEGATE_ADMISSION_UNAVAILABLE",
+                    "The exact delegate lacks independent protected admission.",
+                ),
+                None,
+            )
+        for principal, role in ((delegator, "DELEGATOR"), (delegate, "DELEGATE")):
+            if (
+                role not in principal["roles"]
+                or principal["root_id"] != root.root_id
+                or principal["source_id"] != root.root_id
+                or principal["authority_generation"] != root.authority_generation
+                or principal["lineage"] != root.lineage
+                or principal["boundary"] != root.boundary
+                or principal["boundary_epoch"] != root.boundary_epoch
+                or principal["start_event_order"] > head["head_event_order"]
+                or principal["end_event_order"] < head["head_event_order"]
+                or principal["freshness_challenge_id"] != freshness.freshness_challenge_id
+                or principal["lifecycle_state"] != "ACTIVE"
+            ):
+                return (
+                    _delegation_result(
+                        case, AuthorityOutcome.UNAVAILABLE,
+                        "DELEGATION_PRINCIPAL_ADMISSION_UNAVAILABLE",
+                        "A delegation principal is not exactly current, scoped, and root-admitted.",
+                    ),
+                    None,
+                )
+        records = lifecycle_by_target.get(
+            ("GRANT", grant["grant_id"], grant["grant_generation"]), []
+        )
+        if len(records) != 1:
+            return (
+                _delegation_result(
+                    case, AuthorityOutcome.UNAVAILABLE,
+                    "DELEGATION_CURRENTNESS_UNAVAILABLE",
+                    "A delegation grant lacks one authoritative lifecycle record.",
+                ),
+                None,
+            )
+        lifecycle = records[0]
+        if lifecycle["state"] in {"REVOKED", "REJECTED", "PROHIBITED"}:
+            return (
+                _delegation_result(
+                    case, AuthorityOutcome.DENIED, "DELEGATION_REVOKED",
+                    "A current applicable upstream delegation edge is revoked or prohibited.",
+                ),
+                None,
+            )
+        if (
+            lifecycle["state"] != "ACTIVE"
+            or grant["lifecycle_state"] != "ACTIVE"
+            or lifecycle["event_order"] > head["head_event_order"]
+            or lifecycle["source_id"] != root.root_id
+            or lifecycle["authority_generation"] != root.authority_generation
+        ):
+            return (
+                _delegation_result(
+                    case, AuthorityOutcome.UNAVAILABLE,
+                    "DELEGATION_CURRENTNESS_UNAVAILABLE",
+                    "A delegation grant is stale, expired, superseded, or unordered.",
+                ),
+                None,
+            )
+        if previous is None:
+            if grant["parent_grant_id"] != "ROOT_AUTHORITY" or grant["delegator_id"] != root.root_id:
+                return (
+                    _delegation_result(
+                        case, AuthorityOutcome.UNAVAILABLE,
+                        "DELEGATION_ROOT_AUTHORITY_UNAVAILABLE",
+                        "Delegation chain does not terminate at the independently admitted root.",
+                    ),
+                    None,
+                )
+        else:
+            if (
+                grant["parent_grant_id"] != previous["grant_id"]
+                or grant["parent_grant_generation"] != previous["grant_generation"]
+                or grant["delegator_id"] != previous["delegate_id"]
+                or grant["delegator_generation"] != previous["delegate_generation"]
+                or grant["delegator_identity_basis"] != previous["delegate_identity_basis"]
+            ):
+                return (
+                    _delegation_result(
+                        case, AuthorityOutcome.UNAVAILABLE,
+                        "DELEGATION_CHAIN_INCOMPLETE",
+                        "Delegation chain contains an unrelated splice or missing edge.",
+                    ),
+                    None,
+                )
+            if not previous["further_delegation"]:
+                return (
+                    _delegation_result(
+                        case, AuthorityOutcome.UNAVAILABLE,
+                        "DELEGABLE_SCOPE_UNAVAILABLE",
+                        "Action authority does not independently establish delegation authority.",
+                    ),
+                    None,
+                )
+            if not _scope_is_subset(grant["action_scope"], previous["delegable_scope"]):
+                return (
+                    _delegation_result(
+                        case, AuthorityOutcome.UNAVAILABLE, "DELEGATION_SCOPE_WIDENING",
+                        "A downstream delegation edge widens upstream delegable scope.",
+                    ),
+                    None,
+                )
+        previous = grant
+
+    terminal = chain[-1]
+    if len(uses) != 1:
+        return (
+            _delegation_result(
+                case, AuthorityOutcome.UNAVAILABLE, "DELEGATION_GRANT_USE_UNAVAILABLE",
+                "Delegated execution lacks one exact protected terminal-use binding.",
+            ),
+            None,
+        )
+    use = uses[0]
+    objective = case.t3_binding_facts.objective_identity
+    contract = case.t3_binding_facts.decision_contract_identity
+    expected_use = (
+        use["relationship"] == "DELEGATION_TERMINAL_USE"
+        and use["chain_id"] == terminal["chain_id"]
+        and use["terminal_grant_id"] == terminal["grant_id"]
+        and use["terminal_grant_generation"] == terminal["grant_generation"]
+        and use["execution_grant_id"] == active_state.grant_id
+        and use["subject_id"] == case.authority_tuple.subject
+        and use["subject_generation"] == terminal["delegate_generation"]
+        and use["subject_identity_basis"] == case.authority_tuple.identity_basis
+        and use["artifact"] == case.authority_tuple.artifact
+        and use["boundary"] == root.boundary
+        and use["boundary_epoch"] == root.boundary_epoch
+        and use["execution_context"] == case.facts["execution_context"].value
+        and use["consumption_state"] == case.facts["consumption_state"].value
+        and objective is not None
+        and use["objective_id"] == objective.objective_id
+        and use["objective_generation"] == objective.objective_generation
+        and contract is not None
+        and use["decision_contract_id"] == contract.contract_id
+        and use["decision_contract_version"] == contract.contract_version
+        and use["use_event_order"] == head["head_event_order"]
+        and use["freshness_challenge_id"] == freshness.freshness_challenge_id
+        and use["lifecycle_state"] == "ACTIVE"
+        and use["effect"] in terminal["action_scope"]["actions"]
+        and use["artifact"] in terminal["action_scope"]["artifacts"]
+        and use["tool"] in terminal["action_scope"]["tools"]
+    )
+    if not expected_use:
+        return (
+            _delegation_result(
+                case, AuthorityOutcome.UNAVAILABLE, "DELEGATION_GRANT_USE_UNAVAILABLE",
+                "Terminal execution is not bound to the exact current delegation chain and effect.",
+            ),
+            None,
+        )
+    expected_candidate = {
+        "relationship": "EXACT_DELEGATION",
+        "delegator": terminal["delegator_id"],
+        "delegate": terminal["delegate_id"],
+        "artifact": use["artifact"],
+        "control_state": case.authority_tuple.control_state,
+        "boundary_epoch": use["boundary_epoch"],
+        "applicable_boundary": use["boundary"],
+    }
+    if not _relation_matches(candidate, expected_candidate):
+        code = (
+            "DELEGATION_SOURCE_AUTHORITY_UNAVAILABLE"
+            if candidate.get("delegator") != terminal["delegator_id"]
+            else "DELEGATION_RELATIONSHIP_UNAVAILABLE"
+        )
+        return (
+            _delegation_result(
+                case, AuthorityOutcome.UNAVAILABLE, code,
+                "Candidate delegation does not match the protected current terminal edge.",
+            ),
+            None,
+        )
+    return None, terminal
+
+
 def _evaluate_recovery_and_rotation(
     case: OracleInput,
     binding: ObservationBinding,
@@ -2828,6 +3338,18 @@ def evaluate(case: OracleInput) -> OracleResult:
             ("consumption_binding",),
         )
 
+    # Establish the admitted observation history before relying on any authority
+    # relationship derived from that history.  This also keeps an unavailable
+    # commitment/anchor diagnostic from being masked by a later protected join.
+    observation_result = _evaluate_observation(case)
+    if observation_result.outcome is not AuthorityOutcome.AUTHORIZED:
+        return observation_result
+
+    delegation_result, protected_terminal_grant = _evaluate_delegation_authority(
+        case, active_state
+    )
+    if delegation_result is not None:
+        return delegation_result
     delegation = case.facts["delegation_binding"].value
     if active_state.subject_mode == "DIRECT":
         delegation_expected = {
@@ -2839,10 +3361,17 @@ def evaluate(case: OracleInput) -> OracleResult:
             "applicable_boundary": case.facts["applicable_boundary"].value,
         }
     elif active_state.subject_mode == "DELEGATED":
+        if protected_terminal_grant is None:
+            return _unavailable(
+                case,
+                "DELEGATION_SOURCE_AUTHORITY_UNAVAILABLE",
+                "Protected terminal delegation authority is unavailable.",
+                ("delegation_binding",),
+            )
         delegation_expected = {
             "relationship": "EXACT_DELEGATION",
-            "delegator": delegation.get("delegator") if isinstance(delegation, Mapping) else None,
-            "delegate": case.authority_tuple.subject,
+            "delegator": protected_terminal_grant["delegator_id"],
+            "delegate": protected_terminal_grant["delegate_id"],
             "artifact": case.authority_tuple.artifact,
             "control_state": case.authority_tuple.control_state,
             "boundary_epoch": case.authority_tuple.boundary_epoch,
@@ -2857,13 +3386,6 @@ def evaluate(case: OracleInput) -> OracleResult:
         )
     if (
         not _relation_matches(delegation, delegation_expected)
-        or (
-            active_state.subject_mode == "DELEGATED"
-            and (
-                not isinstance(delegation_expected["delegator"], str)
-                or delegation_expected["delegator"] == ""
-            )
-        )
     ):
         return _unavailable(
             case,
@@ -2887,10 +3409,6 @@ def evaluate(case: OracleInput) -> OracleResult:
 
     if t3_binding_result.outcome is not AuthorityOutcome.AUTHORIZED:
         return t3_binding_result
-
-    observation_result = _evaluate_observation(case)
-    if observation_result.outcome is not AuthorityOutcome.AUTHORIZED:
-        return observation_result
 
     return OracleResult(
         AuthorityOutcome.AUTHORIZED,
