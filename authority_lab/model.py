@@ -2139,12 +2139,99 @@ TRUSTED_SOURCE_TRANSITION_FIELDS = frozenset({
     "ordering_source_id", "freshness_challenge_id", "lifecycle_state",
 })
 
+TRUSTED_CONTROL_PLANE_POLICY_FIELDS = frozenset({
+    "relationship", "policy_id", "policy_generation", "membership_epoch",
+    "required_roles", "required_separation_sets", "allowed_consolidation_ids",
+    "required_appraisal_root_ids", "selection_rule", "boundary",
+    "boundary_epoch", "source_id", "authority_generation",
+    "ordering_source_id", "freshness_challenge_id", "lifecycle_state",
+})
+
+TRUSTED_CONTROL_PLANE_MEMBERSHIP_FIELDS = frozenset({
+    "relationship", "role", "member_id", "member_generation",
+    "identity_basis", "credential_or_key_id", "credential_or_key_generation",
+    "process_or_instance_id", "process_or_instance_generation",
+    "source_lineage", "upstream_dependency", "control_domain",
+    "rollback_domain", "independence_domain", "membership_epoch",
+    "authority_scope", "covered_scope_families", "boundary", "boundary_epoch",
+    "start_event_order", "end_event_order", "appraiser_id",
+    "appraiser_generation", "appraisal_root_id", "source_id",
+    "authority_generation", "ordering_source_id", "freshness_challenge_id",
+    "lifecycle_state",
+})
+
+TRUSTED_INDEPENDENCE_APPRAISAL_ROOT_FIELDS = frozenset({
+    "relationship", "appraisal_root_id", "appraisal_root_generation",
+    "identity_basis", "authority_scope", "source_lineage", "control_domain",
+    "rollback_domain", "independence_domain", "membership_epoch", "boundary",
+    "boundary_epoch", "start_event_order", "end_event_order", "source_id",
+    "authority_generation", "ordering_source_id", "freshness_challenge_id",
+    "lifecycle_state", "predecessor_appraisal_root_id", "rotation_id",
+})
+
+TRUSTED_CONTROL_PLANE_TRANSITION_FIELDS = frozenset({
+    "relationship", "transition_id", "role", "old_member_id",
+    "old_member_generation", "new_member_id", "new_member_generation",
+    "old_effective_domain", "new_effective_domain", "transition_reason",
+    "policy_id", "membership_epoch", "appraisal_root_id", "boundary",
+    "boundary_epoch", "source_id", "authority_generation",
+    "ordering_source_id", "freshness_challenge_id", "lifecycle_state",
+})
+
+TRUSTED_ROLE_CONSOLIDATION_FIELDS = frozenset({
+    "relationship", "consolidation_id", "consolidation_generation", "roles",
+    "member_keys", "effective_domain", "policy_id", "membership_epoch",
+    "appraisal_root_id", "boundary", "boundary_epoch", "source_id",
+    "authority_generation", "ordering_source_id", "freshness_challenge_id",
+    "lifecycle_state",
+})
+
 
 def _trusted_exact_record(value: Any, fields: frozenset[str], name: str) -> Mapping[str, Any]:
     if not isinstance(value, Mapping):
         raise ValueError(f"{name} must be an object")
     _require_exact_fields(value, fields, name)
     return MappingProxyType(dict(value))
+
+
+def _trusted_control_record(
+    value: Any,
+    fields: frozenset[str],
+    name: str,
+    *,
+    integer_fields: frozenset[str] = frozenset(),
+    array_fields: frozenset[str] = frozenset(),
+    nested_array_fields: frozenset[str] = frozenset(),
+) -> Mapping[str, Any]:
+    """Strict, immutable parser for protected control-plane relations."""
+    if not isinstance(value, Mapping):
+        raise ValueError(f"{name} must be an object")
+    _require_exact_fields(value, fields, name)
+    parsed: dict[str, Any] = {}
+    for field in fields:
+        item = value[field]
+        qualified = f"{name}.{field}"
+        if field in integer_fields:
+            parsed[field] = _exact_generation(item, qualified)
+        elif field in nested_array_fields:
+            if not isinstance(item, (list, tuple)):
+                raise ValueError(f"{qualified} must be an array")
+            groups = tuple(
+                tuple(_exact_nonempty_string(part, qualified) for part in group)
+                if isinstance(group, (list, tuple)) and group
+                else ()
+                for group in item
+            )
+            if any(not group for group in groups):
+                raise ValueError(f"{qualified} entries must be non-empty arrays")
+            parsed[field] = groups
+        elif field in array_fields:
+            if not isinstance(item, (list, tuple)):
+                raise ValueError(f"{qualified} must be an array")
+            parsed[field] = tuple(_exact_nonempty_string(part, qualified) for part in item)
+        else:
+            parsed[field] = _exact_nonempty_string(item, qualified)
+    return MappingProxyType(parsed)
 
 
 def validate_trusted_anchor_context(value: Mapping[str, Any]) -> Mapping[str, Any]:
@@ -2182,6 +2269,74 @@ def validate_trusted_anchor_context(value: Mapping[str, Any]) -> Mapping[str, An
     result["source_domain_transitions"] = tuple(
         _trusted_exact_record(item, TRUSTED_SOURCE_TRANSITION_FIELDS, "trusted source transition")
         for item in transitions
+    )
+    result["control_plane_policy"] = _trusted_control_record(
+        value.get("control_plane_policy"), TRUSTED_CONTROL_PLANE_POLICY_FIELDS,
+        "trusted control_plane_policy",
+        integer_fields=frozenset({"policy_generation", "membership_epoch", "authority_generation"}),
+        array_fields=frozenset({"required_roles", "allowed_consolidation_ids", "required_appraisal_root_ids"}),
+        nested_array_fields=frozenset({"required_separation_sets"}),
+    )
+    control_memberships = value.get("control_plane_memberships")
+    if not isinstance(control_memberships, list) or not control_memberships:
+        raise ValueError("trusted control_plane_memberships must be a non-empty array")
+    result["control_plane_memberships"] = tuple(
+        _trusted_control_record(
+            item, TRUSTED_CONTROL_PLANE_MEMBERSHIP_FIELDS,
+            "trusted control-plane membership",
+            integer_fields=frozenset({
+                "member_generation", "credential_or_key_generation",
+                "process_or_instance_generation", "membership_epoch",
+                "start_event_order", "end_event_order", "appraiser_generation",
+                "authority_generation",
+            }),
+            array_fields=frozenset({"authority_scope", "covered_scope_families"}),
+        )
+        for item in control_memberships
+    )
+    appraisal_roots = value.get("independence_appraisal_roots")
+    if not isinstance(appraisal_roots, list) or not appraisal_roots:
+        raise ValueError("trusted independence_appraisal_roots must be a non-empty array")
+    result["independence_appraisal_roots"] = tuple(
+        _trusted_control_record(
+            item, TRUSTED_INDEPENDENCE_APPRAISAL_ROOT_FIELDS,
+            "trusted independence appraisal root",
+            integer_fields=frozenset({
+                "appraisal_root_generation", "membership_epoch",
+                "start_event_order", "end_event_order", "authority_generation",
+            }),
+            array_fields=frozenset({"authority_scope"}),
+        )
+        for item in appraisal_roots
+    )
+    control_transitions = value.get("control_plane_membership_transitions")
+    if not isinstance(control_transitions, list):
+        raise ValueError("trusted control_plane_membership_transitions must be an array")
+    result["control_plane_membership_transitions"] = tuple(
+        _trusted_control_record(
+            item, TRUSTED_CONTROL_PLANE_TRANSITION_FIELDS,
+            "trusted control-plane membership transition",
+            integer_fields=frozenset({
+                "old_member_generation", "new_member_generation",
+                "membership_epoch", "authority_generation",
+            }),
+            array_fields=frozenset({"old_effective_domain", "new_effective_domain"}),
+        )
+        for item in control_transitions
+    )
+    consolidations = value.get("authorized_consolidations")
+    if not isinstance(consolidations, list):
+        raise ValueError("trusted authorized_consolidations must be an array")
+    result["authorized_consolidations"] = tuple(
+        _trusted_control_record(
+            item, TRUSTED_ROLE_CONSOLIDATION_FIELDS,
+            "trusted role consolidation",
+            integer_fields=frozenset({
+                "consolidation_generation", "membership_epoch", "authority_generation",
+            }),
+            array_fields=frozenset({"roles", "member_keys", "effective_domain"}),
+        )
+        for item in consolidations
     )
     reconciliation = value.get("cross_domain_reconciliation")
     result["cross_domain_reconciliation"] = (

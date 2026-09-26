@@ -364,9 +364,9 @@ class AuthorityLabTests(unittest.TestCase):
         self.assertIs(AuthorityOutcome.UNAVAILABLE, result.outcome)
         self.assertIn(reason_code, {reason.code for reason in result.reasons})
 
-    def test_v1_contains_one_hundred_eighty_six_deterministic_fixtures(self) -> None:
+    def test_v1_contains_two_hundred_thirty_four_deterministic_fixtures(self) -> None:
         paths = discover(CASES)
-        self.assertEqual(186, len(paths))
+        self.assertEqual(234, len(paths))
         self.assertEqual(paths, discover(CASES))
 
     def test_every_v0_fixture_matches_its_expected_outcome(self) -> None:
@@ -2111,6 +2111,105 @@ class AuthorityLabTests(unittest.TestCase):
             "ANCHOR_ADAPTER_PROHIBITED",
             {reason.code for reason in result.reasons},
         )
+
+    def test_control_plane_independence_matrix_matches_expectations(self) -> None:
+        for number in range(187, 235):
+            case_id = f"LAB-V1-{number:03d}"
+            with self.subTest(case_id=case_id):
+                self.assertIs(HarnessStatus.PASS, run_fixture(fixture(case_id)).status)
+
+    def test_lab_134_false_independence_reproducer_is_closed(self) -> None:
+        payload = fixture("LAB-V1-134")
+        context = payload["_trusted_anchor_context"][0]
+        root = next(
+            item for item in context["control_plane_memberships"]
+            if item["role"] == "POLICY_ROOT"
+        )
+        verifier = next(
+            item for item in context["control_plane_memberships"]
+            if item["role"] == "COMMITMENT_VERIFIER"
+        )
+        for name in (
+            "source_lineage", "control_domain", "upstream_dependency", "rollback_domain"
+        ):
+            verifier[name] = root[name]
+        self.assert_unavailable_with_reason(
+            payload, "CONTROL_PLANE_INDEPENDENCE_UNAVAILABLE"
+        )
+
+    def test_role_key_process_and_quorum_multiplicity_do_not_create_independence(self) -> None:
+        for case_id in (
+            "LAB-V1-197", "LAB-V1-198", "LAB-V1-199", "LAB-V1-200",
+            "LAB-V1-206", "LAB-V1-207", "LAB-V1-208",
+        ):
+            with self.subTest(case_id=case_id):
+                self.assert_unavailable_with_reason(
+                    fixture(case_id), "CONTROL_PLANE_INDEPENDENCE_UNAVAILABLE"
+                )
+
+    def test_appraisal_self_support_and_cycles_fail_closed(self) -> None:
+        for case_id in (
+            "LAB-V1-224", "LAB-V1-225", "LAB-V1-226", "LAB-V1-227",
+            "LAB-V1-228", "LAB-V1-229",
+        ):
+            with self.subTest(case_id=case_id):
+                self.assert_unavailable_with_reason(
+                    fixture(case_id), "INDEPENDENCE_APPRAISAL_CYCLE"
+                )
+
+    def test_applicable_role_subset_and_stale_membership_fail_closed(self) -> None:
+        self.assert_unavailable_with_reason(
+            fixture("LAB-V1-211"), "APPLICABLE_ROLE_POLICY_UNAVAILABLE"
+        )
+        self.assert_unavailable_with_reason(
+            fixture("LAB-V1-222"), "CONTROL_PLANE_MEMBERSHIP_UNAVAILABLE"
+        )
+
+    def test_correlated_rotations_reconciliation_and_recovery_fail_closed(self) -> None:
+        for case_id in (
+            "LAB-V1-201", "LAB-V1-202", "LAB-V1-203", "LAB-V1-204",
+            "LAB-V1-205", "LAB-V1-212", "LAB-V1-213",
+        ):
+            with self.subTest(case_id=case_id):
+                self.assertIs(AuthorityOutcome.UNAVAILABLE, actual(fixture(case_id)))
+
+    def test_authorized_consolidation_and_separation_remain_reachable(self) -> None:
+        for case_id in ("LAB-V1-218", "LAB-V1-220"):
+            with self.subTest(case_id=case_id):
+                self.assertIs(AuthorityOutcome.AUTHORIZED, actual(fixture(case_id)))
+        self.assert_unavailable_with_reason(
+            fixture("LAB-V1-219"), "CONTROL_PLANE_INDEPENDENCE_UNAVAILABLE"
+        )
+
+    def test_survivor_genesis_recovery_and_successor_paths_remain_reachable(self) -> None:
+        self.assert_unavailable_with_reason(
+            fixture("LAB-V1-231"), "VERIFIER_STATE_ANCHOR_REPLAY"
+        )
+        for case_id in ("LAB-V1-215", "LAB-V1-216", "LAB-V1-218", "LAB-V1-220", "LAB-V1-232", "LAB-V1-233", "LAB-V1-234"):
+            with self.subTest(case_id=case_id):
+                self.assertIs(AuthorityOutcome.AUTHORIZED, actual(fixture(case_id)))
+
+    def test_control_plane_protected_records_are_strictly_typed(self) -> None:
+        payload = fixture("LAB-V1-134")
+        parsed = OracleInput.from_fixture(deepcopy(payload))
+        context = parsed.trusted_anchor_context[0]
+        self.assertIsInstance(context["control_plane_policy"]["required_roles"], tuple)
+        self.assertIsInstance(
+            context["control_plane_memberships"][0]["authority_scope"], tuple
+        )
+        payload["_trusted_anchor_context"][0]["control_plane_policy"]["trusted"] = True
+        with self.assertRaisesRegex(ValueError, "contain exactly"):
+            OracleInput.from_fixture(payload)
+
+    def test_candidate_cannot_supply_trusted_control_plane_context(self) -> None:
+        path = CASES / "LAB-V1-134.json"
+        raw = json.loads(path.read_text(encoding="utf-8"))
+        raw["_trusted_control_plane_context"] = []
+        with patch("authority_lab.runner.Path.open") as opened:
+            opened.return_value.__enter__.return_value.read.return_value = json.dumps(raw)
+            opened.return_value.__enter__.return_value.__iter__.return_value = iter(())
+            with self.assertRaisesRegex(ValueError, "trusted control-plane"):
+                load_fixture(path)
 
     def test_positive_commitment_and_successor_paths_remain_authorized(self) -> None:
         for case_id in ("LAB-V1-098", "LAB-V1-099", "LAB-V1-102", "LAB-V1-111", "LAB-V1-112"):

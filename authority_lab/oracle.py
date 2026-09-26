@@ -1130,6 +1130,11 @@ def _evaluate_verifier_state_anchor(
     )
     if protected_result is not None:
         return protected_result
+    control_plane_result = _evaluate_control_plane_independence(
+        case, binding, root, anchor, contexts
+    )
+    if control_plane_result is not None:
+        return control_plane_result
     trusted = contexts[0]
     conflict = trusted.get("conflicting_anchor_digests", [])
     if conflict:
@@ -1425,6 +1430,436 @@ def _evaluate_protected_anchor_domains(
             effective_domains.add(member["independence_domain"])
         if len(effective_domains) < contexts[0].get("required_witness_domains", 0):
             return _observation_unavailable(case, "WITNESS_SOURCE_CONTINUITY_UNAVAILABLE", "Witness multiplicity does not establish protected independent domains.", ("evidence_binding",))
+    return None
+
+
+CONTROL_PLANE_ROLES = frozenset({
+    "POLICY_ROOT", "ORDERER", "OBSERVER", "COMMITMENT_PRODUCER",
+    "COMMITMENT_VERIFIER", "ANCHOR_SOURCE", "ANCHOR_ADAPTER",
+    "WITNESS_SOURCE", "RECONCILIATION_AUTHORITY", "RECOVERY_AUTHORITY",
+})
+
+
+def _effective_domain(item: Mapping[str, Any]) -> tuple[str, str, str, str]:
+    return (
+        item["source_lineage"], item["control_domain"],
+        item.get("upstream_dependency", item.get("appraisal_root_id", "")),
+        item["rollback_domain"],
+    )
+
+
+def _applicable_control_plane_roles(
+    binding: ObservationBinding,
+    root: Any,
+    anchor: Mapping[str, Any],
+    contexts: list[Mapping[str, Any]],
+) -> set[tuple[str, str, int]]:
+    roles: set[tuple[str, str, int]] = {
+        ("POLICY_ROOT", root.root_id, root.authority_generation),
+        ("ORDERER", root.ordering_source_id, root.authority_generation),
+        ("COMMITMENT_VERIFIER", anchor["verifier_id"], anchor["verifier_generation"]),
+        ("ANCHOR_SOURCE", anchor["anchor_source_id"], anchor["anchor_source_generation"]),
+    }
+    roles.update(
+        ("OBSERVER", item.observer_id, item.observer_generation)
+        for item in binding.observers
+    )
+    roles.update(
+        ("COMMITMENT_PRODUCER", item.values["observer_id"], item.values["observer_generation"])
+        for item in binding.commitment_envelopes
+    )
+    roles.update(
+        ("COMMITMENT_VERIFIER", item.values["verifier_id"], item.values["verifier_generation"])
+        for item in binding.commitment_verifiers
+    )
+    roles.update(
+        ("ANCHOR_SOURCE", item.values["anchor_source_id"], item.values["anchor_source_generation"])
+        for item in binding.anchor_source_admissions
+    )
+    roles.update(
+        ("ANCHOR_ADAPTER", item["adapter_admission"]["adapter_id"], item["adapter_admission"]["adapter_generation"])
+        for item in contexts
+    )
+    roles.update(
+        ("WITNESS_SOURCE", item.values["witness_id"], item.values["witness_generation"])
+        for item in binding.witness_source_admissions
+    )
+    reconciliation = contexts[0].get("cross_domain_reconciliation")
+    if reconciliation is not None:
+        roles.add((
+            "RECONCILIATION_AUTHORITY", reconciliation["source_id"],
+            reconciliation["authority_generation"],
+        ))
+    roles.update(
+        (
+            "RECOVERY_AUTHORITY", item.values["recovery_authority_id"],
+            item.values["recovery_authority_generation"],
+        )
+        for item in binding.recovery_installations
+    )
+    return roles
+
+
+def _control_plane_identity_expectations(
+    binding: ObservationBinding,
+    root: Any,
+    anchor: Mapping[str, Any],
+    contexts: list[Mapping[str, Any]],
+) -> dict[tuple[str, str, int], tuple[str, str | None, int | None]] | None:
+    """Return exact identity/key expectations, or None on conflicting records."""
+    result: dict[tuple[str, str, int], tuple[str, str | None, int | None]] = {}
+
+    def add(role: str, member_id: str, generation: int, identity: str,
+            key_id: str | None = None, key_generation: int | None = None) -> bool:
+        item = (identity, key_id, key_generation)
+        index = (role, member_id, generation)
+        if index in result and result[index] != item:
+            return False
+        result[index] = item
+        return True
+
+    if not add("POLICY_ROOT", root.root_id, root.authority_generation, root.lineage):
+        return None
+    if not add("ORDERER", root.ordering_source_id, root.authority_generation, root.ordering_source_id):
+        return None
+    for item in binding.observers:
+        if not add("OBSERVER", item.observer_id, item.observer_generation, item.observer_identity_basis):
+            return None
+    for record in binding.commitment_envelopes:
+        item = record.values
+        if not add("COMMITMENT_PRODUCER", item["observer_id"], item["observer_generation"], item["observer_identity_basis"], item["issuer_key_id"], item["issuer_key_generation"]):
+            return None
+    for record in binding.commitment_verifiers:
+        item = record.values
+        if not add("COMMITMENT_VERIFIER", item["verifier_id"], item["verifier_generation"], item["verifier_identity_basis"]):
+            return None
+    if not add("COMMITMENT_VERIFIER", anchor["verifier_id"], anchor["verifier_generation"], anchor["verifier_identity_basis"]):
+        return None
+    for record in binding.anchor_source_admissions:
+        item = record.values
+        if not add("ANCHOR_SOURCE", item["anchor_source_id"], item["anchor_source_generation"], item["anchor_source_identity_basis"], item["anchor_key_id"], item["anchor_key_generation"]):
+            return None
+    if not add("ANCHOR_SOURCE", anchor["anchor_source_id"], anchor["anchor_source_generation"], anchor["anchor_source_identity_basis"], anchor["anchor_key_id"], anchor["anchor_key_generation"]):
+        return None
+    for context in contexts:
+        item = context["adapter_admission"]
+        if not add("ANCHOR_ADAPTER", item["adapter_id"], item["adapter_generation"], item["adapter_identity_basis"]):
+            return None
+    for record in binding.witness_source_admissions:
+        item = record.values
+        if not add("WITNESS_SOURCE", item["witness_id"], item["witness_generation"], item["witness_identity_basis"]):
+            return None
+    reconciliation = contexts[0].get("cross_domain_reconciliation")
+    if reconciliation is not None and not add("RECONCILIATION_AUTHORITY", reconciliation["source_id"], reconciliation["authority_generation"], reconciliation["source_id"]):
+        return None
+    for record in binding.recovery_installations:
+        item = record.values
+        if not add("RECOVERY_AUTHORITY", item["recovery_authority_id"], item["recovery_authority_generation"], item["recovery_authority_identity_basis"]):
+            return None
+    return result
+
+
+def _control_plane_unavailable(
+    case: OracleInput, code: str, detail: str,
+) -> OracleResult:
+    return _observation_unavailable(
+        case, code, detail, ("evidence_binding", "binding_source_authority", "freshness"),
+    )
+
+
+def _evaluate_control_plane_independence(
+    case: OracleInput,
+    binding: ObservationBinding,
+    root: Any,
+    anchor: Mapping[str, Any],
+    contexts: list[Mapping[str, Any]],
+) -> OracleResult | None:
+    """Close every selected authority role through protected appraisal facts."""
+    negative_states = {"REVOKED", "REJECTED", "INVALID", "PROHIBITED"}
+    policy = contexts[0]["control_plane_policy"]
+    memberships = contexts[0]["control_plane_memberships"]
+    appraisal_roots = contexts[0]["independence_appraisal_roots"]
+    transitions = contexts[0]["control_plane_membership_transitions"]
+    consolidations = contexts[0]["authorized_consolidations"]
+
+    protected_keys = (
+        "control_plane_policy", "control_plane_memberships",
+        "independence_appraisal_roots", "control_plane_membership_transitions",
+        "authorized_consolidations",
+    )
+    if any(
+        any(context[name] != contexts[0][name] for name in protected_keys)
+        for context in contexts[1:]
+    ):
+        return _control_plane_unavailable(
+            case, "CONTROL_PLANE_POLICY_CONFLICTING",
+            "Protected control-plane contexts disagree about policy or membership.",
+        )
+    if policy["lifecycle_state"] in negative_states:
+        return OracleResult(
+            AuthorityOutcome.DENIED,
+            (Reason("CONTROL_PLANE_POLICY_PROHIBITED", "Current authoritative evidence prohibits the control-plane policy.", ("evidence_binding",)),),
+            _engaged(case),
+        )
+    applicable = _applicable_control_plane_roles(binding, root, anchor, contexts)
+    identity_expectations = _control_plane_identity_expectations(
+        binding, root, anchor, contexts
+    )
+    if identity_expectations is None or set(identity_expectations) != applicable:
+        return _control_plane_unavailable(
+            case, "CONTROL_PLANE_IDENTITY_CONFLICTING",
+            "Selected authority records disagree about protected role identity or key generation.",
+        )
+    applicable_roles = {role for role, _, _ in applicable}
+    required_roles = policy["required_roles"]
+    separation_sets = policy["required_separation_sets"]
+    if (
+        policy["relationship"] != "CONTROL_PLANE_SEPARATION_POLICY"
+        or policy["selection_rule"] != "ALL_APPLICABLE"
+        or not isinstance(required_roles, (list, tuple))
+        or not required_roles
+        or len(required_roles) != len(set(required_roles))
+        or set(required_roles) != applicable_roles
+        or not set(required_roles).issubset(CONTROL_PLANE_ROLES)
+        or not isinstance(separation_sets, (list, tuple))
+        or not all(isinstance(group, (list, tuple)) and group for group in separation_sets)
+        or any(not set(group).issubset(applicable_roles) for group in separation_sets)
+        or policy["source_id"] != root.root_id
+        or policy["authority_generation"] != root.authority_generation
+        or policy["ordering_source_id"] != root.ordering_source_id
+        or policy["boundary"] != root.boundary
+        or policy["boundary_epoch"] != root.boundary_epoch
+        or policy["freshness_challenge_id"] != anchor["freshness_challenge_id"]
+        or policy["lifecycle_state"] != "ACTIVE"
+    ):
+        return _control_plane_unavailable(
+            case, "APPLICABLE_ROLE_POLICY_UNAVAILABLE",
+            "No exact current all-applicable control-plane role policy exists.",
+        )
+
+    membership_index: dict[tuple[str, str, int], Mapping[str, Any]] = {}
+    for item in memberships:
+        key = (item["role"], item["member_id"], item["member_generation"])
+        if key in membership_index:
+            return _control_plane_unavailable(
+                case, "CONTROL_PLANE_MEMBERSHIP_CONFLICTING",
+                "A selected control-plane role has duplicate protected membership.",
+            )
+        membership_index[key] = item
+    if set(membership_index) != applicable:
+        return _control_plane_unavailable(
+            case, "CONTROL_PLANE_MEMBERSHIP_UNAVAILABLE",
+            "Protected role membership does not exactly cover the selected authority path.",
+        )
+
+    root_index = {
+        (item["appraisal_root_id"], item["appraisal_root_generation"]): item
+        for item in appraisal_roots
+    }
+    if len(root_index) != len(appraisal_roots):
+        return _control_plane_unavailable(
+            case, "INDEPENDENCE_APPRAISAL_CONFLICTING",
+            "Independence-appraisal root identity is ambiguous.",
+        )
+    required_root_ids = policy["required_appraisal_root_ids"]
+    if (
+        not isinstance(required_root_ids, (list, tuple))
+        or not required_root_ids
+        or set(required_root_ids) != {item[0] for item in root_index}
+    ):
+        return _control_plane_unavailable(
+            case, "INDEPENDENCE_APPRAISAL_ROOT_UNAVAILABLE",
+            "The protected policy does not select the exact appraisal-root set.",
+        )
+    for appraisal in appraisal_roots:
+        if appraisal["lifecycle_state"] in negative_states:
+            return OracleResult(
+                AuthorityOutcome.DENIED,
+                (Reason("INDEPENDENCE_APPRAISAL_ROOT_PROHIBITED", "Current authoritative evidence prohibits an independence-appraisal root.", ("evidence_binding",)),),
+                _engaged(case),
+            )
+        if (
+            appraisal["relationship"] != "INDEPENDENCE_APPRAISAL_ROOT_ADMISSION"
+            or appraisal["membership_epoch"] != policy["membership_epoch"]
+            or appraisal["boundary"] != root.boundary
+            or appraisal["boundary_epoch"] != root.boundary_epoch
+            or appraisal["start_event_order"] > binding.t1_anchor.event_order
+            or appraisal["end_event_order"] < binding.t3_anchor.event_order
+            or appraisal["source_id"] == root.root_id
+            or appraisal["source_id"] in {item["member_id"] for item in memberships}
+            or not isinstance(appraisal["authority_generation"], int)
+            or appraisal["authority_generation"] < 1
+            or appraisal["freshness_challenge_id"] != anchor["freshness_challenge_id"]
+            or appraisal["lifecycle_state"] != "ACTIVE"
+        ):
+            return _control_plane_unavailable(
+                case, "INDEPENDENCE_APPRAISAL_ROOT_UNAVAILABLE",
+                "An appraisal root is stale, out of scope, or not current.",
+            )
+
+    for key, item in membership_index.items():
+        if item["lifecycle_state"] in negative_states:
+            return OracleResult(
+                AuthorityOutcome.DENIED,
+                (Reason("CONTROL_PLANE_MEMBERSHIP_PROHIBITED", "Current authoritative evidence prohibits a selected role membership.", ("evidence_binding",)),),
+                _engaged(case),
+            )
+        if (
+            item["relationship"] != "CONTROL_PLANE_ROLE_MEMBERSHIP"
+            or item["role"] not in CONTROL_PLANE_ROLES
+            or item["membership_epoch"] != policy["membership_epoch"]
+            or item["boundary"] != root.boundary
+            or item["boundary_epoch"] != root.boundary_epoch
+            or item["start_event_order"] > binding.t1_anchor.event_order
+            or item["end_event_order"] < binding.t3_anchor.event_order
+            or item["source_id"] != root.root_id
+            or item["authority_generation"] != root.authority_generation
+            or item["ordering_source_id"] != root.ordering_source_id
+            or item["freshness_challenge_id"] != anchor["freshness_challenge_id"]
+            or item["lifecycle_state"] != "ACTIVE"
+            or not isinstance(item["authority_scope"], (list, tuple))
+            or "AUTHORITY_DECISION" not in item["authority_scope"]
+        ):
+            return _control_plane_unavailable(
+                case, "CONTROL_PLANE_MEMBERSHIP_UNAVAILABLE",
+                "A selected role membership is stale, incomplete, or out of scope.",
+            )
+        expected_identity, expected_key, expected_key_generation = identity_expectations[key]
+        if (
+            item["identity_basis"] != expected_identity
+            or (expected_key is not None and item["credential_or_key_id"] != expected_key)
+            or (
+                expected_key_generation is not None
+                and item["credential_or_key_generation"] != expected_key_generation
+            )
+        ):
+            return _control_plane_unavailable(
+                case, "CONTROL_PLANE_IDENTITY_UNAVAILABLE",
+                "Protected membership does not bind the exact selected role identity and key generation.",
+            )
+        appraisal_root = root_index.get((item["appraiser_id"], item["appraiser_generation"]))
+        if appraisal_root is not None:
+            if item["appraisal_root_id"] != appraisal_root["appraisal_root_id"]:
+                return _control_plane_unavailable(case, "INDEPENDENCE_APPRAISAL_UNAVAILABLE", "Membership appraisal does not close at its selected root.")
+            if item["member_id"] == appraisal_root["appraisal_root_id"] or _effective_domain(item) == _effective_domain(appraisal_root):
+                return _control_plane_unavailable(case, "INDEPENDENCE_APPRAISAL_CYCLE", "An appraisal root is inside the effective domain it appraises.")
+
+    # Follow every appraisal edge. It must terminate at an admitted root and may
+    # not self-support or cycle through another selected role.
+    by_identity = {
+        (item["member_id"], item["member_generation"]): item
+        for item in memberships
+    }
+    for start in memberships:
+        seen: set[tuple[str, int]] = set()
+        node = start
+        while True:
+            node_key = (node["member_id"], node["member_generation"])
+            if node_key in seen:
+                return _control_plane_unavailable(case, "INDEPENDENCE_APPRAISAL_CYCLE", "The protected appraisal graph contains a cycle.")
+            seen.add(node_key)
+            target_key = (node["appraiser_id"], node["appraiser_generation"])
+            appraisal_root = root_index.get(target_key)
+            if appraisal_root is not None:
+                if node["appraisal_root_id"] != appraisal_root["appraisal_root_id"]:
+                    return _control_plane_unavailable(case, "INDEPENDENCE_APPRAISAL_UNAVAILABLE", "The appraisal chain terminates at the wrong root.")
+                break
+            target = by_identity.get(target_key)
+            if target is None:
+                return _control_plane_unavailable(case, "INDEPENDENCE_APPRAISAL_UNAVAILABLE", "The appraisal chain has no admitted terminal root.")
+            node = target
+
+    transition_index = {
+        (item["role"], item["new_member_id"], item["new_member_generation"]): item
+        for item in transitions
+    }
+    for key, item in membership_index.items():
+        if item["member_generation"] <= 1 and policy["membership_epoch"] <= 1:
+            continue
+        transition = transition_index.get(key)
+        if (
+            transition is None
+            or transition["relationship"] != "CONTROL_PLANE_MEMBERSHIP_TRANSITION"
+            or transition["new_member_id"] != item["member_id"]
+            or transition["new_member_generation"] != item["member_generation"]
+            or transition["old_member_generation"] != max(0, item["member_generation"] - 1)
+            or transition["transition_reason"] not in {"ROTATION", "SEPARATION", "CONSOLIDATION", "RECOVERY"}
+            or not isinstance(transition["old_effective_domain"], (list, tuple))
+            or len(transition["old_effective_domain"]) != 4
+            or transition["new_effective_domain"] != _effective_domain(item)
+            or transition["policy_id"] != policy["policy_id"]
+            or transition["membership_epoch"] != policy["membership_epoch"]
+            or transition["appraisal_root_id"] != item["appraisal_root_id"]
+            or transition["boundary"] != root.boundary
+            or transition["boundary_epoch"] != root.boundary_epoch
+            or transition["source_id"] != root.root_id
+            or transition["authority_generation"] != root.authority_generation
+            or transition["ordering_source_id"] != root.ordering_source_id
+            or transition["freshness_challenge_id"] != anchor["freshness_challenge_id"]
+            or transition["lifecycle_state"] != "ACTIVE"
+        ):
+            return _control_plane_unavailable(case, "CONTROL_PLANE_MEMBERSHIP_TRANSITION_UNAVAILABLE", "Role replacement lacks one exact protected membership transition.")
+
+    allowed_ids = policy["allowed_consolidation_ids"]
+    if not isinstance(allowed_ids, (list, tuple)) or set(allowed_ids) != {item["consolidation_id"] for item in consolidations}:
+        return _control_plane_unavailable(case, "ROLE_CONSOLIDATION_UNAVAILABLE", "The exact authorized consolidation set is unavailable.")
+    permitted_pairs: set[frozenset[str]] = set()
+    for consolidation in consolidations:
+        if consolidation["lifecycle_state"] in negative_states:
+            return OracleResult(
+                AuthorityOutcome.DENIED,
+                (Reason("ROLE_CONSOLIDATION_PROHIBITED", "Current authoritative evidence prohibits role consolidation.", ("evidence_binding",)),),
+                _engaged(case),
+            )
+        roles = consolidation["roles"]
+        member_keys = consolidation["member_keys"]
+        selected_members = [
+            item for key, item in membership_index.items()
+            if f"{key[0]}:{key[1]}:{key[2]}" in member_keys
+        ]
+        if (
+            consolidation["relationship"] != "AUTHORIZED_ROLE_CONSOLIDATION"
+            or not isinstance(roles, (list, tuple))
+            or len(roles) < 2
+            or not set(roles).issubset(applicable_roles)
+            or not isinstance(member_keys, (list, tuple))
+            or len(member_keys) != len(set(member_keys))
+            or len(selected_members) != len(member_keys)
+            or {item["role"] for item in selected_members} != set(roles)
+            or len({_effective_domain(item) for item in selected_members}) != 1
+            or consolidation["effective_domain"] != _effective_domain(selected_members[0])
+            or consolidation["policy_id"] != policy["policy_id"]
+            or consolidation["membership_epoch"] != policy["membership_epoch"]
+            or consolidation["appraisal_root_id"] not in required_root_ids
+            or consolidation["boundary"] != root.boundary
+            or consolidation["boundary_epoch"] != root.boundary_epoch
+            or consolidation["source_id"] != root.root_id
+            or consolidation["authority_generation"] != root.authority_generation
+            or consolidation["ordering_source_id"] != root.ordering_source_id
+            or consolidation["freshness_challenge_id"] != anchor["freshness_challenge_id"]
+            or consolidation["lifecycle_state"] != "ACTIVE"
+        ):
+            return _control_plane_unavailable(case, "ROLE_CONSOLIDATION_UNAVAILABLE", "Role consolidation is stale, incomplete, or unauthorized.")
+        permitted_pairs.add(frozenset(roles))
+
+    domains_by_role: dict[str, set[tuple[str, str, str, str]]] = {}
+    for item in memberships:
+        domains_by_role.setdefault(item["role"], set()).add(_effective_domain(item))
+    for group in separation_sets:
+        seen_domains: dict[tuple[str, str, str, str], set[str]] = {}
+        seen_components: list[dict[str, set[str]]] = [{}, {}, {}, {}]
+        for role in group:
+            for domain in domains_by_role.get(role, set()):
+                seen_domains.setdefault(domain, set()).add(role)
+                for index, value in enumerate(domain):
+                    seen_components[index].setdefault(value, set()).add(role)
+        for roles in seen_domains.values():
+            if len(roles) > 1 and not any(roles.issubset(pair) for pair in permitted_pairs):
+                return _control_plane_unavailable(case, "CONTROL_PLANE_INDEPENDENCE_UNAVAILABLE", "Nominally distinct roles share one protected effective authority domain.")
+        for component in seen_components:
+            for roles in component.values():
+                if len(roles) > 1 and not any(roles.issubset(pair) for pair in permitted_pairs):
+                    return _control_plane_unavailable(case, "CONTROL_PLANE_INDEPENDENCE_UNAVAILABLE", "Required roles share a protected source, controller, upstream dependency, or rollback domain.")
     return None
 
 
