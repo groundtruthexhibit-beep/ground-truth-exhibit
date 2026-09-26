@@ -1103,12 +1103,33 @@ def _evaluate_verifier_state_anchor(
     elif anchor["predecessor_anchor_position"] != anchor["anchor_position"] - 1:
         return _observation_unavailable(case, "VERIFIER_STATE_ANCHOR_CONTINUITY_UNAVAILABLE", "Anchor predecessor ordering is incomplete.", ("evidence_binding", "binding_ordering"))
 
-    contexts = [
+    matching_contexts = [
         item for item in case.trusted_anchor_context
         if item.get("exact_anchor_key_digest") == anchor_key_digest(anchor)
     ]
-    if len(contexts) != 1:
+    if not matching_contexts:
         return _observation_unavailable(case, "VERIFIER_STATE_ANCHOR_UNAVAILABLE", "No unique independently current anchor context exists.", ("evidence_binding", "freshness"))
+    policy_ids = {
+        item["required_domain_policy"]["policy_id"] for item in matching_contexts
+    }
+    if len(policy_ids) != 1:
+        return _observation_unavailable(case, "REQUIRED_SOURCE_DOMAIN_CONFLICTING", "The candidate anchor maps to ambiguous protected domain policy.", ("evidence_binding",))
+    policy_id = next(iter(policy_ids))
+    required_domain_count = len(
+        matching_contexts[0]["required_domain_policy"]["required_domains"]
+    )
+    contexts = list(matching_contexts)
+    if required_domain_count > 1:
+        contexts.extend(
+            item for item in case.trusted_anchor_context
+            if item not in matching_contexts
+            and item["required_domain_policy"]["policy_id"] == policy_id
+        )
+    protected_result = _evaluate_protected_anchor_domains(
+        case, binding, root, anchor, checkpoint, contexts
+    )
+    if protected_result is not None:
+        return protected_result
     trusted = contexts[0]
     conflict = trusted.get("conflicting_anchor_digests", [])
     if conflict:
@@ -1141,6 +1162,245 @@ def _evaluate_verifier_state_anchor(
     recovery_result = _evaluate_recovery_and_rotation(case, binding, root, anchor, trusted)
     if recovery_result is not None:
         return recovery_result
+    return None
+
+
+def _evaluate_protected_anchor_domains(
+    case: OracleInput,
+    binding: ObservationBinding,
+    root: Any,
+    anchor: Mapping[str, Any],
+    checkpoint: Mapping[str, Any],
+    contexts: list[Mapping[str, Any]],
+) -> OracleResult | None:
+    """Require protected adapter currentness and root-selected source domains."""
+    policies = [item["required_domain_policy"] for item in contexts]
+    first_policy = policies[0]
+    negative_states = {"REVOKED", "REJECTED", "INVALID", "PROHIBITED"}
+    if any(item["lifecycle_state"] in negative_states for item in policies):
+        return OracleResult(
+            AuthorityOutcome.DENIED,
+            (Reason("SOURCE_DOMAIN_POLICY_PROHIBITED", "Current authoritative lifecycle evidence prohibits the required-domain policy.", ("evidence_binding",)),),
+            _engaged(case),
+        )
+    policy_key = (
+        first_policy["policy_id"], first_policy["policy_generation"],
+        first_policy["membership_epoch"], tuple(first_policy["required_domains"]),
+        tuple(first_policy["optional_domains"]), first_policy["selection_rule"],
+        first_policy["boundary"], first_policy["boundary_epoch"],
+        first_policy["source_id"], first_policy["authority_generation"],
+        first_policy["ordering_source_id"], first_policy["freshness_challenge_id"],
+        first_policy["lifecycle_state"],
+    )
+    if any((
+        item["policy_id"], item["policy_generation"], item["membership_epoch"],
+        tuple(item["required_domains"]), tuple(item["optional_domains"]),
+        item["selection_rule"], item["boundary"], item["boundary_epoch"],
+        item["source_id"], item["authority_generation"],
+        item["ordering_source_id"], item["freshness_challenge_id"],
+        item["lifecycle_state"],
+    ) != policy_key for item in policies):
+        return _observation_unavailable(case, "REQUIRED_SOURCE_DOMAIN_CONFLICTING", "Protected required-domain policies conflict.", ("evidence_binding",))
+    if (
+        first_policy["relationship"] != "REQUIRED_SOURCE_DOMAIN_POLICY"
+        or first_policy["selection_rule"] != "ALL_LISTED"
+        or not first_policy["required_domains"]
+        or len(first_policy["required_domains"]) != len(set(first_policy["required_domains"]))
+        or first_policy["source_id"] != root.root_id
+        or first_policy["authority_generation"] != root.authority_generation
+        or first_policy["ordering_source_id"] != root.ordering_source_id
+        or first_policy["boundary"] != root.boundary
+        or first_policy["boundary_epoch"] != root.boundary_epoch
+        or first_policy["freshness_challenge_id"] != anchor["freshness_challenge_id"]
+        or first_policy["lifecycle_state"] != "ACTIVE"
+    ):
+        return _observation_unavailable(case, "REQUIRED_SOURCE_DOMAIN_UNAVAILABLE", "No exact current root-selected source-domain policy exists.", ("evidence_binding", "freshness"))
+
+    required = set(first_policy["required_domains"])
+    views = [item["domain_view"] for item in contexts]
+    view_domains = [item["domain_id"] for item in views]
+    if set(view_domains) != required or len(view_domains) != len(set(view_domains)):
+        return _observation_unavailable(case, "REQUIRED_SOURCE_DOMAIN_UNAVAILABLE", "A required protected source domain is missing, duplicated, or candidate-selected.", ("evidence_binding",))
+
+    forbidden = {case.authority_tuple.subject, anchor["verifier_id"], anchor["anchor_source_id"]}
+    domain_sources: list[tuple[str, str, str, str]] = []
+    for context, view in zip(contexts, views):
+        adapter = context["adapter_admission"]
+        if adapter["lifecycle_state"] in negative_states:
+            return OracleResult(
+                AuthorityOutcome.DENIED,
+                (Reason("ANCHOR_ADAPTER_PROHIBITED", "Current authoritative lifecycle evidence prohibits the anchor adapter.", ("evidence_binding",)),),
+                _engaged(case),
+            )
+        if (
+            adapter["relationship"] != "ANCHOR_ADAPTER_ADMISSION"
+            or adapter["adapter_id"] in forbidden
+            or adapter["anchor_source_id"] != anchor["anchor_source_id"]
+            or adapter["anchor_source_generation"] != anchor["anchor_source_generation"]
+            or adapter["stream_id"] != anchor["stream_id"]
+            or adapter["stream_generation"] != anchor["stream_generation"]
+            or adapter["boundary"] != root.boundary
+            or adapter["boundary_epoch"] != root.boundary_epoch
+            or adapter["source_id"] != root.root_id
+            or adapter["authority_generation"] != root.authority_generation
+            or adapter["ordering_source_id"] != root.ordering_source_id
+            or adapter["freshness_challenge_id"] != anchor["freshness_challenge_id"]
+            or adapter["lifecycle_state"] != "ACTIVE"
+            or "VERIFIER_STATE_CURRENTNESS" not in adapter["covered_scope_families"]
+            or adapter["start_event_order"] > binding.t1_anchor.event_order
+            or adapter["end_event_order"] < binding.t3_anchor.event_order
+            or context.get("adapter_source_id") != adapter["anchor_source_id"]
+            or context.get("adapter_source_generation") != adapter["anchor_source_generation"]
+            or context.get("adapter_observation_id") != adapter["adapter_observation_id"]
+            or context.get("adapter_observation_generation") != adapter["adapter_observation_generation"]
+            or context.get("adapter_event_order") != adapter["end_event_order"]
+            or view["relationship"] != "DOMAIN_CHECKPOINT_VIEW"
+            or view["domain_id"] != adapter["independence_domain"]
+            or view["adapter_id"] != adapter["adapter_id"]
+            or view["stream_id"] != anchor["stream_id"]
+            or view["stream_generation"] != anchor["stream_generation"]
+            or view["boundary"] != root.boundary
+            or view["boundary_epoch"] != root.boundary_epoch
+            or view["freshness_challenge_id"] != anchor["freshness_challenge_id"]
+            or view["lifecycle_state"] != "ACTIVE"
+        ):
+            return _observation_unavailable(case, "ANCHOR_ADAPTER_CURRENTNESS_UNAVAILABLE", "The protected adapter admission/currentness join is missing, stale, or ambiguous.", ("evidence_binding", "freshness"))
+        memberships = [
+            item for item in context["source_domain_memberships"]
+            if item["member_kind"] == "ADAPTER" and item["member_id"] == adapter["adapter_id"]
+        ]
+        if len(memberships) != 1:
+            return _observation_unavailable(case, "SOURCE_DOMAIN_MEMBERSHIP_UNAVAILABLE", "Adapter source-domain membership is not uniquely established.", ("evidence_binding",))
+        member = memberships[0]
+        if member["lifecycle_state"] in negative_states:
+            return OracleResult(
+                AuthorityOutcome.DENIED,
+                (Reason("SOURCE_DOMAIN_MEMBERSHIP_PROHIBITED", "Current authoritative lifecycle evidence prohibits the source-domain membership.", ("evidence_binding",)),),
+                _engaged(case),
+            )
+        if (
+            member["member_generation"] != adapter["adapter_generation"]
+            or member["identity_basis"] != adapter["adapter_identity_basis"]
+            or member["source_lineage"] != adapter["source_lineage"]
+            or member["control_domain"] != adapter["control_domain"]
+            or member["independence_domain"] != adapter["independence_domain"]
+            or member["rollback_domain"] != adapter["rollback_domain"]
+            or member["membership_epoch"] != first_policy["membership_epoch"]
+            or member["source_id"] != root.root_id
+            or member["authority_generation"] != root.authority_generation
+            or member["ordering_source_id"] != root.ordering_source_id
+            or member["boundary"] != root.boundary
+            or member["boundary_epoch"] != root.boundary_epoch
+            or member["freshness_challenge_id"] != anchor["freshness_challenge_id"]
+            or member["lifecycle_state"] != "ACTIVE"
+        ):
+            return _observation_unavailable(case, "SOURCE_DOMAIN_MEMBERSHIP_UNAVAILABLE", "Adapter independence is not authoritatively appraised.", ("evidence_binding", "binding_source_authority"))
+        domain_sources.append((
+            member["source_lineage"], member["control_domain"],
+            member["upstream_dependency"], member["rollback_domain"],
+        ))
+        if adapter["adapter_generation"] > 1:
+            rotation = context.get("adapter_rotation")
+            if (
+                rotation is None
+                or rotation["relationship"] != "ANCHOR_ADAPTER_ROTATION"
+                or rotation["new_adapter_id"] != adapter["adapter_id"]
+                or rotation["new_adapter_generation"] != adapter["adapter_generation"]
+                or rotation["rotation_id"] != adapter["rotation_id"]
+                or rotation["source_lineage"] != adapter["source_lineage"]
+                or rotation["source_id"] != root.root_id
+                or rotation["authority_generation"] != root.authority_generation
+                or rotation["ordering_source_id"] != root.ordering_source_id
+                or rotation["freshness_challenge_id"] != anchor["freshness_challenge_id"]
+                or rotation["lifecycle_state"] != "ACTIVE"
+            ):
+                return _observation_unavailable(case, "ANCHOR_ADAPTER_ROTATION_UNAVAILABLE", "Adapter replacement lacks exact authorized continuity.", ("evidence_binding",))
+
+    if len(domain_sources) != len(set(domain_sources)):
+        return _observation_unavailable(case, "SOURCE_DOMAIN_INDEPENDENCE_UNAVAILABLE", "Multiple required domains share one authoritative source/control/rollback lineage.", ("evidence_binding", "binding_source_authority"))
+
+    selected = {(item["anchor_position"], item["anchor_digest"], item["head_commitment_digest"]) for item in views}
+    reconciliation = contexts[0].get("cross_domain_reconciliation")
+    if len(selected) != 1:
+        if reconciliation is None:
+            return _observation_unavailable(case, "CROSS_DOMAIN_CHECKPOINT_CONFLICTING", "Required source domains report unresolved checkpoint disagreement.", ("evidence_binding",))
+        if reconciliation["lifecycle_state"] in negative_states:
+            return OracleResult(
+                AuthorityOutcome.DENIED,
+                (Reason("CROSS_DOMAIN_RECONCILIATION_PROHIBITED", "Current authoritative lifecycle evidence prohibits the reconciliation.", ("evidence_binding",)),),
+                _engaged(case),
+            )
+        competing_domains = sorted(view["domain_id"] for view in views)
+        competing_digests = sorted({view["anchor_digest"] for view in views})
+        if (
+            reconciliation["relationship"] != "CROSS_DOMAIN_CHECKPOINT_RECONCILIATION"
+            or reconciliation["policy_id"] != first_policy["policy_id"]
+            or reconciliation["membership_epoch"] != first_policy["membership_epoch"]
+            or sorted(reconciliation["competing_domain_ids"]) != competing_domains
+            or sorted(reconciliation["competing_anchor_digests"]) != competing_digests
+            or reconciliation["selected_anchor_digest"] != anchor["anchor_digest"]
+            or reconciliation["selected_head_commitment_digest"] != anchor["head_commitment_digest"]
+            or reconciliation["source_id"] != root.root_id
+            or reconciliation["authority_generation"] != root.authority_generation
+            or reconciliation["ordering_source_id"] != root.ordering_source_id
+            or reconciliation["freshness_challenge_id"] != anchor["freshness_challenge_id"]
+            or reconciliation["lifecycle_state"] != "ACTIVE"
+        ):
+            return _observation_unavailable(case, "CROSS_DOMAIN_RECONCILIATION_UNAVAILABLE", "Checkpoint reconciliation is incomplete or unauthorized.", ("evidence_binding", "binding_ordering"))
+    elif reconciliation is not None:
+        return _observation_unavailable(case, "CROSS_DOMAIN_RECONCILIATION_UNAVAILABLE", "Unselected reconciliation data cannot manufacture authority.", ("evidence_binding",))
+
+    witnesses = [item.values for item in binding.witness_source_admissions]
+    protected_witnesses = contexts[0]["witness_source_memberships"]
+    if witnesses or protected_witnesses:
+        if len(witnesses) != len(protected_witnesses):
+            return _observation_unavailable(case, "WITNESS_SOURCE_CONTINUITY_UNAVAILABLE", "Candidate witness selection differs from protected membership.", ("evidence_binding",))
+        effective_domains: set[str] = set()
+        used_memberships: set[tuple[str, int]] = set()
+        for witness in witnesses:
+            matches = [item for item in protected_witnesses if item["member_id"] == witness["witness_id"] and item["member_generation"] == witness["witness_generation"]]
+            if len(matches) != 1:
+                return _observation_unavailable(case, "WITNESS_SOURCE_CONTINUITY_UNAVAILABLE", "Witness identity lacks protected source membership.", ("evidence_binding",))
+            member = matches[0]
+            if member["lifecycle_state"] in negative_states:
+                return OracleResult(
+                    AuthorityOutcome.DENIED,
+                    (Reason("WITNESS_SOURCE_PROHIBITED", "Current authoritative lifecycle evidence prohibits the witness source.", ("evidence_binding",)),),
+                    _engaged(case),
+                )
+            key = (member["member_id"], member["member_generation"])
+            if key in used_memberships:
+                return _observation_unavailable(case, "WITNESS_SOURCE_CONTINUITY_UNAVAILABLE", "Duplicate witness identity cannot establish independence.", ("evidence_binding",))
+            used_memberships.add(key)
+            if (
+                member["member_kind"] != "WITNESS_SOURCE"
+                or member["identity_basis"] != witness["witness_identity_basis"]
+                or member["source_lineage"] != witness["source_lineage"]
+                or member["control_domain"] != witness["control_domain"]
+                or member["source_id"] != root.root_id
+                or member["authority_generation"] != root.authority_generation
+                or member["ordering_source_id"] != root.ordering_source_id
+                or member["boundary"] != root.boundary
+                or member["boundary_epoch"] != root.boundary_epoch
+                or member["freshness_challenge_id"] != anchor["freshness_challenge_id"]
+                or member["lifecycle_state"] != "ACTIVE"
+                or witness["witness_source_id"] != member["upstream_dependency"]
+                or witness["anchor_digest"] != anchor["anchor_digest"]
+                or witness["head_commitment_digest"] != anchor["head_commitment_digest"]
+                or witness["source_id"] != root.root_id
+                or witness["authority_generation"] != root.authority_generation
+                or witness["boundary"] != root.boundary
+                or witness["boundary_epoch"] != root.boundary_epoch
+                or witness["ordering_source_id"] != root.ordering_source_id
+                or witness["lifecycle_state"] != "ACTIVE"
+                or "VERIFIER_STATE_CURRENTNESS" not in witness["covered_scope_families"]
+                or witness["start_event_order"] > binding.t1_anchor.event_order
+                or witness["end_event_order"] < binding.t3_anchor.event_order
+            ):
+                return _observation_unavailable(case, "WITNESS_COVERAGE_UNAVAILABLE", "Witness identity, source, scope, interval, freshness, or boundary is not exact.", ("evidence_binding", "freshness"))
+            effective_domains.add(member["independence_domain"])
+        if len(effective_domains) < contexts[0].get("required_witness_domains", 0):
+            return _observation_unavailable(case, "WITNESS_SOURCE_CONTINUITY_UNAVAILABLE", "Witness multiplicity does not establish protected independent domains.", ("evidence_binding",))
     return None
 
 

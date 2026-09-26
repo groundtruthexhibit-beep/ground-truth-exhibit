@@ -2052,7 +2052,9 @@ class OracleInput:
             observation_binding=observation_binding,
             observation_freshness=observation_freshness,
             trusted_commitment_context=tuple(MappingProxyType(dict(item)) for item in raw_context),
-            trusted_anchor_context=tuple(MappingProxyType(dict(item)) for item in raw_anchor_context),
+            trusted_anchor_context=tuple(
+                validate_trusted_anchor_context(item) for item in raw_anchor_context
+            ),
             required_facts=required_facts,
             required_values=required_values,
             reestablishment_state=raw_reestablishment.state,
@@ -2087,3 +2089,101 @@ class RunResult:
     actual: OracleResult
     status: HarnessStatus
     oracle_input: OracleInput
+
+
+TRUSTED_ADAPTER_ADMISSION_FIELDS = frozenset({
+    "relationship", "adapter_id", "adapter_generation", "adapter_identity_basis",
+    "adapter_observation_id", "adapter_observation_generation",
+    "anchor_source_id", "anchor_source_generation", "source_lineage",
+    "control_domain", "independence_domain", "rollback_domain",
+    "covered_scope_families", "stream_id", "stream_generation", "boundary",
+    "boundary_epoch", "source_id", "authority_generation", "ordering_source_id",
+    "start_event_order", "end_event_order", "freshness_challenge_id",
+    "lifecycle_state", "predecessor_adapter_id", "rotation_id",
+})
+
+TRUSTED_DOMAIN_POLICY_FIELDS = frozenset({
+    "relationship", "policy_id", "policy_generation", "membership_epoch",
+    "required_domains", "optional_domains", "selection_rule", "boundary",
+    "boundary_epoch", "source_id", "authority_generation", "ordering_source_id",
+    "freshness_challenge_id", "lifecycle_state",
+})
+
+TRUSTED_DOMAIN_VIEW_FIELDS = frozenset({
+    "relationship", "domain_id", "adapter_id", "anchor_position", "anchor_digest",
+    "head_commitment_digest", "stream_id", "stream_generation", "boundary",
+    "boundary_epoch", "freshness_challenge_id", "lifecycle_state",
+})
+
+TRUSTED_SOURCE_MEMBERSHIP_FIELDS = frozenset({
+    "relationship", "member_kind", "member_id", "member_generation",
+    "identity_basis", "source_lineage", "control_domain", "independence_domain",
+    "upstream_dependency", "rollback_domain", "membership_epoch", "boundary",
+    "boundary_epoch", "source_id", "authority_generation", "ordering_source_id",
+    "freshness_challenge_id", "lifecycle_state",
+})
+
+TRUSTED_RECONCILIATION_FIELDS = frozenset({
+    "relationship", "reconciliation_id", "policy_id", "membership_epoch",
+    "competing_domain_ids", "competing_anchor_digests", "selected_anchor_digest",
+    "selected_head_commitment_digest", "consistency_evidence_id", "boundary",
+    "boundary_epoch", "source_id", "authority_generation", "ordering_source_id",
+    "freshness_challenge_id", "lifecycle_state",
+})
+
+
+def _trusted_exact_record(value: Any, fields: frozenset[str], name: str) -> Mapping[str, Any]:
+    if not isinstance(value, Mapping):
+        raise ValueError(f"{name} must be an object")
+    _require_exact_fields(value, fields, name)
+    return MappingProxyType(dict(value))
+
+
+def validate_trusted_anchor_context(value: Mapping[str, Any]) -> Mapping[str, Any]:
+    """Validate harness-owned adapter/domain authority without trusting fixture input."""
+    result = dict(value)
+    result["adapter_admission"] = _trusted_exact_record(
+        value.get("adapter_admission"), TRUSTED_ADAPTER_ADMISSION_FIELDS,
+        "trusted adapter_admission",
+    )
+    result["required_domain_policy"] = _trusted_exact_record(
+        value.get("required_domain_policy"), TRUSTED_DOMAIN_POLICY_FIELDS,
+        "trusted required_domain_policy",
+    )
+    result["domain_view"] = _trusted_exact_record(
+        value.get("domain_view"), TRUSTED_DOMAIN_VIEW_FIELDS,
+        "trusted domain_view",
+    )
+    memberships = value.get("source_domain_memberships")
+    if not isinstance(memberships, list) or not memberships:
+        raise ValueError("trusted source_domain_memberships must be a non-empty array")
+    result["source_domain_memberships"] = tuple(
+        _trusted_exact_record(item, TRUSTED_SOURCE_MEMBERSHIP_FIELDS, "trusted source membership")
+        for item in memberships
+    )
+    witnesses = value.get("witness_source_memberships")
+    if not isinstance(witnesses, list):
+        raise ValueError("trusted witness_source_memberships must be an array")
+    result["witness_source_memberships"] = tuple(
+        _trusted_exact_record(item, TRUSTED_SOURCE_MEMBERSHIP_FIELDS, "trusted witness membership")
+        for item in witnesses
+    )
+    reconciliation = value.get("cross_domain_reconciliation")
+    result["cross_domain_reconciliation"] = (
+        None if reconciliation is None else _trusted_exact_record(
+            reconciliation, TRUSTED_RECONCILIATION_FIELDS, "trusted reconciliation"
+        )
+    )
+    rotation = value.get("adapter_rotation")
+    if rotation is not None:
+        if not isinstance(rotation, Mapping):
+            raise ValueError("trusted adapter_rotation must be an object")
+        required = {
+            "relationship", "rotation_id", "old_adapter_id", "old_adapter_generation",
+            "new_adapter_id", "new_adapter_generation", "source_lineage", "boundary",
+            "boundary_epoch", "source_id", "authority_generation", "ordering_source_id",
+            "freshness_challenge_id", "lifecycle_state",
+        }
+        _require_exact_fields(rotation, required, "trusted adapter_rotation")
+        result["adapter_rotation"] = MappingProxyType(dict(rotation))
+    return MappingProxyType(result)

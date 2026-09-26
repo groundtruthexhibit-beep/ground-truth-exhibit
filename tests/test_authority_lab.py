@@ -128,6 +128,43 @@ def reissue_observation_commitment(payload: dict) -> None:
         verifier_state_digest=anchor["verifier_state_digest"],
         freshness_challenge_id=anchor["freshness_challenge_id"],
     )
+    adapter = trusted_anchor["adapter_admission"]
+    adapter.update(
+        anchor_source_id=anchor["anchor_source_id"],
+        anchor_source_generation=anchor["anchor_source_generation"],
+        stream_id=anchor["stream_id"],
+        stream_generation=anchor["stream_generation"],
+        boundary=anchor["boundary"],
+        boundary_epoch=anchor["boundary_epoch"],
+        source_id=anchor["source_id"],
+        authority_generation=anchor["authority_generation"],
+        ordering_source_id=anchor["ordering_source_id"],
+        freshness_challenge_id=anchor["freshness_challenge_id"],
+    )
+    policy = trusted_anchor["required_domain_policy"]
+    policy.update(
+        boundary=anchor["boundary"], boundary_epoch=anchor["boundary_epoch"],
+        source_id=anchor["source_id"], authority_generation=anchor["authority_generation"],
+        ordering_source_id=anchor["ordering_source_id"],
+        freshness_challenge_id=anchor["freshness_challenge_id"],
+    )
+    view = trusted_anchor["domain_view"]
+    view.update(
+        anchor_digest=digest, head_commitment_digest=anchor["head_commitment_digest"],
+        stream_id=anchor["stream_id"], stream_generation=anchor["stream_generation"],
+        boundary=anchor["boundary"], boundary_epoch=anchor["boundary_epoch"],
+        freshness_challenge_id=anchor["freshness_challenge_id"],
+    )
+    for member in (
+        *trusted_anchor["source_domain_memberships"],
+        *trusted_anchor["witness_source_memberships"],
+    ):
+        member.update(
+            boundary=anchor["boundary"], boundary_epoch=anchor["boundary_epoch"],
+            source_id=anchor["source_id"], authority_generation=anchor["authority_generation"],
+            ordering_source_id=anchor["ordering_source_id"],
+            freshness_challenge_id=anchor["freshness_challenge_id"],
+        )
 
 
 def rebind_objective_binding(payload: dict, *, suffix: str) -> dict:
@@ -327,9 +364,9 @@ class AuthorityLabTests(unittest.TestCase):
         self.assertIs(AuthorityOutcome.UNAVAILABLE, result.outcome)
         self.assertIn(reason_code, {reason.code for reason in result.reasons})
 
-    def test_v1_contains_one_hundred_forty_six_deterministic_fixtures(self) -> None:
+    def test_v1_contains_one_hundred_eighty_six_deterministic_fixtures(self) -> None:
         paths = discover(CASES)
-        self.assertEqual(146, len(paths))
+        self.assertEqual(186, len(paths))
         self.assertEqual(paths, discover(CASES))
 
     def test_every_v0_fixture_matches_its_expected_outcome(self) -> None:
@@ -1979,6 +2016,97 @@ class AuthorityLabTests(unittest.TestCase):
         self.assertIs(AuthorityOutcome.DENIED, result.outcome)
         self.assertIn(
             "VERIFIER_STATE_ANCHOR_PROHIBITED",
+            {reason.code for reason in result.reasons},
+        )
+
+    def test_anchor_currentness_independence_matrix_matches_expectations(self) -> None:
+        for number in range(147, 187):
+            case_id = f"LAB-V1-{number:03d}"
+            with self.subTest(case_id=case_id):
+                self.assertIs(HarnessStatus.PASS, run_fixture(fixture(case_id)).status)
+
+    def test_adapter_relabel_staleness_and_unauthorized_rotation_fail_closed(self) -> None:
+        expected = {
+            "LAB-V1-147": "ANCHOR_ADAPTER_CURRENTNESS_UNAVAILABLE",
+            "LAB-V1-148": "ANCHOR_ADAPTER_CURRENTNESS_UNAVAILABLE",
+            "LAB-V1-150": "ANCHOR_ADAPTER_ROTATION_UNAVAILABLE",
+            "LAB-V1-151": "ANCHOR_ADAPTER_ROTATION_UNAVAILABLE",
+        }
+        for case_id, reason in expected.items():
+            with self.subTest(case_id=case_id):
+                self.assert_unavailable_with_reason(fixture(case_id), reason)
+
+    def test_correlated_adapter_domains_cannot_create_independence(self) -> None:
+        for case_id in ("LAB-V1-149", "LAB-V1-178", "LAB-V1-179"):
+            with self.subTest(case_id=case_id):
+                self.assert_unavailable_with_reason(
+                    fixture(case_id), "SOURCE_DOMAIN_INDEPENDENCE_UNAVAILABLE"
+                )
+
+    def test_witness_labels_scope_interval_and_freshness_are_exact(self) -> None:
+        for case_id in (
+            "LAB-V1-153", "LAB-V1-154", "LAB-V1-156", "LAB-V1-158",
+            "LAB-V1-159", "LAB-V1-160", "LAB-V1-161", "LAB-V1-164",
+            "LAB-V1-176",
+        ):
+            with self.subTest(case_id=case_id):
+                self.assert_unavailable_with_reason(
+                    fixture(case_id), "WITNESS_COVERAGE_UNAVAILABLE"
+                )
+
+    def test_required_domain_and_candidate_shopping_fail_closed(self) -> None:
+        for case_id in ("LAB-V1-166", "LAB-V1-169", "LAB-V1-173"):
+            with self.subTest(case_id=case_id):
+                self.assert_unavailable_with_reason(
+                    fixture(case_id), "REQUIRED_SOURCE_DOMAIN_UNAVAILABLE"
+                )
+        for case_id in ("LAB-V1-163", "LAB-V1-165", "LAB-V1-167", "LAB-V1-168"):
+            with self.subTest(case_id=case_id):
+                self.assert_unavailable_with_reason(
+                    fixture(case_id), "WITNESS_SOURCE_CONTINUITY_UNAVAILABLE"
+                )
+
+    def test_cross_domain_conflict_requires_exact_reconciliation(self) -> None:
+        for case_id in ("LAB-V1-171", "LAB-V1-172"):
+            with self.subTest(case_id=case_id):
+                self.assert_unavailable_with_reason(
+                    fixture(case_id), "CROSS_DOMAIN_CHECKPOINT_CONFLICTING"
+                )
+        self.assert_unavailable_with_reason(
+            fixture("LAB-V1-175"), "CROSS_DOMAIN_RECONCILIATION_UNAVAILABLE"
+        )
+
+    def test_protected_context_is_strictly_typed(self) -> None:
+        payload = fixture("LAB-V1-032")
+        payload["_trusted_anchor_context"][0]["adapter_admission"]["trusted"] = True
+        with self.assertRaisesRegex(ValueError, "contain exactly"):
+            OracleInput.from_fixture(payload)
+
+    def test_adapter_and_domain_positive_paths_remain_reachable(self) -> None:
+        for case_id in (
+            "LAB-V1-152", "LAB-V1-157", "LAB-V1-170", "LAB-V1-174",
+            "LAB-V1-177", "LAB-V1-182", "LAB-V1-183", "LAB-V1-184",
+            "LAB-V1-185",
+        ):
+            with self.subTest(case_id=case_id):
+                result = evaluate(OracleInput.from_fixture(fixture(case_id)))
+                self.assertIs(AuthorityOutcome.AUTHORIZED, result.outcome)
+                self.assertIn(
+                    "CURRENT_AUTHORITY_ESTABLISHED",
+                    {reason.code for reason in result.reasons},
+                )
+
+    def test_total_rollback_boundary_is_explicit_but_survivor_rejects_replay(self) -> None:
+        self.assertIs(AuthorityOutcome.AUTHORIZED, actual(fixture("LAB-V1-180")))
+        self.assert_unavailable_with_reason(
+            fixture("LAB-V1-181"), "VERIFIER_STATE_ANCHOR_REPLAY"
+        )
+
+    def test_current_authoritative_adapter_revocation_is_denied(self) -> None:
+        result = evaluate(OracleInput.from_fixture(fixture("LAB-V1-186")))
+        self.assertIs(AuthorityOutcome.DENIED, result.outcome)
+        self.assertIn(
+            "ANCHOR_ADAPTER_PROHIBITED",
             {reason.code for reason in result.reasons},
         )
 

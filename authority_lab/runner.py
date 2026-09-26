@@ -179,6 +179,14 @@ def _observation_trace(case: OracleInput) -> tuple[str, ...]:
     lines.append(f"trusted_commitment_states: {len(case.trusted_commitment_context)}")
     lines.append(f"trusted_anchor_states: {len(case.trusted_anchor_context)}")
     lines.extend(
+        "anchor_domain: "
+        f"{item['domain_view']['domain_id']} adapter="
+        f"{item['adapter_admission']['adapter_id']}@"
+        f"{item['adapter_admission']['adapter_generation']} policy="
+        f"{item['required_domain_policy']['policy_id']}"
+        for item in case.trusted_anchor_context
+    )
+    lines.extend(
         "verifier_anchor: "
         f"{item.values['anchor_id']}@{item.values['anchor_position']} "
         f"head={item.values['head_commitment_digest']} "
