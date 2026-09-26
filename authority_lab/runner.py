@@ -38,6 +38,8 @@ def load_fixture(path: str | Path) -> dict[str, Any]:
         raise ValueError("fixture cannot supply harness-owned trusted delegation state")
     if "_trusted_human_approval_context" in value:
         raise ValueError("fixture cannot supply harness-owned trusted human approval state")
+    if "_trusted_tool_connector_context" in value:
+        raise ValueError("fixture cannot supply harness-owned trusted tool connector state")
     manifest_path = fixture_path.parent / "trusted_commitment_state.json"
     if value.get("schema_version") == "authority-lab-v1" and manifest_path.exists():
         with manifest_path.open("r", encoding="utf-8") as handle:
@@ -190,6 +192,19 @@ def _observation_trace(case: OracleInput) -> tuple[str, ...]:
     )
     lines.append(f"protected_human_approval_policies: {len(approval_requirements)}")
     lines.append(f"human_approval_requirements: {approval_requirements}")
+    tool_requirements = tuple(
+        item["tool_connector_authority_context"]["tool_connector_policy"]["requirement"]
+        for item in case.trusted_anchor_context
+    )
+    lines.append(f"protected_tool_connector_policies: {len(tool_requirements)}")
+    lines.append(f"tool_connector_requirements: {tool_requirements}")
+    lines.extend(
+        "tool_connector_authority: "
+        f"contexts={len(item['tool_connector_authority_context']['execution_contexts'])} "
+        f"transitions={len(item['tool_connector_authority_context']['component_transitions'])} "
+        f"uses={len(item['tool_connector_authority_context']['protected_terminal_uses'])}"
+        for item in case.trusted_anchor_context
+    )
     lines.extend(
         "anchor_domain: "
         f"{item['domain_view']['domain_id']} adapter="

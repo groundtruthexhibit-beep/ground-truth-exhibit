@@ -44,6 +44,7 @@ from authority_lab.oracle import (
     human_approval_effect_digest,
     human_approval_envelope_digest,
     human_approval_request_digest,
+    tool_connector_context_digest,
 )
 from authority_lab.runner import discover, format_trace, load_fixture, run_fixture, run_path
 
@@ -367,9 +368,9 @@ class AuthorityLabTests(unittest.TestCase):
         self.assertIs(AuthorityOutcome.UNAVAILABLE, result.outcome)
         self.assertIn(reason_code, {reason.code for reason in result.reasons})
 
-    def test_v1_contains_three_hundred_forty_two_deterministic_fixtures(self) -> None:
+    def test_v1_contains_four_hundred_eleven_deterministic_fixtures(self) -> None:
         paths = discover(CASES)
-        self.assertEqual(342, len(paths))
+        self.assertEqual(411, len(paths))
         self.assertEqual(paths, discover(CASES))
 
     def test_every_v0_fixture_matches_its_expected_outcome(self) -> None:
@@ -2432,6 +2433,143 @@ class AuthorityLabTests(unittest.TestCase):
         self.assert_unavailable_with_reason(
             payload, "HUMAN_APPROVAL_ORDERING_UNAVAILABLE"
         )
+
+    def test_tool_connector_hostile_matrix_matches_independent_expectations(self) -> None:
+        authorized = {
+            343, 351, 371, 372, 375, 376, 377, 379, 381, 383, 385, 387,
+            404, 408, 409,
+        }
+        for number in range(343, 410):
+            case_id = f"LAB-V1-{number:03d}"
+            expected = (
+                AuthorityOutcome.AUTHORIZED
+                if number in authorized
+                else AuthorityOutcome.UNAVAILABLE
+            )
+            with self.subTest(case_id=case_id):
+                self.assertIs(expected, actual(fixture(case_id)))
+        for case_id in ("LAB-V1-410", "LAB-V1-411"):
+            with self.subTest(case_id=case_id):
+                self.assertIs(AuthorityOutcome.DENIED, actual(fixture(case_id)))
+
+    def test_original_tool_connector_reproducers_now_fail_closed(self) -> None:
+        for case_id in ("LAB-V1-337", "LAB-V1-338", "LAB-V1-253"):
+            payload = fixture(case_id)
+            payload["t3"]["facts"]["tool_connector_identity"] = {
+                "state": "KNOWN", "value": "payments@BACKEND-B",
+            }
+            payload["t3"]["required_facts"].append("tool_connector_identity")
+            payload["t3"]["required_values"]["tool_connector_identity"] = "payments@BACKEND-B"
+            with self.subTest(case_id=case_id):
+                self.assert_unavailable_with_reason(
+                    payload, "TOOL_CONNECTOR_SELF_ASSERTED"
+                )
+
+    def test_hidden_backend_fails_for_plain_approval_and_delegation_paths(self) -> None:
+        for case_id in ("LAB-V1-343", "LAB-V1-338", "LAB-V1-253"):
+            payload = fixture(case_id)
+            binding = payload["t3"]["facts"]["tool_connector_use_binding"]["value"]
+            binding["backend_id"] = "HIDDEN-BACKEND-B"
+            with self.subTest(case_id=case_id):
+                self.assert_unavailable_with_reason(
+                    payload, "TOOL_CONNECTOR_USE_UNAVAILABLE"
+                )
+
+    def test_tool_context_digest_commits_to_every_authority_component(self) -> None:
+        payload = fixture("LAB-V1-343")
+        context = payload["_trusted_anchor_context"][0][
+            "tool_connector_authority_context"
+        ]["execution_contexts"][0]
+        original = tool_connector_context_digest(context)
+        for field in (
+            "logical_tool_id", "connector_generation", "backend_id", "target_id",
+            "credential_generation", "permissions", "operator_lineage", "boundary_epoch",
+        ):
+            changed = deepcopy(context)
+            changed[field] = [*changed[field], "WRITE"] if field == "permissions" else f"{changed[field]}-CHANGED"
+            with self.subTest(field=field):
+                self.assertNotEqual(original, tool_connector_context_digest(changed))
+
+    def test_candidate_digest_recomputation_cannot_replace_protected_context(self) -> None:
+        payload = fixture("LAB-V1-343")
+        binding = payload["t3"]["facts"]["tool_connector_use_binding"]["value"]
+        protected = deepcopy(payload["_trusted_anchor_context"][0][
+            "tool_connector_authority_context"
+        ]["execution_contexts"][0])
+        protected["backend_id"] = "ATTACKER-BACKEND"
+        binding["backend_id"] = protected["backend_id"]
+        binding["context_digest"] = tool_connector_context_digest(protected)
+        self.assert_unavailable_with_reason(
+            payload, "TOOL_CONNECTOR_USE_UNAVAILABLE"
+        )
+
+    def test_candidate_permission_expansion_and_transition_self_authority_fail_closed(self) -> None:
+        payload = fixture("LAB-V1-343")
+        payload["t3"]["facts"]["tool_connector_use_binding"]["value"][
+            "permissions"
+        ].append("WRITE")
+        self.assert_unavailable_with_reason(payload, "TOOL_CONNECTOR_USE_UNAVAILABLE")
+
+        payload = fixture("LAB-V1-377")
+        transition = payload["_trusted_anchor_context"][0][
+            "tool_connector_authority_context"
+        ]["component_transitions"][0]
+        transition["source_id"] = payload["t3"]["facts"][
+            "tool_connector_use_binding"
+        ]["value"]["logical_tool_id"]
+        self.assert_unavailable_with_reason(
+            payload, "TOOL_CONNECTOR_TRANSITION_UNAVAILABLE"
+        )
+
+    def test_tool_connector_protected_records_are_strictly_typed(self) -> None:
+        payload = fixture("LAB-V1-343")
+        parsed = OracleInput.from_fixture(deepcopy(payload))
+        context = parsed.trusted_anchor_context[0]["tool_connector_authority_context"]
+        self.assertIsInstance(context["execution_contexts"], tuple)
+        self.assertIsInstance(context["execution_contexts"][0]["permissions"], tuple)
+        payload["_trusted_anchor_context"][0]["tool_connector_authority_context"][
+            "execution_contexts"
+        ][0]["trusted"] = True
+        with self.assertRaisesRegex(ValueError, "contain exactly"):
+            OracleInput.from_fixture(payload)
+
+    def test_candidate_cannot_supply_trusted_tool_connector_context(self) -> None:
+        path = CASES / "LAB-V1-337.json"
+        raw = json.loads(path.read_text(encoding="utf-8"))
+        raw["_trusted_tool_connector_context"] = {}
+        with patch("authority_lab.runner.Path.open") as opened:
+            opened.return_value.__enter__.return_value.read.return_value = json.dumps(raw)
+            opened.return_value.__enter__.return_value.__iter__.return_value = iter(())
+            with self.assertRaisesRegex(ValueError, "trusted tool connector"):
+                load_fixture(path)
+
+    def test_tool_shopping_conflicts_and_stale_contexts_fail_closed(self) -> None:
+        for case_id in (
+            "LAB-V1-389", "LAB-V1-390", "LAB-V1-391", "LAB-V1-392",
+            "LAB-V1-393", "LAB-V1-394", "LAB-V1-395", "LAB-V1-396",
+            "LAB-V1-397", "LAB-V1-398", "LAB-V1-399", "LAB-V1-400",
+            "LAB-V1-401", "LAB-V1-402", "LAB-V1-403", "LAB-V1-405",
+            "LAB-V1-406", "LAB-V1-407",
+        ):
+            with self.subTest(case_id=case_id):
+                self.assertIs(AuthorityOutcome.UNAVAILABLE, actual(fixture(case_id)))
+
+    def test_authorized_tool_rotations_and_revalidations_remain_reachable(self) -> None:
+        for case_id in (
+            "LAB-V1-375", "LAB-V1-376", "LAB-V1-377", "LAB-V1-379",
+            "LAB-V1-381", "LAB-V1-383", "LAB-V1-385", "LAB-V1-387",
+            "LAB-V1-404", "LAB-V1-408", "LAB-V1-409",
+        ):
+            with self.subTest(case_id=case_id):
+                self.assertIs(AuthorityOutcome.AUTHORIZED, actual(fixture(case_id)))
+        expansion = fixture("LAB-V1-385")["_trusted_anchor_context"][0][
+            "tool_connector_authority_context"
+        ]["component_transitions"][0]
+        narrowing = fixture("LAB-V1-387")["_trusted_anchor_context"][0][
+            "tool_connector_authority_context"
+        ]["component_transitions"][0]
+        self.assertLess(set(expansion["old_permissions"]), set(expansion["new_permissions"]))
+        self.assertLess(set(narrowing["new_permissions"]), set(narrowing["old_permissions"]))
 
     def test_grant_shopping_and_conflict_fail_closed(self) -> None:
         for case_id in ("LAB-V1-283", "LAB-V1-284"):

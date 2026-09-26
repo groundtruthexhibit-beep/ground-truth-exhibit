@@ -39,6 +39,7 @@ from .model import (
     OracleResult,
     RELATIONAL_T3_FACTS,
     RESERVED_HUMAN_APPROVAL_FACTS,
+    RESERVED_TOOL_CONNECTOR_FACTS,
     Reason,
     exact_value_equal,
 )
@@ -84,6 +85,18 @@ def human_approval_envelope_digest(envelope: Mapping[str, Any]) -> str:
             field: value
             for field, value in envelope.items()
             if field != "canonical_payload_digest"
+        },
+    )
+
+
+def tool_connector_context_digest(context: Mapping[str, Any]) -> str:
+    """Canonical identity of every authority-relevant execution-target field."""
+    return _canonical_digest(
+        "authority-lab-v1/tool-connector-context",
+        {
+            field: value
+            for field, value in context.items()
+            if field != "context_digest"
         },
     )
 
@@ -2790,6 +2803,246 @@ def _evaluate_human_approval(
     return None
 
 
+def _tool_result(
+    case: OracleInput, outcome: AuthorityOutcome, code: str, detail: str
+) -> OracleResult:
+    return OracleResult(
+        outcome, (Reason(code, detail, ("tool_connector_use_binding",)),), _engaged(case)
+    )
+
+
+def _evaluate_tool_connector_authority(
+    case: OracleInput,
+    active_state: AuthorityStateBinding,
+    protected_terminal_grant: Mapping[str, Any] | None,
+) -> OracleResult | None:
+    """Join exact T3 use to independently protected effect-capable target state."""
+    contexts = tuple(
+        item["tool_connector_authority_context"]
+        for item in case.trusted_anchor_context
+    )
+    if not contexts:
+        return _tool_result(case, AuthorityOutcome.UNAVAILABLE, "TOOL_CONNECTOR_POLICY_UNAVAILABLE", "Protected tool/connector policy is unavailable.")
+    first = contexts[0]
+    if any(item != first for item in contexts[1:]):
+        return _tool_result(case, AuthorityOutcome.UNAVAILABLE, "TOOL_CONNECTOR_CONTEXT_CONFLICTING", "Protected tool/connector contexts conflict.")
+    policy = first["tool_connector_policy"]
+    root = case.t3_binding_facts.authority_root
+    objective = case.t3_binding_facts.objective_identity
+    contract = case.t3_binding_facts.decision_contract_identity
+    freshness = case.observation_freshness
+    observation = case.observation_binding
+    if root is None or objective is None or contract is None or freshness is None or observation is None:
+        return _tool_result(case, AuthorityOutcome.UNAVAILABLE, "TOOL_CONNECTOR_POLICY_UNAVAILABLE", "Tool policy cannot join current authority and observation state.")
+    if (
+        policy["relationship"] != "TOOL_CONNECTOR_POLICY"
+        or policy["selection_rule"] != "ALL_APPLICABLE"
+        or policy["source_id"] != root.root_id
+        or policy["authority_generation"] != root.authority_generation
+        or policy["lineage"] != root.lineage
+        or policy["ordering_source_id"] != root.ordering_source_id
+        or policy["boundary"] != root.boundary
+        or policy["boundary_epoch"] != root.boundary_epoch
+        or policy["objective_id"] != objective.objective_id
+        or policy["objective_generation"] != objective.objective_generation
+        or policy["decision_contract_id"] != contract.contract_id
+        or policy["decision_contract_version"] != contract.contract_version
+        or policy["freshness_challenge_id"] != freshness.freshness_challenge_id
+    ):
+        return _tool_result(case, AuthorityOutcome.UNAVAILABLE, "TOOL_CONNECTOR_POLICY_UNAVAILABLE", "Tool policy is not exact, current, root-issued, and applicable.")
+    if policy["lifecycle_state"] in {"REVOKED", "REJECTED", "PROHIBITED"}:
+        return _tool_result(case, AuthorityOutcome.DENIED, "TOOL_CONNECTOR_PROHIBITED", "The current tool/connector policy is revoked or prohibited.")
+    if policy["lifecycle_state"] != "ACTIVE":
+        return _tool_result(case, AuthorityOutcome.UNAVAILABLE, "TOOL_CONNECTOR_POLICY_UNAVAILABLE", "Tool policy lifecycle is unavailable.")
+
+    if RESERVED_TOOL_CONNECTOR_FACTS.intersection(case.facts):
+        return _tool_result(case, AuthorityOutcome.UNAVAILABLE, "TOOL_CONNECTOR_SELF_ASSERTED", "Candidate tool, backend, credential, or permission facts cannot establish protected execution-target authority.")
+    candidate = case.tool_connector_use_binding
+    if policy["requirement"] == "NONE":
+        if candidate is not None:
+            return _tool_result(case, AuthorityOutcome.UNAVAILABLE, "TOOL_CONNECTOR_POLICY_CONFLICTING", "Candidate tool use conflicts with the selected no-tool policy.")
+        return None
+    if policy["requirement"] != "REQUIRED" or candidate is None:
+        return _tool_result(case, AuthorityOutcome.UNAVAILABLE, "TOOL_CONNECTOR_USE_UNAVAILABLE", "The selected policy requires one exact current tool/connector use.")
+
+    records = tuple(first["execution_contexts"])
+    selections = tuple(first["execution_target_selection"])
+    uses = tuple(first["protected_terminal_uses"])
+    if len(records) != 1 or len(selections) != 1 or len(uses) != 1:
+        return _tool_result(case, AuthorityOutcome.UNAVAILABLE, "TOOL_CONNECTOR_SELECTION_UNAVAILABLE", "All-applicable selection lacks one unique context, head, and use.")
+    current, selection, protected_use = records[0], selections[0], uses[0]
+    prohibited = {"REVOKED", "REJECTED", "PROHIBITED"}
+    if current["lifecycle_state"] in prohibited or protected_use["lifecycle_state"] in prohibited:
+        return _tool_result(case, AuthorityOutcome.DENIED, "TOOL_CONNECTOR_REVOKED", "The current execution target, credential, permission, or use is prohibited.")
+    digest = tool_connector_context_digest(current)
+    if current["context_digest"] != digest:
+        return _tool_result(case, AuthorityOutcome.UNAVAILABLE, "TOOL_CONNECTOR_CONTEXT_DIGEST_UNAVAILABLE", "Protected execution-target context digest is not canonical.")
+    exact_current = (
+        current["relationship"] == "TOOL_CONNECTOR_EXECUTION_CONTEXT"
+        and current["source_id"] == root.root_id
+        and current["authority_generation"] == root.authority_generation
+        and current["lineage"] == root.lineage
+        and current["ordering_source_id"] == root.ordering_source_id
+        and current["freshness_challenge_id"] == freshness.freshness_challenge_id
+        and current["boundary"] == root.boundary
+        and current["boundary_epoch"] == root.boundary_epoch
+        and current["execution_context"] == case.facts["execution_context"].value
+        and current["subject_id"] == case.authority_tuple.subject
+        and current["artifact"] == case.authority_tuple.artifact
+        and current["objective_id"] == objective.objective_id
+        and current["objective_generation"] == objective.objective_generation
+        and current["decision_contract_id"] == contract.contract_id
+        and current["decision_contract_version"] == contract.contract_version
+        and current["grant_id"] == active_state.grant_id
+        and current["effect"] in current["permissions"]
+        and current["start_event_order"] <= selection["head_event_order"] <= current["end_event_order"]
+        and current["lifecycle_state"] == "ACTIVE"
+        and current["operator_id"] not in {case.authority_tuple.subject, current["executor_id"]}
+    )
+    if not exact_current:
+        return _tool_result(case, AuthorityOutcome.UNAVAILABLE, "TOOL_CONNECTOR_CURRENTNESS_UNAVAILABLE", "Execution-target identity, permissions, source lineage, boundary, or currentness is unavailable.")
+    if (
+        selection["relationship"] != "TOOL_CONNECTOR_SELECTION_HEAD"
+        or selection["policy_id"] != policy["policy_id"]
+        or selection["policy_generation"] != policy["policy_generation"]
+        or selection["context_id"] != current["context_id"]
+        or selection["context_generation"] != current["context_generation"]
+        or selection["context_digest"] != digest
+        or selection["source_id"] != root.root_id
+        or selection["authority_generation"] != root.authority_generation
+        or selection["lineage"] != root.lineage
+        or selection["ordering_source_id"] != root.ordering_source_id
+        or selection["boundary"] != root.boundary
+        or selection["boundary_epoch"] != root.boundary_epoch
+        or selection["freshness_challenge_id"] != freshness.freshness_challenge_id
+        or selection["lifecycle_state"] != "ACTIVE"
+        or selection["head_event_order"] > observation.t3_anchor.event_order
+    ):
+        return _tool_result(case, AuthorityOutcome.UNAVAILABLE, "TOOL_CONNECTOR_SELECTION_UNAVAILABLE", "The root-selected execution target is stale, conflicting, or unavailable.")
+
+    transitions = tuple(first["component_transitions"])
+    if current["context_generation"] > 1:
+        applicable = tuple(item for item in transitions if item["new_context_id"] == current["context_id"] and item["new_context_generation"] == current["context_generation"])
+        if len(applicable) != 1:
+            return _tool_result(case, AuthorityOutcome.UNAVAILABLE, "TOOL_CONNECTOR_TRANSITION_UNAVAILABLE", "Successor target lacks one exact authorized transition.")
+        transition = applicable[0]
+        valid_transition_classes = {
+            "TOOL": {"ROTATION"},
+            "CONNECTOR": {"HANDOFF"},
+            "BACKEND": {"MIGRATION"},
+            "CREDENTIAL": {"ROTATION"},
+            "PERMISSION": {"NARROWING", "EXPANSION"},
+        }
+        old_permissions = frozenset(transition["old_permissions"])
+        new_permissions = frozenset(transition["new_permissions"])
+        permission_transition_valid = (
+            new_permissions == frozenset(current["permissions"])
+            and (
+                transition["transition_class"] == "NARROWING"
+                and new_permissions < old_permissions
+                or transition["transition_class"] == "EXPANSION"
+                and old_permissions < new_permissions
+                or transition["component_kind"] != "PERMISSION"
+                and old_permissions == new_permissions
+            )
+        )
+        if (
+            transition["relationship"] != "TOOL_COMPONENT_TRANSITION"
+            or transition["transition_class"] not in valid_transition_classes.get(
+                transition["component_kind"], set()
+            )
+            or transition["old_context_id"] == transition["new_context_id"]
+            or transition["old_context_generation"] + 1 != transition["new_context_generation"]
+            or transition["old_context_digest"] == transition["new_context_digest"]
+            or transition["new_context_digest"] != digest
+            or not permission_transition_valid
+            or transition["source_id"] != root.root_id
+            or transition["authority_generation"] != root.authority_generation
+            or transition["lineage"] != root.lineage
+            or transition["ordering_source_id"] != root.ordering_source_id
+            or transition["boundary"] != root.boundary
+            or transition["boundary_epoch"] != root.boundary_epoch
+            or transition["freshness_challenge_id"] != freshness.freshness_challenge_id
+            or transition["lifecycle_state"] != "ACTIVE"
+            or transition["event_order"] < current["start_event_order"]
+            or transition["event_order"] > selection["head_event_order"]
+        ):
+            return _tool_result(case, AuthorityOutcome.UNAVAILABLE, "TOOL_CONNECTOR_TRANSITION_UNAVAILABLE", "Tool rotation, connector handoff, backend migration, credential rotation, or permission transition is not authorized.")
+        if transition["approval_revalidation"] == "REQUIRED" and (
+            case.human_approval_binding is None
+            or any(
+                envelope["issuance_order"] < transition["event_order"]
+                for envelope in case.human_approval_binding["approval_envelopes"]
+            )
+        ):
+            return _tool_result(case, AuthorityOutcome.UNAVAILABLE, "TOOL_CONNECTOR_APPROVAL_REVALIDATION_UNAVAILABLE", "The authorized component transition requires fresh human reapproval.")
+        if transition["delegation_revalidation"] == "REQUIRED" and (
+            protected_terminal_grant is None
+            or protected_terminal_grant["created_event_order"] < transition["event_order"]
+        ):
+            return _tool_result(case, AuthorityOutcome.UNAVAILABLE, "TOOL_CONNECTOR_DELEGATION_REVALIDATION_UNAVAILABLE", "The authorized component transition requires a fresh delegation regrant.")
+    elif transitions:
+        return _tool_result(case, AuthorityOutcome.UNAVAILABLE, "TOOL_CONNECTOR_TRANSITION_CONFLICTING", "Unselected transition state cannot create target authority.")
+
+    approval_id = (
+        case.human_approval_binding["policy_id"]
+        if case.human_approval_binding is not None else "NONE"
+    )
+    chain_id = protected_terminal_grant["chain_id"] if protected_terminal_grant is not None else "DIRECT"
+    if case.human_approval_binding is not None and (
+        case.human_approval_binding["tool_backend_id"] != current["backend_id"]
+        or case.human_approval_binding["credential_generation"] != current["credential_generation"]
+    ):
+        return _tool_result(case, AuthorityOutcome.UNAVAILABLE, "TOOL_CONNECTOR_APPROVAL_MISMATCH", "Human approval does not bind the actual protected backend and credential generation.")
+    if protected_terminal_grant is not None and current["logical_tool_id"] not in protected_terminal_grant["action_scope"]["tools"]:
+        return _tool_result(case, AuthorityOutcome.UNAVAILABLE, "TOOL_CONNECTOR_DELEGATION_MISMATCH", "Delegation does not admit the actual protected logical tool.")
+
+    expected = {
+        "policy_id": policy["policy_id"], "policy_generation": policy["policy_generation"],
+        "context_id": current["context_id"], "context_generation": current["context_generation"],
+        "context_digest": digest, "logical_tool_id": current["logical_tool_id"],
+        "tool_generation": current["tool_generation"], "connector_id": current["connector_id"],
+        "connector_generation": current["connector_generation"], "backend_id": current["backend_id"],
+        "backend_generation": current["backend_generation"], "target_id": current["target_id"],
+        "target_generation": current["target_generation"], "credential_id": current["credential_id"],
+        "credential_generation": current["credential_generation"], "permission_scope_id": current["permission_scope_id"],
+        "permission_scope_generation": current["permission_scope_generation"],
+        "permissions": tuple(current["permissions"]), "operator_lineage": current["operator_lineage"],
+        "subject_id": current["subject_id"], "executor_id": current["executor_id"],
+        "artifact": current["artifact"], "effect": current["effect"],
+        "delegation_chain_id": chain_id, "approval_policy_id": approval_id,
+        "boundary": current["boundary"], "boundary_epoch": current["boundary_epoch"],
+        "execution_context": current["execution_context"], "objective_id": current["objective_id"],
+        "objective_generation": current["objective_generation"],
+        "decision_contract_id": current["decision_contract_id"],
+        "decision_contract_version": current["decision_contract_version"],
+        "grant_id": current["grant_id"], "freshness_challenge_id": freshness.freshness_challenge_id,
+    }
+    if candidate["relationship"] != "EXACT_TOOL_CONNECTOR_USE" or any(candidate[name] != value for name, value in expected.items()):
+        return _tool_result(case, AuthorityOutcome.UNAVAILABLE, "TOOL_CONNECTOR_USE_UNAVAILABLE", "Candidate use is not bound to the exact protected execution target.")
+    if (
+        protected_use["relationship"] != "TOOL_CONNECTOR_TERMINAL_USE"
+        or any(protected_use[name] != value for name, value in {
+            "context_id": current["context_id"], "context_generation": current["context_generation"],
+            "context_digest": digest, "subject_id": current["subject_id"],
+            "executor_id": current["executor_id"], "artifact": current["artifact"],
+            "effect": current["effect"], "delegation_chain_id": chain_id,
+            "approval_policy_id": approval_id, "grant_id": current["grant_id"],
+            "boundary": current["boundary"], "boundary_epoch": current["boundary_epoch"],
+            "execution_context": current["execution_context"],
+        }.items())
+        or protected_use["use_id"] != candidate["use_id"]
+        or protected_use["use_event_order"] != candidate["use_event_order"]
+        or protected_use["use_event_order"] != selection["head_event_order"]
+        or protected_use["source_id"] != root.root_id
+        or protected_use["authority_generation"] != root.authority_generation
+        or protected_use["freshness_challenge_id"] != freshness.freshness_challenge_id
+        or protected_use["lifecycle_state"] != "ACTIVE"
+    ):
+        return _tool_result(case, AuthorityOutcome.UNAVAILABLE, "TOOL_CONNECTOR_USE_UNAVAILABLE", "Protected terminal use is stale, incomplete, or mismatched.")
+    return None
+
+
 def _evaluate_recovery_and_rotation(
     case: OracleInput,
     binding: ObservationBinding,
@@ -3832,6 +4085,12 @@ def evaluate(case: OracleInput) -> OracleResult:
     )
     if approval_result is not None:
         return approval_result
+
+    tool_result = _evaluate_tool_connector_authority(
+        case, active_state, protected_terminal_grant
+    )
+    if tool_result is not None:
+        return tool_result
 
     return OracleResult(
         AuthorityOutcome.AUTHORIZED,

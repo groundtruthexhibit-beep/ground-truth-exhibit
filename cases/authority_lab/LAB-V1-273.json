@@ -706,6 +706,50 @@
       "subject_identity": {
         "state": "KNOWN",
         "value": "DELEGATE-D"
+      },
+      "tool_connector_use_binding": {
+        "state": "KNOWN",
+        "value": {
+          "approval_policy_id": "NONE",
+          "artifact": "A",
+          "backend_generation": 1,
+          "backend_id": "BACKEND-LAB-V1-273",
+          "boundary": "AUTH-BOUNDARY-1",
+          "boundary_epoch": "B1",
+          "connector_generation": 1,
+          "connector_id": "CONNECTOR-LAB-V1-273",
+          "context_digest": "26f2b9c016ff2ebb40e738d61c85b3820eee7dfd76f5f7c56419c36860b17405",
+          "context_generation": 1,
+          "context_id": "TOOL-CONTEXT-LAB-V1-273",
+          "credential_generation": 1,
+          "credential_id": "CREDENTIAL-LAB-V1-273",
+          "decision_contract_id": "CONTRACT-LAB-V0-010",
+          "decision_contract_version": "1",
+          "delegation_chain_id": "CHAIN-DELEGATION-010",
+          "effect": "EXECUTE",
+          "execution_context": "E1",
+          "executor_id": "DELEGATE-D",
+          "freshness_challenge_id": "CHALLENGE-LAB-V0-010-1",
+          "grant_id": "GRANT-010-DELEGATED",
+          "logical_tool_id": "E1",
+          "objective_generation": 1,
+          "objective_id": "OBJECTIVE-LAB-V0-010",
+          "operator_lineage": "OPERATOR-LINEAGE-LAB-V1-273",
+          "permission_scope_generation": 1,
+          "permission_scope_id": "PERMISSION-SCOPE-LAB-V1-273",
+          "permissions": [
+            "EXECUTE"
+          ],
+          "policy_generation": 1,
+          "policy_id": "TOOL-CONNECTOR-POLICY-LAB-V1-273",
+          "relationship": "EXACT_TOOL_CONNECTOR_USE",
+          "subject_id": "DELEGATE-D",
+          "target_generation": 1,
+          "target_id": "TARGET-LAB-V1-273",
+          "tool_generation": 1,
+          "use_event_order": 3,
+          "use_id": "TOOL-USE-LAB-V1-273"
+        }
       }
     },
     "prohibition": {
@@ -724,7 +768,8 @@
       "delegation_binding",
       "closure_binding",
       "consumption_state",
-      "freshness"
+      "freshness",
+      "tool_connector_use_binding"
     ],
     "required_values": {
       "applicable_boundary": "AUTH-BOUNDARY-1",

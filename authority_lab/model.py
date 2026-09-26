@@ -115,9 +115,14 @@ RELATIONAL_T3_FACTS = (
     "binding_lifecycle",
     "binding_ordering",
     "human_approval_binding",
+    "tool_connector_use_binding",
 )
 
 RESERVED_HUMAN_APPROVAL_FACTS = frozenset({"human_approval", "user_said_yes"})
+RESERVED_TOOL_CONNECTOR_FACTS = frozenset({
+    "tool_connector_identity", "credential_identity", "permission_scope",
+    "backend_identity", "connector_identity", "execution_target_identity",
+})
 
 OBJECTIVE_BINDING_FACTS = (
     "objective_identity",
@@ -1948,6 +1953,18 @@ HUMAN_APPROVAL_USE_FIELDS = frozenset({
     "boundary_epoch", "session_id", "session_generation", "grant_id",
     "use_position", "use_event_order", "freshness_challenge_id",
 })
+TOOL_CONNECTOR_USE_FIELDS = frozenset({
+    "relationship", "policy_id", "policy_generation", "context_id",
+    "context_generation", "context_digest", "logical_tool_id", "tool_generation",
+    "connector_id", "connector_generation", "backend_id", "backend_generation",
+    "target_id", "target_generation", "credential_id", "credential_generation",
+    "permission_scope_id", "permission_scope_generation", "permissions",
+    "operator_lineage", "subject_id", "executor_id", "artifact", "effect",
+    "delegation_chain_id", "approval_policy_id", "boundary", "boundary_epoch",
+    "execution_context", "objective_id", "objective_generation",
+    "decision_contract_id", "decision_contract_version", "grant_id",
+    "use_id", "use_event_order", "freshness_challenge_id",
+})
 HUMAN_APPROVAL_VERIFICATION_FIELDS = frozenset({
     "relationship", "approval_id", "approval_generation", "envelope_digest",
     "verifier_id", "verifier_generation", "approval_source_id",
@@ -2038,6 +2055,19 @@ def _human_approval_binding(value: Mapping[str, Any]) -> Mapping[str, Any]:
     return MappingProxyType(result)
 
 
+def _tool_connector_use_binding(value: Mapping[str, Any]) -> Mapping[str, Any]:
+    return _strict_approval_record(
+        value, TOOL_CONNECTOR_USE_FIELDS, "tool_connector_use_binding",
+        integer_fields=frozenset({
+            "policy_generation", "context_generation", "tool_generation",
+            "connector_generation", "backend_generation", "target_generation",
+            "credential_generation", "permission_scope_generation",
+            "objective_generation", "use_event_order",
+        }),
+        array_fields=frozenset({"permissions"}),
+    )
+
+
 @dataclass(frozen=True)
 class OracleInput:
     schema_version: str
@@ -2054,6 +2084,7 @@ class OracleInput:
     observation_binding: ObservationBinding | None
     observation_freshness: ObservationFreshness | None
     human_approval_binding: Mapping[str, Any] | None
+    tool_connector_use_binding: Mapping[str, Any] | None
     trusted_commitment_context: tuple[Mapping[str, Any], ...]
     trusted_anchor_context: tuple[Mapping[str, Any], ...]
     required_facts: tuple[str, ...]
@@ -2155,6 +2186,12 @@ class OracleInput:
             if not isinstance(approval_fact.value, Mapping):
                 raise ValueError("KNOWN human_approval_binding requires a typed object")
             human_approval_binding = _human_approval_binding(approval_fact.value)
+        tool_connector_use_binding = None
+        tool_use_fact = facts.get("tool_connector_use_binding")
+        if tool_use_fact is not None and tool_use_fact.state is FactState.KNOWN:
+            if not isinstance(tool_use_fact.value, Mapping):
+                raise ValueError("KNOWN tool_connector_use_binding requires a typed object")
+            tool_connector_use_binding = _tool_connector_use_binding(tool_use_fact.value)
         raw_context = fixture.get("_trusted_commitment_context", ())
         if not isinstance(raw_context, (list, tuple)) or not all(
             isinstance(item, Mapping) for item in raw_context
@@ -2180,6 +2217,7 @@ class OracleInput:
             observation_binding=observation_binding,
             observation_freshness=observation_freshness,
             human_approval_binding=human_approval_binding,
+            tool_connector_use_binding=tool_connector_use_binding,
             trusted_commitment_context=tuple(MappingProxyType(dict(item)) for item in raw_context),
             trusted_anchor_context=tuple(
                 validate_trusted_anchor_context(item) for item in raw_anchor_context
@@ -2423,6 +2461,53 @@ TRUSTED_HUMAN_APPROVAL_USE_STATE_FIELDS = frozenset({
     "boundary", "boundary_epoch", "freshness_challenge_id", "lifecycle_state",
 })
 
+TRUSTED_TOOL_CONNECTOR_POLICY_FIELDS = frozenset({
+    "relationship", "policy_id", "policy_generation", "requirement",
+    "selection_rule", "objective_id", "objective_generation",
+    "decision_contract_id", "decision_contract_version", "artifact", "effect",
+    "subject_id", "executor_id", "boundary", "boundary_epoch",
+    "execution_context", "source_id", "authority_generation", "lineage",
+    "ordering_source_id", "freshness_challenge_id", "lifecycle_state",
+})
+TRUSTED_TOOL_CONNECTOR_CONTEXT_FIELDS = frozenset({
+    "relationship", "context_id", "context_generation", "context_digest",
+    "logical_tool_id", "tool_generation", "tool_identity_basis",
+    "connector_id", "connector_generation", "connector_identity_basis",
+    "backend_id", "backend_generation", "backend_identity_basis",
+    "target_id", "target_generation", "target_identity_basis", "target_type",
+    "credential_id", "credential_generation", "credential_identity_basis",
+    "credential_issuer_id", "permission_scope_id", "permission_scope_generation",
+    "permissions", "operator_id", "operator_generation", "operator_lineage",
+    "source_lineage", "subject_id", "executor_id", "artifact", "effect",
+    "delegation_chain_id", "approval_policy_id", "boundary", "boundary_epoch",
+    "execution_context", "objective_id", "objective_generation",
+    "decision_contract_id", "decision_contract_version", "grant_id",
+    "start_event_order", "end_event_order", "source_id", "authority_generation",
+    "lineage", "ordering_source_id", "freshness_challenge_id", "lifecycle_state",
+})
+TRUSTED_TOOL_CONNECTOR_TRANSITION_FIELDS = frozenset({
+    "relationship", "transition_id", "transition_class", "component_kind",
+    "old_context_id", "old_context_generation", "old_context_digest",
+    "new_context_id", "new_context_generation", "new_context_digest",
+    "old_permissions", "new_permissions",
+    "approval_revalidation", "delegation_revalidation", "event_order",
+    "source_id", "authority_generation", "lineage", "ordering_source_id",
+    "boundary", "boundary_epoch", "freshness_challenge_id", "lifecycle_state",
+})
+TRUSTED_TOOL_CONNECTOR_SELECTION_FIELDS = frozenset({
+    "relationship", "policy_id", "policy_generation", "context_id",
+    "context_generation", "context_digest", "head_event_order", "source_id",
+    "authority_generation", "lineage", "ordering_source_id", "boundary",
+    "boundary_epoch", "freshness_challenge_id", "lifecycle_state",
+})
+TRUSTED_TOOL_CONNECTOR_TERMINAL_USE_FIELDS = frozenset({
+    "relationship", "context_id", "context_generation", "context_digest",
+    "subject_id", "executor_id", "artifact", "effect", "delegation_chain_id",
+    "approval_policy_id", "grant_id", "boundary", "boundary_epoch",
+    "execution_context", "use_id", "use_event_order", "source_id",
+    "authority_generation", "freshness_challenge_id", "lifecycle_state",
+})
+
 
 def _trusted_exact_record(value: Any, fields: frozenset[str], name: str) -> Mapping[str, Any]:
     if not isinstance(value, Mapping):
@@ -2636,6 +2721,60 @@ def _trusted_human_approval_context(value: Any) -> Mapping[str, Any]:
     return MappingProxyType(result)
 
 
+def _trusted_tool_connector_context(value: Any) -> Mapping[str, Any]:
+    name = "trusted tool_connector_authority_context"
+    fields = {
+        "tool_connector_policy", "execution_contexts", "component_transitions",
+        "execution_target_selection", "protected_terminal_uses",
+    }
+    if not isinstance(value, Mapping):
+        raise ValueError(f"{name} must be an object")
+    _require_exact_fields(value, fields, name)
+    result: dict[str, Any] = {}
+    result["tool_connector_policy"] = _trusted_control_record(
+        value["tool_connector_policy"], TRUSTED_TOOL_CONNECTOR_POLICY_FIELDS,
+        "trusted tool connector policy",
+        integer_fields=frozenset({
+            "policy_generation", "objective_generation", "authority_generation",
+        }),
+    )
+    specs = (
+        ("execution_contexts", TRUSTED_TOOL_CONNECTOR_CONTEXT_FIELDS,
+         frozenset({
+             "context_generation", "tool_generation", "connector_generation",
+             "backend_generation", "target_generation", "credential_generation",
+             "permission_scope_generation", "operator_generation",
+             "objective_generation", "start_event_order", "end_event_order",
+             "authority_generation",
+         }), frozenset({"permissions"})),
+        ("component_transitions", TRUSTED_TOOL_CONNECTOR_TRANSITION_FIELDS,
+         frozenset({
+             "old_context_generation", "new_context_generation", "event_order",
+             "authority_generation",
+         }), frozenset({"old_permissions", "new_permissions"})),
+        ("execution_target_selection", TRUSTED_TOOL_CONNECTOR_SELECTION_FIELDS,
+         frozenset({
+             "policy_generation", "context_generation", "head_event_order",
+             "authority_generation",
+         }), frozenset()),
+        ("protected_terminal_uses", TRUSTED_TOOL_CONNECTOR_TERMINAL_USE_FIELDS,
+         frozenset({"context_generation", "use_event_order", "authority_generation"}),
+         frozenset()),
+    )
+    for field, record_fields, integer_fields, array_fields in specs:
+        raw = value[field]
+        if not isinstance(raw, list):
+            raise ValueError(f"trusted {field} must be an array")
+        result[field] = tuple(
+            _trusted_control_record(
+                item, record_fields, f"trusted {field} record",
+                integer_fields=integer_fields, array_fields=array_fields,
+            )
+            for item in raw
+        )
+    return MappingProxyType(result)
+
+
 def validate_trusted_anchor_context(value: Mapping[str, Any]) -> Mapping[str, Any]:
     """Validate harness-owned adapter/domain authority without trusting fixture input."""
     result = dict(value)
@@ -2745,6 +2884,9 @@ def validate_trusted_anchor_context(value: Mapping[str, Any]) -> Mapping[str, An
     )
     result["human_approval_authority_context"] = _trusted_human_approval_context(
         value.get("human_approval_authority_context")
+    )
+    result["tool_connector_authority_context"] = _trusted_tool_connector_context(
+        value.get("tool_connector_authority_context")
     )
     reconciliation = value.get("cross_domain_reconciliation")
     result["cross_domain_reconciliation"] = (

@@ -874,6 +874,50 @@
       "subject_identity": {
         "state": "KNOWN",
         "value": "S"
+      },
+      "tool_connector_use_binding": {
+        "state": "KNOWN",
+        "value": {
+          "approval_policy_id": "HUMAN-APPROVAL-POLICY-LAB-V1-334",
+          "artifact": "A",
+          "backend_generation": 1,
+          "backend_id": "TOOL-BACKEND-1",
+          "boundary": "AUTH-BOUNDARY-1",
+          "boundary_epoch": "B1",
+          "connector_generation": 1,
+          "connector_id": "CONNECTOR-LAB-V1-334",
+          "context_digest": "e90810cd627f446750675c648ccc525612618e5f5ad0b8014c9f135d623555e1",
+          "context_generation": 1,
+          "context_id": "TOOL-CONTEXT-LAB-V1-334",
+          "credential_generation": 1,
+          "credential_id": "CREDENTIAL-LAB-V1-334",
+          "decision_contract_id": "CONTRACT-LAB-V1-032",
+          "decision_contract_version": "1",
+          "delegation_chain_id": "DIRECT",
+          "effect": "COMMIT",
+          "execution_context": "E1",
+          "executor_id": "S",
+          "freshness_challenge_id": "CHALLENGE-LAB-V1-032-1",
+          "grant_id": "GRANT-001",
+          "logical_tool_id": "TOOL-LAB-V1-334",
+          "objective_generation": 1,
+          "objective_id": "OBJECTIVE-LAB-V1-032",
+          "operator_lineage": "OPERATOR-LINEAGE-LAB-V1-334",
+          "permission_scope_generation": 1,
+          "permission_scope_id": "PERMISSION-SCOPE-LAB-V1-334",
+          "permissions": [
+            "COMMIT"
+          ],
+          "policy_generation": 1,
+          "policy_id": "TOOL-CONNECTOR-POLICY-LAB-V1-334",
+          "relationship": "EXACT_TOOL_CONNECTOR_USE",
+          "subject_id": "S",
+          "target_generation": 1,
+          "target_id": "TARGET-LAB-V1-334",
+          "tool_generation": 1,
+          "use_event_order": 3,
+          "use_id": "TOOL-USE-LAB-V1-334"
+        }
       }
     },
     "prohibition": {
@@ -893,7 +937,8 @@
       "execution_context",
       "freshness",
       "consumption_state",
-      "human_approval_binding"
+      "human_approval_binding",
+      "tool_connector_use_binding"
     ],
     "required_values": {
       "applicable_boundary": "AUTH-BOUNDARY-1",
