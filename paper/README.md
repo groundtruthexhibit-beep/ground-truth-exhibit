@@ -7,11 +7,20 @@ Independent Researcher
 Antigonish, Nova Scotia, Canada  
 Research preprint v1.0 — 27 September 2026
 
-## Files
+## Public reading copy
 
-- `Ground_Truth_Paper_v1_0_Preprint_David_B_Boyd.pdf` — publication PDF
+Google Docs:
+https://docs.google.com/document/d/1oG9gGmoeVaAcIInzyC-7BbdL1sdhW0oB/edit?usp=drivesdk&ouid=100784840950225384768&rtpof=true&sd=true
+
+## Publication artifacts
+
+The finalized v1.0 files are:
+
+- `Ground_Truth_Paper_v1_0_Preprint_David_B_Boyd.pdf` — canonical publication PDF
 - `Ground_Truth_Paper_v1_0_Preprint_David_B_Boyd.docx` — editable source document
-- `SHA256SUMS.txt` — cryptographic checksums for the two paper files
+- `SHA256SUMS.txt` — cryptographic checksums for both files
+
+The repository metadata and checksums are committed here first; the binary PDF/DOCX must be uploaded without altering their bytes so the recorded SHA-256 values remain valid.
 
 ## Evidence binding
 
