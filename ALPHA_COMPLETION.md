@@ -37,6 +37,6 @@ It is not a claim of:
 
 ## Public/private custody
 
-The authoritative engineering implementation and detailed evidence chain remain in a private repository.
+The private Ground Truth core and its protected operational evidence remain outside this public repository.
 
-This public repository is a curated exhibit intended to communicate architecture, authority semantics, demonstrated properties, limitations, and terminology without mirroring the private core.
+This public repository is a curated exhibit intended to communicate architecture, authority semantics, demonstrated properties, limitations, and terminology. It also contains the separate bounded Authority Lab v1 falsification harness and its public evidence package. Publishing that research harness does not convert it into the private core or authorize deployment.
