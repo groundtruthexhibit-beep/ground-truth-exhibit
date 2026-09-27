@@ -61,7 +61,7 @@ The private engineering program exercised adversarial cases in categories includ
 - configuration rotation and skew;
 - ambiguous or unavailable state.
 
-This public exhibit intentionally does not publish the private hostile test corpus or exact bypass mechanics.
+This public exhibit publishes a bounded public Authority Lab fixture corpus for deterministic falsification. It does not publish the private-core hostile corpus, protected operational evidence, or sensitive bypass mechanics outside that bounded public model.
 
 ## Non-claims
 
