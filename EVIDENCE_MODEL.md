@@ -51,4 +51,6 @@ Consensus is not evidence of independence.
 
 ## Alpha evidence posture
 
-The completed Alpha includes adversarial and reproducible validation of the authorized scope. This public repository exposes the evidence model and earned claims at a high level while keeping private fixtures, internal enforcement logic, and sensitive operational details out of the exhibit.
+The completed Alpha includes adversarial and reproducible validation of the authorized scope. This public repository exposes the evidence model, a bounded public falsification harness, its public fixture corpus, and selected earned claims while keeping the private-core implementation, protected evidence, non-public hostile material, and sensitive operational details outside the exhibit.
+
+Public fixture presence does not make a fixture authoritative evidence about the external world; it supplies explicit modeled facts to the deterministic oracle.
