@@ -68,6 +68,12 @@ All outcomes preserve the separation between a decision and execution. `DENIED` 
 
 Ground Truth uses explicit control states and narrow transitions. A completed gate does not implicitly authorize a future gate. A merge does not implicitly mint new authority. A successful test does not silently widen claims.
 
+## Public implementation boundary
+
+This repository includes a bounded public Authority Lab for deterministic falsification of the published authority model. The public lab is not the private Ground Truth core and is not a production authorization service.
+
+Later reviewed Authority Lab v1 release-candidate work is not treated as remotely verifiable here until its exact Git history is transported.
+
 ## Alpha boundary
 
 The completed Alpha reached a terminal lifecycle state for its authorized scope. No subsequent phase is implied by that completion.
