@@ -1,6 +1,8 @@
 # Public Authority Lab v0
 
-Authority Lab v0 is a deterministic, local-only public falsification harness for the published Ground Truth authority model. It is not the private Ground Truth core, a production authorization service, a policy engine, a certification system, or evidence that Ground Truth is secure or complete.
+Authority Lab v0 is the bounded, remotely inspectable deterministic falsification harness currently published in this Git history. It is not the private Ground Truth core, a production authorization service, a policy engine, a certification system, or evidence that Ground Truth is secure or complete.
+
+Later reviewed Authority Lab v1 release-candidate work is outside this currently transported history. Do not infer later fixture counts, exact-head verdicts, or freeze status from this v0 directory.
 
 Run one fixture:
 
