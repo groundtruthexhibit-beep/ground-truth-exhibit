@@ -1,9 +1,11 @@
-"""Bounded public data model for Authority Lab v0."""
+"""Bounded public data model for Authority Lab v1."""
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from enum import Enum
+from types import MappingProxyType
 from typing import Any, Mapping
 
 
@@ -22,6 +24,35 @@ class FactState(str, Enum):
 class HarnessStatus(str, Enum):
     PASS = "PASS"
     CASE_MISMATCH = "CASE_MISMATCH"
+
+
+class MutationTargetKind(str, Enum):
+    STATE = "STATE"
+    RELATION = "RELATION"
+    BINDING = "BINDING"
+    FACT = "FACT"
+
+
+class ContinuityEffect(str, Enum):
+    """Authority effects retained for every admitted mutation edge."""
+
+    IDENTITY_DISCONTINUITY = "IDENTITY_DISCONTINUITY"
+    NON_RESTORABLE_LINEAGE = "NON_RESTORABLE_LINEAGE"
+    TERMINAL_DISCONTINUITY = "TERMINAL_DISCONTINUITY"
+    GRANT_USE_DISCONTINUITY = "GRANT_USE_DISCONTINUITY"
+    CONTROL_REESTABLISHMENT = "CONTROL_REESTABLISHMENT"
+    EVIDENCE_OR_EFFECT_REESTABLISHMENT = "EVIDENCE_OR_EFFECT_REESTABLISHMENT"
+    OBJECTIVE_AUTHORITY_REESTABLISHMENT = "OBJECTIVE_AUTHORITY_REESTABLISHMENT"
+
+
+@dataclass(frozen=True)
+class MutationSpec:
+    canonical_field: str
+    target_kind: MutationTargetKind
+    target: str
+    continuity_effects: tuple[ContinuityEffect, ...]
+    observation_scope_families: tuple[str, ...]
+    legacy_aliases: tuple[str, ...] = ()
 
 
 INVARIANTS = (
@@ -59,21 +90,132 @@ MANDATORY_T3_FACTS = (
     "consumption_binding",
     "delegation_binding",
     "closure_binding",
+    "objective_identity",
+    "decision_contract_identity",
+    "authority_root",
+    "objective_binding",
+    "binding_source_authority",
+    "binding_lifecycle",
+    "binding_ordering",
 )
 
 RELATIONAL_T3_FACTS = (
+    "evidence_binding",
+    "freshness",
     "boundary_epoch_binding",
     "execution_control_binding",
     "consumption_binding",
     "delegation_binding",
     "closure_binding",
+    "objective_identity",
+    "decision_contract_identity",
+    "authority_root",
+    "objective_binding",
+    "binding_source_authority",
+    "binding_lifecycle",
+    "binding_ordering",
+    "human_approval_binding",
+    "tool_connector_use_binding",
 )
+
+RESERVED_HUMAN_APPROVAL_FACTS = frozenset({"human_approval", "user_said_yes"})
+RESERVED_TOOL_CONNECTOR_FACTS = frozenset({
+    "tool_connector_identity", "credential_identity", "permission_scope",
+    "backend_identity", "connector_identity", "execution_target_identity",
+})
+RESERVED_T3_EXECUTION_FACTS = frozenset({"t3_execution_event"})
+
+OBJECTIVE_BINDING_FACTS = (
+    "objective_identity",
+    "decision_contract_identity",
+    "authority_root",
+    "objective_binding",
+    "binding_source_authority",
+    "binding_lifecycle",
+    "binding_ordering",
+)
+
+OBSERVATION_PROFILE_ID = "AUTHORITY-LAB-OBSERVATION-PROFILE-1"
+OBSERVATION_PROFILE_VERSION = 1
+OBSERVATION_SCOPE_FAMILIES = (
+    "SUBJECT_AND_DELEGATION",
+    "ARTIFACT_AND_TRANSFORMATION",
+    "EXECUTION_CONTROL",
+    "BOUNDARY_AND_EPOCH",
+    "CREDENTIAL_AND_IDENTITY",
+    "GRANT_USE_AND_CONSUMPTION",
+    "OBJECTIVE_AUTHORITY_LIFECYCLE",
+    "OBSERVATION_PIPELINE",
+)
+OBSERVATION_LIFECYCLE_STATES = (
+    "ACTIVE",
+    "INVALID",
+    "REVOKED",
+    "REJECTED",
+    "SUPERSEDED",
+)
+
+OBSERVATION_COMMITMENT_FORMAT = "AUTHORITY-LAB-OBSERVATION-COMMITMENT-V1"
+OBSERVATION_COMMITMENT_DIGEST_ALGORITHM = "SHA-256"
 
 
 def _exact_string(value: Any, field: str) -> str:
     if not isinstance(value, str):
         raise ValueError(f"{field} must be a string")
     return value
+
+
+def _exact_nonempty_string(value: Any, field: str) -> str:
+    value = _exact_string(value, field)
+    if value == "":
+        raise ValueError(f"{field} must be non-empty")
+    return value
+
+
+def _exact_generation(value: Any, field: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise ValueError(f"{field} must be a non-negative integer")
+    return value
+
+
+def _require_exact_fields(value: Mapping[str, Any], fields: set[str], field: str) -> None:
+    if set(value) != fields:
+        raise ValueError(f"{field} must contain exactly {sorted(fields)}")
+
+
+def _exact_scope_families(value: Any, field: str) -> tuple[str, ...]:
+    if not isinstance(value, (list, tuple)) or not value:
+        raise ValueError(f"{field} must be a non-empty array")
+    families = tuple(_exact_nonempty_string(item, field) for item in value)
+    if len(families) != len(set(families)):
+        raise ValueError(f"{field} must not contain duplicates")
+    unknown = set(families) - set(OBSERVATION_SCOPE_FAMILIES)
+    if unknown:
+        raise ValueError(f"{field} contains unknown scope families: {sorted(unknown)}")
+    return families
+
+
+def _exact_lifecycle_state(value: Any, field: str) -> str:
+    state = _exact_nonempty_string(value, field)
+    if state not in OBSERVATION_LIFECYCLE_STATES:
+        raise ValueError(f"{field} is unsupported")
+    return state
+
+
+def exact_value_equal(left: Any, right: Any) -> bool:
+    """Compare fixture values without Python bool/int or container coercion."""
+    if type(left) is not type(right):
+        return False
+    if isinstance(left, Mapping):
+        return set(left) == set(right) and all(
+            exact_value_equal(left[key], right[key]) for key in left
+        )
+    if isinstance(left, (list, tuple)):
+        return len(left) == len(right) and all(
+            exact_value_equal(left_item, right_item)
+            for left_item, right_item in zip(left, right)
+        )
+    return bool(left == right)
 
 
 @dataclass(frozen=True)
@@ -96,6 +238,1230 @@ class AuthorityTuple:
             identity_basis=_exact_string(value["identity_basis"], "authority_tuple.identity_basis"),
             boundary_epoch=_exact_string(value["boundary_epoch"], "authority_tuple.boundary_epoch"),
             decision=AuthorityOutcome(value["decision"]),
+        )
+
+
+@dataclass(frozen=True)
+class BindingScope:
+    subject: str
+    artifact: str
+    control_state: str
+    identity_basis: str
+    boundary_epoch: str
+    decision: AuthorityOutcome
+    applicable_boundary: str
+
+    @classmethod
+    def from_mapping(cls, value: Mapping[str, Any]) -> "BindingScope":
+        fields = set(TUPLE_FIELDS) | {"applicable_boundary"}
+        _require_exact_fields(value, fields, "binding scope")
+        return cls(
+            subject=_exact_nonempty_string(value["subject"], "binding scope.subject"),
+            artifact=_exact_nonempty_string(value["artifact"], "binding scope.artifact"),
+            control_state=_exact_nonempty_string(
+                value["control_state"], "binding scope.control_state"
+            ),
+            identity_basis=_exact_nonempty_string(
+                value["identity_basis"], "binding scope.identity_basis"
+            ),
+            boundary_epoch=_exact_nonempty_string(
+                value["boundary_epoch"], "binding scope.boundary_epoch"
+            ),
+            decision=AuthorityOutcome(value["decision"]),
+            applicable_boundary=_exact_nonempty_string(
+                value["applicable_boundary"], "binding scope.applicable_boundary"
+            ),
+        )
+
+
+@dataclass(frozen=True)
+class ObjectiveIdentity:
+    objective_id: str
+    objective_generation: int
+    policy_id: str
+    policy_version: str
+
+    @classmethod
+    def from_mapping(cls, value: Mapping[str, Any]) -> "ObjectiveIdentity":
+        fields = {"objective_id", "objective_generation", "policy_id", "policy_version"}
+        _require_exact_fields(value, fields, "objective_identity")
+        return cls(
+            objective_id=_exact_nonempty_string(
+                value["objective_id"], "objective_identity.objective_id"
+            ),
+            objective_generation=_exact_generation(
+                value["objective_generation"], "objective_identity.objective_generation"
+            ),
+            policy_id=_exact_nonempty_string(
+                value["policy_id"], "objective_identity.policy_id"
+            ),
+            policy_version=_exact_nonempty_string(
+                value["policy_version"], "objective_identity.policy_version"
+            ),
+        )
+
+
+@dataclass(frozen=True)
+class DecisionContractIdentity:
+    contract_id: str
+    contract_version: str
+    schema_id: str
+    derived_from: str
+
+    @classmethod
+    def from_mapping(cls, value: Mapping[str, Any]) -> "DecisionContractIdentity":
+        fields = {"contract_id", "contract_version", "schema_id", "derived_from"}
+        _require_exact_fields(value, fields, "decision_contract_identity")
+        return cls(
+            contract_id=_exact_nonempty_string(
+                value["contract_id"], "decision_contract_identity.contract_id"
+            ),
+            contract_version=_exact_nonempty_string(
+                value["contract_version"], "decision_contract_identity.contract_version"
+            ),
+            schema_id=_exact_nonempty_string(
+                value["schema_id"], "decision_contract_identity.schema_id"
+            ),
+            derived_from=_exact_nonempty_string(
+                value["derived_from"], "decision_contract_identity.derived_from"
+            ),
+        )
+
+
+@dataclass(frozen=True)
+class AuthorityRoot:
+    root_id: str
+    boundary: str
+    boundary_epoch: str
+    lineage: str
+    authority_generation: int
+    ordering_source_id: str
+
+    @classmethod
+    def from_mapping(cls, value: Mapping[str, Any]) -> "AuthorityRoot":
+        fields = {
+            "root_id",
+            "boundary",
+            "boundary_epoch",
+            "lineage",
+            "authority_generation",
+            "ordering_source_id",
+        }
+        _require_exact_fields(value, fields, "authority_root")
+        return cls(
+            root_id=_exact_nonempty_string(value["root_id"], "authority_root.root_id"),
+            boundary=_exact_nonempty_string(value["boundary"], "authority_root.boundary"),
+            boundary_epoch=_exact_nonempty_string(
+                value["boundary_epoch"], "authority_root.boundary_epoch"
+            ),
+            lineage=_exact_nonempty_string(value["lineage"], "authority_root.lineage"),
+            authority_generation=_exact_generation(
+                value["authority_generation"], "authority_root.authority_generation"
+            ),
+            ordering_source_id=_exact_nonempty_string(
+                value["ordering_source_id"], "authority_root.ordering_source_id"
+            ),
+        )
+
+
+@dataclass(frozen=True)
+class ObjectiveBinding:
+    binding_id: str
+    disposition: str
+    objective_id: str
+    objective_generation: int
+    contract_id: str
+    contract_version: str
+    schema_id: str
+    source_id: str
+    authority_generation: int
+    binding_generation: int
+    lineage: str
+    policy_id: str
+    policy_version: str
+    producer_kind: str
+    producer_id: str
+    scope: BindingScope
+
+    @classmethod
+    def from_mapping(cls, value: Mapping[str, Any]) -> "ObjectiveBinding":
+        fields = {
+            "binding_id",
+            "disposition",
+            "objective_id",
+            "objective_generation",
+            "contract_id",
+            "contract_version",
+            "schema_id",
+            "source_id",
+            "authority_generation",
+            "binding_generation",
+            "lineage",
+            "policy_id",
+            "policy_version",
+            "producer_kind",
+            "producer_id",
+            "scope",
+        }
+        _require_exact_fields(value, fields, "objective_binding candidate")
+        disposition = _exact_nonempty_string(
+            value["disposition"], "objective_binding.disposition"
+        )
+        if disposition not in {"ADMIT", "REJECT"}:
+            raise ValueError("objective_binding.disposition must be ADMIT or REJECT")
+        scope = value["scope"]
+        if not isinstance(scope, Mapping):
+            raise ValueError("objective_binding.scope must be an object")
+        return cls(
+            binding_id=_exact_nonempty_string(
+                value["binding_id"], "objective_binding.binding_id"
+            ),
+            disposition=disposition,
+            objective_id=_exact_nonempty_string(
+                value["objective_id"], "objective_binding.objective_id"
+            ),
+            objective_generation=_exact_generation(
+                value["objective_generation"], "objective_binding.objective_generation"
+            ),
+            contract_id=_exact_nonempty_string(
+                value["contract_id"], "objective_binding.contract_id"
+            ),
+            contract_version=_exact_nonempty_string(
+                value["contract_version"], "objective_binding.contract_version"
+            ),
+            schema_id=_exact_nonempty_string(
+                value["schema_id"], "objective_binding.schema_id"
+            ),
+            source_id=_exact_nonempty_string(
+                value["source_id"], "objective_binding.source_id"
+            ),
+            authority_generation=_exact_generation(
+                value["authority_generation"], "objective_binding.authority_generation"
+            ),
+            binding_generation=_exact_generation(
+                value["binding_generation"], "objective_binding.binding_generation"
+            ),
+            lineage=_exact_nonempty_string(
+                value["lineage"], "objective_binding.lineage"
+            ),
+            policy_id=_exact_nonempty_string(
+                value["policy_id"], "objective_binding.policy_id"
+            ),
+            policy_version=_exact_nonempty_string(
+                value["policy_version"], "objective_binding.policy_version"
+            ),
+            producer_kind=_exact_nonempty_string(
+                value["producer_kind"], "objective_binding.producer_kind"
+            ),
+            producer_id=_exact_nonempty_string(
+                value["producer_id"], "objective_binding.producer_id"
+            ),
+            scope=BindingScope.from_mapping(scope),
+        )
+
+
+@dataclass(frozen=True)
+class BindingSourceAuthority:
+    relationship: str
+    root_id: str
+    source_id: str
+    delegation_id: str
+    authority_generation: int
+    boundary: str
+    boundary_epoch: str
+    lineage: str
+    status: str
+    scope: BindingScope
+
+    @classmethod
+    def from_mapping(cls, value: Mapping[str, Any]) -> "BindingSourceAuthority":
+        fields = {
+            "relationship",
+            "root_id",
+            "source_id",
+            "delegation_id",
+            "authority_generation",
+            "boundary",
+            "boundary_epoch",
+            "lineage",
+            "status",
+            "scope",
+        }
+        _require_exact_fields(value, fields, "binding_source_authority relation")
+        relationship = _exact_nonempty_string(
+            value["relationship"], "binding_source_authority.relationship"
+        )
+        if relationship not in {"ROOT", "EXACT_DELEGATION"}:
+            raise ValueError(
+                "binding_source_authority.relationship must be ROOT or EXACT_DELEGATION"
+            )
+        status = _exact_nonempty_string(value["status"], "binding_source_authority.status")
+        if status not in {"ACTIVE", "REVOKED", "REJECTED"}:
+            raise ValueError(
+                "binding_source_authority.status must be ACTIVE, REVOKED, or REJECTED"
+            )
+        scope = value["scope"]
+        if not isinstance(scope, Mapping):
+            raise ValueError("binding_source_authority.scope must be an object")
+        return cls(
+            relationship=relationship,
+            root_id=_exact_nonempty_string(
+                value["root_id"], "binding_source_authority.root_id"
+            ),
+            source_id=_exact_nonempty_string(
+                value["source_id"], "binding_source_authority.source_id"
+            ),
+            delegation_id=_exact_nonempty_string(
+                value["delegation_id"], "binding_source_authority.delegation_id"
+            ),
+            authority_generation=_exact_generation(
+                value["authority_generation"],
+                "binding_source_authority.authority_generation",
+            ),
+            boundary=_exact_nonempty_string(
+                value["boundary"], "binding_source_authority.boundary"
+            ),
+            boundary_epoch=_exact_nonempty_string(
+                value["boundary_epoch"], "binding_source_authority.boundary_epoch"
+            ),
+            lineage=_exact_nonempty_string(
+                value["lineage"], "binding_source_authority.lineage"
+            ),
+            status=status,
+            scope=BindingScope.from_mapping(scope),
+        )
+
+
+@dataclass(frozen=True)
+class BindingLifecycle:
+    binding_id: str
+    binding_generation: int
+    state: str
+    event_id: str
+    event_order: int
+    source_id: str
+    authority_generation: int
+    lineage: str
+
+    @classmethod
+    def from_mapping(cls, value: Mapping[str, Any]) -> "BindingLifecycle":
+        fields = {
+            "binding_id",
+            "binding_generation",
+            "state",
+            "event_id",
+            "event_order",
+            "source_id",
+            "authority_generation",
+            "lineage",
+        }
+        _require_exact_fields(value, fields, "binding_lifecycle record")
+        state = _exact_nonempty_string(value["state"], "binding_lifecycle.state")
+        if state not in {"ACTIVE", "INVALID", "REVOKED", "REJECTED", "SUPERSEDED"}:
+            raise ValueError("unsupported binding_lifecycle.state")
+        return cls(
+            binding_id=_exact_nonempty_string(
+                value["binding_id"], "binding_lifecycle.binding_id"
+            ),
+            binding_generation=_exact_generation(
+                value["binding_generation"], "binding_lifecycle.binding_generation"
+            ),
+            state=state,
+            event_id=_exact_nonempty_string(
+                value["event_id"], "binding_lifecycle.event_id"
+            ),
+            event_order=_exact_generation(
+                value["event_order"], "binding_lifecycle.event_order"
+            ),
+            source_id=_exact_nonempty_string(
+                value["source_id"], "binding_lifecycle.source_id"
+            ),
+            authority_generation=_exact_generation(
+                value["authority_generation"], "binding_lifecycle.authority_generation"
+            ),
+            lineage=_exact_nonempty_string(value["lineage"], "binding_lifecycle.lineage"),
+        )
+
+
+@dataclass(frozen=True)
+class BindingOrdering:
+    ordering_source_id: str
+    lineage: str
+    authority_generation: int
+    head_binding_id: str
+    head_binding_generation: int
+    head_event_order: int
+
+    @classmethod
+    def from_mapping(cls, value: Mapping[str, Any]) -> "BindingOrdering":
+        fields = {
+            "ordering_source_id",
+            "lineage",
+            "authority_generation",
+            "head_binding_id",
+            "head_binding_generation",
+            "head_event_order",
+        }
+        _require_exact_fields(value, fields, "binding_ordering")
+        return cls(
+            ordering_source_id=_exact_nonempty_string(
+                value["ordering_source_id"], "binding_ordering.ordering_source_id"
+            ),
+            lineage=_exact_nonempty_string(value["lineage"], "binding_ordering.lineage"),
+            authority_generation=_exact_generation(
+                value["authority_generation"], "binding_ordering.authority_generation"
+            ),
+            head_binding_id=_exact_nonempty_string(
+                value["head_binding_id"], "binding_ordering.head_binding_id"
+            ),
+            head_binding_generation=_exact_generation(
+                value["head_binding_generation"],
+                "binding_ordering.head_binding_generation",
+            ),
+            head_event_order=_exact_generation(
+                value["head_event_order"], "binding_ordering.head_event_order"
+            ),
+        )
+
+
+@dataclass(frozen=True)
+class ObservationAnchor:
+    anchor_id: str
+    event_order: int
+
+    @classmethod
+    def from_mapping(cls, value: Mapping[str, Any], field: str) -> "ObservationAnchor":
+        _require_exact_fields(value, {"anchor_id", "event_order"}, field)
+        return cls(
+            _exact_nonempty_string(value["anchor_id"], f"{field}.anchor_id"),
+            _exact_generation(value["event_order"], f"{field}.event_order"),
+        )
+
+
+@dataclass(frozen=True)
+class ObserverAdmission:
+    observer_id: str
+    observer_generation: int
+    observer_identity_basis: str
+    scope_families: tuple[str, ...]
+    lifecycle_state: str
+    observation_binding_id: str
+    observation_binding_generation: int
+
+    @classmethod
+    def from_mapping(cls, value: Mapping[str, Any]) -> "ObserverAdmission":
+        field = "evidence_binding.observers"
+        _require_exact_fields(
+            value,
+            {
+                "observer_id",
+                "observer_generation",
+                "observer_identity_basis",
+                "scope_families",
+                "lifecycle_state",
+                "observation_binding_id",
+                "observation_binding_generation",
+            },
+            f"{field} entry",
+        )
+        return cls(
+            _exact_nonempty_string(value["observer_id"], f"{field}.observer_id"),
+            _exact_generation(value["observer_generation"], f"{field}.observer_generation"),
+            _exact_nonempty_string(
+                value["observer_identity_basis"], f"{field}.observer_identity_basis"
+            ),
+            _exact_scope_families(value["scope_families"], f"{field}.scope_families"),
+            _exact_lifecycle_state(value["lifecycle_state"], f"{field}.lifecycle_state"),
+            _exact_nonempty_string(
+                value["observation_binding_id"], f"{field}.observation_binding_id"
+            ),
+            _exact_generation(
+                value["observation_binding_generation"],
+                f"{field}.observation_binding_generation",
+            ),
+        )
+
+
+@dataclass(frozen=True)
+class ObservationSegment:
+    segment_id: str
+    observer_id: str
+    observer_generation: int
+    stream_id: str
+    stream_generation: int
+    scope_families: tuple[str, ...]
+    start_anchor_id: str
+    start_event_order: int
+    end_anchor_id: str
+    end_event_order: int
+    start_sequence: int
+    end_sequence: int
+    stream_commitment: str
+    boundary_epoch: str
+    observation_binding_generation: int
+
+    @classmethod
+    def from_mapping(cls, value: Mapping[str, Any]) -> "ObservationSegment":
+        field = "evidence_binding.segments"
+        _require_exact_fields(
+            value,
+            {
+                "segment_id", "observer_id", "observer_generation", "stream_id",
+                "stream_generation", "scope_families", "start_anchor_id",
+                "start_event_order", "end_anchor_id", "end_event_order",
+                "start_sequence", "end_sequence", "stream_commitment",
+                "boundary_epoch", "observation_binding_generation",
+            },
+            f"{field} entry",
+        )
+        return cls(
+            _exact_nonempty_string(value["segment_id"], f"{field}.segment_id"),
+            _exact_nonempty_string(value["observer_id"], f"{field}.observer_id"),
+            _exact_generation(value["observer_generation"], f"{field}.observer_generation"),
+            _exact_nonempty_string(value["stream_id"], f"{field}.stream_id"),
+            _exact_generation(value["stream_generation"], f"{field}.stream_generation"),
+            _exact_scope_families(value["scope_families"], f"{field}.scope_families"),
+            _exact_nonempty_string(value["start_anchor_id"], f"{field}.start_anchor_id"),
+            _exact_generation(value["start_event_order"], f"{field}.start_event_order"),
+            _exact_nonempty_string(value["end_anchor_id"], f"{field}.end_anchor_id"),
+            _exact_generation(value["end_event_order"], f"{field}.end_event_order"),
+            _exact_generation(value["start_sequence"], f"{field}.start_sequence"),
+            _exact_generation(value["end_sequence"], f"{field}.end_sequence"),
+            _exact_nonempty_string(value["stream_commitment"], f"{field}.stream_commitment"),
+            _exact_nonempty_string(value["boundary_epoch"], f"{field}.boundary_epoch"),
+            _exact_generation(
+                value["observation_binding_generation"],
+                f"{field}.observation_binding_generation",
+            ),
+        )
+
+
+@dataclass(frozen=True)
+class ObservationHandoff:
+    relationship: str
+    handoff_id: str
+    from_observer_id: str
+    from_observer_generation: int
+    to_observer_id: str
+    to_observer_generation: int
+    from_segment_id: str
+    to_segment_id: str
+    scope_families: tuple[str, ...]
+    handoff_anchor_id: str
+    handoff_event_order: int
+    source_id: str
+    authority_generation: int
+    boundary: str
+    boundary_epoch: str
+    lineage: str
+
+    @classmethod
+    def from_mapping(cls, value: Mapping[str, Any]) -> "ObservationHandoff":
+        field = "evidence_binding.handoffs"
+        _require_exact_fields(
+            value,
+            {
+                "relationship", "handoff_id", "from_observer_id",
+                "from_observer_generation", "to_observer_id",
+                "to_observer_generation", "from_segment_id", "to_segment_id",
+                "scope_families", "handoff_anchor_id", "handoff_event_order",
+                "source_id", "authority_generation", "boundary", "boundary_epoch",
+                "lineage",
+            },
+            f"{field} entry",
+        )
+        relationship = _exact_nonempty_string(value["relationship"], f"{field}.relationship")
+        if relationship != "AUTHORITY_PRESERVING_OBSERVER_HANDOFF":
+            raise ValueError(f"{field}.relationship is unsupported")
+        return cls(
+            relationship,
+            _exact_nonempty_string(value["handoff_id"], f"{field}.handoff_id"),
+            _exact_nonempty_string(value["from_observer_id"], f"{field}.from_observer_id"),
+            _exact_generation(
+                value["from_observer_generation"], f"{field}.from_observer_generation"
+            ),
+            _exact_nonempty_string(value["to_observer_id"], f"{field}.to_observer_id"),
+            _exact_generation(
+                value["to_observer_generation"], f"{field}.to_observer_generation"
+            ),
+            _exact_nonempty_string(value["from_segment_id"], f"{field}.from_segment_id"),
+            _exact_nonempty_string(value["to_segment_id"], f"{field}.to_segment_id"),
+            _exact_scope_families(value["scope_families"], f"{field}.scope_families"),
+            _exact_nonempty_string(value["handoff_anchor_id"], f"{field}.handoff_anchor_id"),
+            _exact_generation(value["handoff_event_order"], f"{field}.handoff_event_order"),
+            _exact_nonempty_string(value["source_id"], f"{field}.source_id"),
+            _exact_generation(value["authority_generation"], f"{field}.authority_generation"),
+            _exact_nonempty_string(value["boundary"], f"{field}.boundary"),
+            _exact_nonempty_string(value["boundary_epoch"], f"{field}.boundary_epoch"),
+            _exact_nonempty_string(value["lineage"], f"{field}.lineage"),
+        )
+
+
+@dataclass(frozen=True)
+class ObservationTransformation:
+    relationship: str
+    transformation_id: str
+    transformation_generation: int
+    source_stream_id: str
+    source_stream_generation: int
+    source_commitment: str
+    target_stream_id: str
+    target_stream_generation: int
+    target_commitment: str
+    scope_families: tuple[str, ...]
+    source_id: str
+    authority_generation: int
+    boundary: str
+    boundary_epoch: str
+    lineage: str
+    lifecycle_state: str
+
+    @classmethod
+    def from_mapping(cls, value: Mapping[str, Any]) -> "ObservationTransformation":
+        field = "evidence_binding.transformations"
+        _require_exact_fields(
+            value,
+            {
+                "relationship", "transformation_id", "transformation_generation",
+                "source_stream_id", "source_stream_generation", "source_commitment",
+                "target_stream_id", "target_stream_generation", "target_commitment",
+                "scope_families", "source_id", "authority_generation", "boundary",
+                "boundary_epoch", "lineage", "lifecycle_state",
+            },
+            f"{field} entry",
+        )
+        relationship = _exact_nonempty_string(value["relationship"], f"{field}.relationship")
+        if relationship != "OBSERVATION_PRESERVING":
+            raise ValueError(f"{field}.relationship is unsupported")
+        return cls(
+            relationship,
+            _exact_nonempty_string(
+                value["transformation_id"], f"{field}.transformation_id"
+            ),
+            _exact_generation(
+                value["transformation_generation"], f"{field}.transformation_generation"
+            ),
+            _exact_nonempty_string(value["source_stream_id"], f"{field}.source_stream_id"),
+            _exact_generation(
+                value["source_stream_generation"], f"{field}.source_stream_generation"
+            ),
+            _exact_nonempty_string(value["source_commitment"], f"{field}.source_commitment"),
+            _exact_nonempty_string(value["target_stream_id"], f"{field}.target_stream_id"),
+            _exact_generation(
+                value["target_stream_generation"], f"{field}.target_stream_generation"
+            ),
+            _exact_nonempty_string(value["target_commitment"], f"{field}.target_commitment"),
+            _exact_scope_families(value["scope_families"], f"{field}.scope_families"),
+            _exact_nonempty_string(value["source_id"], f"{field}.source_id"),
+            _exact_generation(value["authority_generation"], f"{field}.authority_generation"),
+            _exact_nonempty_string(value["boundary"], f"{field}.boundary"),
+            _exact_nonempty_string(value["boundary_epoch"], f"{field}.boundary_epoch"),
+            _exact_nonempty_string(value["lineage"], f"{field}.lineage"),
+            _exact_lifecycle_state(value["lifecycle_state"], f"{field}.lifecycle_state"),
+        )
+
+
+@dataclass(frozen=True)
+class ObservationLifecycle:
+    record_id: str
+    target_kind: str
+    target_id: str
+    target_generation: int
+    state: str
+    event_id: str
+    event_order: int
+    source_id: str
+    authority_generation: int
+    boundary: str
+    boundary_epoch: str
+    lineage: str
+
+    @classmethod
+    def from_mapping(cls, value: Mapping[str, Any]) -> "ObservationLifecycle":
+        field = "evidence_binding.lifecycle_records"
+        _require_exact_fields(
+            value,
+            {
+                "record_id", "target_kind", "target_id", "target_generation", "state",
+                "event_id", "event_order", "source_id", "authority_generation",
+                "boundary", "boundary_epoch", "lineage",
+            },
+            f"{field} entry",
+        )
+        target_kind = _exact_nonempty_string(value["target_kind"], f"{field}.target_kind")
+        if target_kind not in {"OBSERVATION_BINDING", "OBSERVER"}:
+            raise ValueError(f"{field}.target_kind is unsupported")
+        return cls(
+            _exact_nonempty_string(value["record_id"], f"{field}.record_id"),
+            target_kind,
+            _exact_nonempty_string(value["target_id"], f"{field}.target_id"),
+            _exact_generation(value["target_generation"], f"{field}.target_generation"),
+            _exact_lifecycle_state(value["state"], f"{field}.state"),
+            _exact_nonempty_string(value["event_id"], f"{field}.event_id"),
+            _exact_generation(value["event_order"], f"{field}.event_order"),
+            _exact_nonempty_string(value["source_id"], f"{field}.source_id"),
+            _exact_generation(value["authority_generation"], f"{field}.authority_generation"),
+            _exact_nonempty_string(value["boundary"], f"{field}.boundary"),
+            _exact_nonempty_string(value["boundary_epoch"], f"{field}.boundary_epoch"),
+            _exact_nonempty_string(value["lineage"], f"{field}.lineage"),
+        )
+
+
+def _typed_object_array(value: Any, field: str, parser: Any) -> tuple[Any, ...]:
+    if not isinstance(value, (list, tuple)):
+        raise ValueError(f"{field} must be an array")
+    if not all(isinstance(item, Mapping) for item in value):
+        raise ValueError(f"{field} entries must be objects")
+    return tuple(parser(item) for item in value)
+
+
+def _strict_commitment_record(
+    value: Mapping[str, Any], field: str, fields: tuple[str, ...]
+) -> Mapping[str, Any]:
+    """Parse a commitment subrelation without coercion or ignored members."""
+    _require_exact_fields(value, set(fields), field)
+    parsed: dict[str, Any] = {}
+    for name in fields:
+        item = value[name]
+        item_field = f"{field}.{name}"
+        if name in {
+            "observer_generation", "issuer_key_generation", "stream_generation",
+            "logical_position", "start_event_order", "end_event_order",
+            "start_sequence", "end_sequence", "observation_binding_generation",
+            "objective_binding_generation", "authority_generation",
+            "verifier_generation", "verification_event_order", "checkpoint_generation",
+            "verifier_state_generation", "previous_verifier_state_generation",
+            "head_logical_position", "checkpoint_event_order", "from_logical_position",
+            "to_logical_position", "link_event_order", "witness_generation",
+            "witness_event_order", "anchor_source_generation", "anchor_key_generation",
+            "anchor_generation", "anchor_position", "predecessor_anchor_generation",
+            "predecessor_anchor_position", "durable_state_generation",
+            "adapter_source_generation", "adapter_observation_generation",
+            "adapter_event_order", "recovery_generation",
+            "recovery_authority_generation", "replay_start_position",
+            "replay_end_position", "final_head_position", "installation_event_order",
+            "old_verifier_generation", "new_verifier_generation",
+            "old_anchor_generation", "new_anchor_generation", "replica_generation",
+            "membership_epoch", "witness_source_generation",
+            "anchor_event_order", "source_anchor_generation",
+            "source_anchor_position", "source_checkpoint_generation",
+            "source_head_position", "target_verifier_generation",
+            "target_durable_state_generation", "target_stream_generation",
+        }:
+            parsed[name] = _exact_generation(item, item_field)
+        elif name == "scope_families":
+            parsed[name] = _exact_scope_families(item, item_field)
+        elif name in {
+            "segment_ids", "replay_commitment_ids", "replay_commitment_digests",
+            "replay_link_ids", "replay_correction_ids", "replay_terminal_event_ids",
+            "competing_head_digests", "covered_scope_families",
+        }:
+            if not isinstance(item, (list, tuple)) or not item:
+                raise ValueError(f"{item_field} must be a non-empty array")
+            parsed[name] = tuple(_exact_nonempty_string(part, item_field) for part in item)
+            if len(parsed[name]) != len(set(parsed[name])):
+                raise ValueError(f"{item_field} must not contain duplicates")
+        else:
+            parsed[name] = _exact_nonempty_string(item, item_field)
+    return MappingProxyType(parsed)
+
+
+ENVELOPE_FIELDS = (
+    "relationship", "commitment_id", "commitment_format",
+    "commitment_digest_algorithm", "commitment_digest", "observer_id",
+    "observer_generation", "observer_identity_basis", "issuer_key_id",
+    "issuer_key_generation", "stream_id", "stream_generation",
+    "logical_position", "segment_ids", "start_anchor_id", "start_event_order",
+    "end_anchor_id", "end_event_order", "start_sequence", "end_sequence",
+    "scope_families", "observation_binding_id", "observation_binding_generation",
+    "objective_binding_id", "objective_binding_generation", "decision_contract_id",
+    "decision_contract_version", "source_id", "authority_generation", "boundary",
+    "boundary_epoch", "lineage", "ordering_source_id", "freshness_challenge_id",
+    "predecessor_commitment_id", "predecessor_commitment_digest",
+    "canonical_payload_digest", "signature_evidence_id",
+)
+VERIFIER_FIELDS = (
+    "verifier_id", "verifier_generation", "verifier_identity_basis", "role",
+    "scope_families", "boundary", "boundary_epoch", "source_id",
+    "authority_generation", "lineage", "ordering_source_id", "lifecycle_state",
+)
+VERIFICATION_FIELDS = (
+    "verification_id", "verifier_id", "verifier_generation", "commitment_id",
+    "commitment_digest", "canonical_payload_digest", "signature_evidence_id",
+    "issuer_key_id", "issuer_key_generation", "verification_method_id",
+    "freshness_challenge_id", "verification_event_order", "disposition",
+)
+LINK_FIELDS = (
+    "relationship", "link_id", "stream_id", "stream_generation",
+    "from_commitment_id", "from_commitment_digest", "from_logical_position",
+    "to_commitment_id", "to_commitment_digest", "to_logical_position",
+    "consistency_evidence_id", "verifier_id", "verifier_generation",
+    "ordering_source_id", "link_event_order", "source_id", "authority_generation",
+    "boundary", "boundary_epoch", "lineage",
+)
+CHECKPOINT_FIELDS = (
+    "relationship", "checkpoint_id", "checkpoint_generation", "verifier_state_id",
+    "verifier_state_generation", "previous_verifier_state_id",
+    "previous_verifier_state_generation", "previous_verifier_state_digest",
+    "current_verifier_state_digest", "observation_binding_id",
+    "observation_binding_generation", "stream_id", "stream_generation",
+    "head_logical_position", "head_commitment_id", "head_commitment_digest",
+    "freshness_challenge_id", "checkpoint_event_order", "source_id",
+    "authority_generation", "boundary", "boundary_epoch", "lineage",
+    "ordering_source_id", "lifecycle_state",
+)
+WITNESS_FIELDS = (
+    "witness_id", "witness_generation", "checkpoint_id", "checkpoint_generation",
+    "head_commitment_id", "head_commitment_digest", "source_id",
+    "authority_generation", "boundary", "boundary_epoch", "lineage",
+    "witness_event_order", "disposition",
+)
+
+ANCHOR_SOURCE_FIELDS = (
+    "relationship", "anchor_source_id", "anchor_source_generation",
+    "anchor_source_identity_basis", "anchor_key_id", "anchor_key_generation",
+    "scope", "verifier_id", "durable_state_id", "stream_id", "stream_generation",
+    "source_id", "authority_generation", "boundary", "boundary_epoch", "lineage",
+    "ordering_source_id", "lifecycle_state",
+)
+ANCHOR_FIELDS = (
+    "relationship", "anchor_id", "anchor_generation", "anchor_source_id",
+    "anchor_source_generation", "anchor_source_identity_basis", "anchor_key_id",
+    "anchor_key_generation", "anchor_position", "anchor_digest",
+    "predecessor_anchor_id", "predecessor_anchor_generation",
+    "predecessor_anchor_position", "predecessor_anchor_digest", "verifier_id",
+    "verifier_generation", "verifier_identity_basis", "durable_state_id",
+    "durable_state_generation", "exact_state_key_digest", "stream_id",
+    "stream_generation", "head_logical_position", "head_commitment_id",
+    "head_commitment_digest", "verifier_state_digest", "checkpoint_id",
+    "checkpoint_generation", "boundary", "boundary_epoch", "source_id",
+    "authority_generation", "lineage", "ordering_source_id", "anchor_event_order",
+    "freshness_challenge_id", "recovery_eligibility", "lifecycle_state",
+    "canonical_payload_digest", "signature_evidence_id",
+)
+RECOVERY_FIELDS = (
+    "relationship", "recovery_id", "recovery_generation", "recovery_authority_id",
+    "recovery_authority_generation", "recovery_authority_identity_basis",
+    "source_anchor_id", "source_anchor_generation", "source_anchor_position",
+    "source_anchor_digest", "source_checkpoint_id", "source_checkpoint_generation",
+    "source_head_position", "source_head_commitment_id", "source_head_commitment_digest",
+    "source_verifier_state_digest", "target_verifier_id", "target_verifier_generation",
+    "target_verifier_identity_basis", "target_durable_state_id",
+    "target_durable_state_generation", "target_stream_id", "target_stream_generation",
+    "replay_start_position", "replay_end_position", "replay_commitment_ids",
+    "replay_commitment_digests", "replay_link_ids", "replay_correction_ids",
+    "replay_terminal_event_ids", "replay_completeness_evidence_id",
+    "final_head_position", "final_head_commitment_id", "final_head_commitment_digest",
+    "final_verifier_state_digest", "installation_receipt_id",
+    "installation_receipt_digest", "installation_event_order", "boundary",
+    "boundary_epoch", "source_id", "authority_generation", "lineage",
+    "ordering_source_id", "freshness_challenge_id", "lifecycle_state",
+)
+VERIFIER_ROTATION_FIELDS = (
+    "relationship", "rotation_id", "old_verifier_id", "old_verifier_generation",
+    "new_verifier_id", "new_verifier_generation", "new_verifier_identity_basis",
+    "source_anchor_digest", "installed_head_commitment_digest",
+    "installation_receipt_id", "source_id", "authority_generation", "boundary",
+    "boundary_epoch", "lineage", "ordering_source_id", "lifecycle_state",
+)
+ANCHOR_ROTATION_FIELDS = (
+    "relationship", "rotation_id", "old_anchor_source_id", "old_anchor_generation",
+    "new_anchor_source_id", "new_anchor_generation", "old_anchor_digest",
+    "new_anchor_digest", "cross_confirmation_id", "source_id",
+    "authority_generation", "boundary", "boundary_epoch", "lineage",
+    "ordering_source_id", "lifecycle_state",
+)
+REPLICA_FIELDS = (
+    "relationship", "replica_id", "replica_generation", "membership_epoch",
+    "verifier_id", "verifier_generation", "durable_state_id",
+    "durable_state_generation", "anchor_id", "anchor_generation", "anchor_position",
+    "head_commitment_digest", "competing_head_digests", "source_id",
+    "authority_generation", "boundary", "boundary_epoch", "lineage",
+    "ordering_source_id", "lifecycle_state",
+)
+WITNESS_SOURCE_FIELDS = (
+    "relationship", "witness_id", "witness_generation", "witness_identity_basis",
+    "witness_source_id", "witness_source_generation", "source_lineage",
+    "control_domain", "covered_scope_families", "start_event_order",
+    "end_event_order", "anchor_digest", "head_commitment_digest", "source_id",
+    "authority_generation", "boundary", "boundary_epoch", "lineage",
+    "ordering_source_id", "lifecycle_state",
+)
+
+
+@dataclass(frozen=True)
+class ObservationCommitmentEnvelope:
+    values: Mapping[str, Any]
+    @classmethod
+    def from_mapping(cls, value: Mapping[str, Any]) -> "ObservationCommitmentEnvelope":
+        return cls(_strict_commitment_record(value, "commitment_envelopes entry", ENVELOPE_FIELDS))
+
+
+@dataclass(frozen=True)
+class CommitmentVerifierAdmission:
+    values: Mapping[str, Any]
+    @classmethod
+    def from_mapping(cls, value: Mapping[str, Any]) -> "CommitmentVerifierAdmission":
+        return cls(_strict_commitment_record(value, "commitment_verifiers entry", VERIFIER_FIELDS))
+
+
+@dataclass(frozen=True)
+class CommitmentVerification:
+    values: Mapping[str, Any]
+    @classmethod
+    def from_mapping(cls, value: Mapping[str, Any]) -> "CommitmentVerification":
+        return cls(_strict_commitment_record(value, "commitment_verifications entry", VERIFICATION_FIELDS))
+
+
+@dataclass(frozen=True)
+class CommitmentLink:
+    values: Mapping[str, Any]
+    @classmethod
+    def from_mapping(cls, value: Mapping[str, Any]) -> "CommitmentLink":
+        return cls(_strict_commitment_record(value, "commitment_links entry", LINK_FIELDS))
+
+
+@dataclass(frozen=True)
+class CommitmentCheckpoint:
+    values: Mapping[str, Any]
+    @classmethod
+    def from_mapping(cls, value: Mapping[str, Any]) -> "CommitmentCheckpoint":
+        return cls(_strict_commitment_record(value, "commitment_checkpoints entry", CHECKPOINT_FIELDS))
+
+
+@dataclass(frozen=True)
+class CommitmentWitness:
+    values: Mapping[str, Any]
+    @classmethod
+    def from_mapping(cls, value: Mapping[str, Any]) -> "CommitmentWitness":
+        return cls(_strict_commitment_record(value, "commitment_witnesses entry", WITNESS_FIELDS))
+
+
+@dataclass(frozen=True)
+class AnchorRelation:
+    values: Mapping[str, Any]
+
+    @classmethod
+    def parse(cls, value: Mapping[str, Any], field: str, fields: tuple[str, ...]) -> "AnchorRelation":
+        return cls(_strict_commitment_record(value, field, fields))
+
+
+@dataclass(frozen=True)
+class ObservationBinding:
+    relationship: str
+    observation_binding_id: str
+    observation_binding_generation: int
+    profile_id: str
+    profile_version: int
+    objective_binding_id: str
+    objective_binding_generation: int
+    decision_contract_id: str
+    decision_contract_version: str
+    source_id: str
+    authority_generation: int
+    boundary: str
+    boundary_epoch: str
+    lineage: str
+    ordering_source_id: str
+    t1_anchor: ObservationAnchor
+    t3_anchor: ObservationAnchor
+    observers: tuple[ObserverAdmission, ...]
+    segments: tuple[ObservationSegment, ...]
+    handoffs: tuple[ObservationHandoff, ...]
+    transformations: tuple[ObservationTransformation, ...]
+    lifecycle_records: tuple[ObservationLifecycle, ...]
+    commitment_envelopes: tuple[ObservationCommitmentEnvelope, ...]
+    commitment_verifiers: tuple[CommitmentVerifierAdmission, ...]
+    commitment_verifications: tuple[CommitmentVerification, ...]
+    commitment_links: tuple[CommitmentLink, ...]
+    commitment_checkpoints: tuple[CommitmentCheckpoint, ...]
+    commitment_witnesses: tuple[CommitmentWitness, ...]
+    anchor_source_admissions: tuple[AnchorRelation, ...]
+    verifier_state_anchors: tuple[AnchorRelation, ...]
+    recovery_installations: tuple[AnchorRelation, ...]
+    verifier_rotations: tuple[AnchorRelation, ...]
+    anchor_rotations: tuple[AnchorRelation, ...]
+    replica_observations: tuple[AnchorRelation, ...]
+    witness_source_admissions: tuple[AnchorRelation, ...]
+
+    @classmethod
+    def from_mapping(cls, value: Mapping[str, Any]) -> "ObservationBinding":
+        field = "evidence_binding"
+        base_fields = {
+                "relationship", "observation_binding_id",
+                "observation_binding_generation", "profile_id", "profile_version",
+                "objective_binding_id", "objective_binding_generation",
+                "decision_contract_id", "decision_contract_version", "source_id",
+                "authority_generation", "boundary", "boundary_epoch", "lineage",
+                "ordering_source_id", "t1_anchor", "t3_anchor", "observers",
+                "segments", "handoffs", "transformations", "lifecycle_records",
+        }
+        commitment_fields = {
+                "commitment_envelopes", "commitment_verifiers",
+                "commitment_verifications", "commitment_links",
+                "commitment_checkpoints", "commitment_witnesses",
+        }
+        anchor_fields = {
+                "anchor_source_admissions", "verifier_state_anchors",
+                "recovery_installations", "verifier_rotations", "anchor_rotations",
+                "replica_observations", "witness_source_admissions",
+        }
+        if set(value) not in {
+            frozenset(base_fields), frozenset(base_fields | commitment_fields),
+            frozenset(base_fields | commitment_fields | anchor_fields),
+        }:
+            raise ValueError(f"{field} must contain the exact legacy or commitment-envelope field set")
+        relationship = _exact_nonempty_string(value["relationship"], f"{field}.relationship")
+        if relationship != "OBSERVATION_COVERAGE":
+            raise ValueError(f"{field}.relationship must be OBSERVATION_COVERAGE")
+        t1_anchor = value["t1_anchor"]
+        t3_anchor = value["t3_anchor"]
+        if not isinstance(t1_anchor, Mapping) or not isinstance(t3_anchor, Mapping):
+            raise ValueError(f"{field} anchors must be objects")
+        return cls(
+            relationship,
+            _exact_nonempty_string(
+                value["observation_binding_id"], f"{field}.observation_binding_id"
+            ),
+            _exact_generation(
+                value["observation_binding_generation"],
+                f"{field}.observation_binding_generation",
+            ),
+            _exact_nonempty_string(value["profile_id"], f"{field}.profile_id"),
+            _exact_generation(value["profile_version"], f"{field}.profile_version"),
+            _exact_nonempty_string(
+                value["objective_binding_id"], f"{field}.objective_binding_id"
+            ),
+            _exact_generation(
+                value["objective_binding_generation"],
+                f"{field}.objective_binding_generation",
+            ),
+            _exact_nonempty_string(
+                value["decision_contract_id"], f"{field}.decision_contract_id"
+            ),
+            _exact_nonempty_string(
+                value["decision_contract_version"], f"{field}.decision_contract_version"
+            ),
+            _exact_nonempty_string(value["source_id"], f"{field}.source_id"),
+            _exact_generation(value["authority_generation"], f"{field}.authority_generation"),
+            _exact_nonempty_string(value["boundary"], f"{field}.boundary"),
+            _exact_nonempty_string(value["boundary_epoch"], f"{field}.boundary_epoch"),
+            _exact_nonempty_string(value["lineage"], f"{field}.lineage"),
+            _exact_nonempty_string(value["ordering_source_id"], f"{field}.ordering_source_id"),
+            ObservationAnchor.from_mapping(t1_anchor, f"{field}.t1_anchor"),
+            ObservationAnchor.from_mapping(t3_anchor, f"{field}.t3_anchor"),
+            _typed_object_array(value["observers"], f"{field}.observers", ObserverAdmission.from_mapping),
+            _typed_object_array(value["segments"], f"{field}.segments", ObservationSegment.from_mapping),
+            _typed_object_array(value["handoffs"], f"{field}.handoffs", ObservationHandoff.from_mapping),
+            _typed_object_array(
+                value["transformations"],
+                f"{field}.transformations",
+                ObservationTransformation.from_mapping,
+            ),
+            _typed_object_array(
+                value["lifecycle_records"],
+                f"{field}.lifecycle_records",
+                ObservationLifecycle.from_mapping,
+            ),
+            _typed_object_array(value.get("commitment_envelopes", []), f"{field}.commitment_envelopes", ObservationCommitmentEnvelope.from_mapping),
+            _typed_object_array(value.get("commitment_verifiers", []), f"{field}.commitment_verifiers", CommitmentVerifierAdmission.from_mapping),
+            _typed_object_array(value.get("commitment_verifications", []), f"{field}.commitment_verifications", CommitmentVerification.from_mapping),
+            _typed_object_array(value.get("commitment_links", []), f"{field}.commitment_links", CommitmentLink.from_mapping),
+            _typed_object_array(value.get("commitment_checkpoints", []), f"{field}.commitment_checkpoints", CommitmentCheckpoint.from_mapping),
+            _typed_object_array(value.get("commitment_witnesses", []), f"{field}.commitment_witnesses", CommitmentWitness.from_mapping),
+            _typed_object_array(value.get("anchor_source_admissions", []), f"{field}.anchor_source_admissions", lambda item: AnchorRelation.parse(item, "anchor_source_admissions entry", ANCHOR_SOURCE_FIELDS)),
+            _typed_object_array(value.get("verifier_state_anchors", []), f"{field}.verifier_state_anchors", lambda item: AnchorRelation.parse(item, "verifier_state_anchors entry", ANCHOR_FIELDS)),
+            _typed_object_array(value.get("recovery_installations", []), f"{field}.recovery_installations", lambda item: AnchorRelation.parse(item, "recovery_installations entry", RECOVERY_FIELDS)),
+            _typed_object_array(value.get("verifier_rotations", []), f"{field}.verifier_rotations", lambda item: AnchorRelation.parse(item, "verifier_rotations entry", VERIFIER_ROTATION_FIELDS)),
+            _typed_object_array(value.get("anchor_rotations", []), f"{field}.anchor_rotations", lambda item: AnchorRelation.parse(item, "anchor_rotations entry", ANCHOR_ROTATION_FIELDS)),
+            _typed_object_array(value.get("replica_observations", []), f"{field}.replica_observations", lambda item: AnchorRelation.parse(item, "replica_observations entry", REPLICA_FIELDS)),
+            _typed_object_array(value.get("witness_source_admissions", []), f"{field}.witness_source_admissions", lambda item: AnchorRelation.parse(item, "witness_source_admissions entry", WITNESS_SOURCE_FIELDS)),
+        )
+
+
+@dataclass(frozen=True)
+class ObservationFreshness:
+    relationship: str
+    observation_binding_id: str
+    observation_binding_generation: int
+    profile_id: str
+    profile_version: int
+    boundary: str
+    boundary_epoch: str
+    lineage: str
+    source_id: str
+    authority_generation: int
+    ordering_source_id: str
+    head_anchor_id: str
+    head_event_order: int
+    commitment_id: str
+    commitment_digest: str
+    checkpoint_id: str
+    checkpoint_generation: int
+    verifier_state_id: str
+    verifier_state_generation: int
+    verifier_state_digest: str
+    freshness_challenge_id: str
+
+    @classmethod
+    def from_mapping(cls, value: Mapping[str, Any]) -> "ObservationFreshness":
+        field = "freshness"
+        base_fields = {
+                "relationship", "observation_binding_id",
+                "observation_binding_generation", "profile_id", "profile_version",
+                "boundary", "boundary_epoch", "lineage", "source_id",
+                "authority_generation", "ordering_source_id", "head_anchor_id",
+                "head_event_order",
+        }
+        commitment_fields = {
+                "commitment_id", "commitment_digest",
+                "checkpoint_id", "checkpoint_generation", "verifier_state_id",
+                "verifier_state_generation", "verifier_state_digest",
+                "freshness_challenge_id",
+        }
+        has_commitment = set(value) == base_fields | commitment_fields
+        if set(value) not in {frozenset(base_fields), frozenset(base_fields | commitment_fields)}:
+            raise ValueError(f"{field} must contain the exact legacy or commitment-envelope field set")
+        relationship = _exact_nonempty_string(value["relationship"], f"{field}.relationship")
+        if relationship != "OBSERVATION_CURRENT_AT_T3":
+            raise ValueError(f"{field}.relationship must be OBSERVATION_CURRENT_AT_T3")
+        return cls(
+            relationship,
+            _exact_nonempty_string(
+                value["observation_binding_id"], f"{field}.observation_binding_id"
+            ),
+            _exact_generation(
+                value["observation_binding_generation"],
+                f"{field}.observation_binding_generation",
+            ),
+            _exact_nonempty_string(value["profile_id"], f"{field}.profile_id"),
+            _exact_generation(value["profile_version"], f"{field}.profile_version"),
+            _exact_nonempty_string(value["boundary"], f"{field}.boundary"),
+            _exact_nonempty_string(value["boundary_epoch"], f"{field}.boundary_epoch"),
+            _exact_nonempty_string(value["lineage"], f"{field}.lineage"),
+            _exact_nonempty_string(value["source_id"], f"{field}.source_id"),
+            _exact_generation(value["authority_generation"], f"{field}.authority_generation"),
+            _exact_nonempty_string(value["ordering_source_id"], f"{field}.ordering_source_id"),
+            _exact_nonempty_string(value["head_anchor_id"], f"{field}.head_anchor_id"),
+            _exact_generation(value["head_event_order"], f"{field}.head_event_order"),
+            _exact_nonempty_string(value["commitment_id"], f"{field}.commitment_id") if has_commitment else "",
+            _exact_nonempty_string(value["commitment_digest"], f"{field}.commitment_digest") if has_commitment else "",
+            _exact_nonempty_string(value["checkpoint_id"], f"{field}.checkpoint_id") if has_commitment else "",
+            _exact_generation(value["checkpoint_generation"], f"{field}.checkpoint_generation") if has_commitment else 0,
+            _exact_nonempty_string(value["verifier_state_id"], f"{field}.verifier_state_id") if has_commitment else "",
+            _exact_generation(value["verifier_state_generation"], f"{field}.verifier_state_generation") if has_commitment else 0,
+            _exact_nonempty_string(value["verifier_state_digest"], f"{field}.verifier_state_digest") if has_commitment else "",
+            _exact_nonempty_string(value["freshness_challenge_id"], f"{field}.freshness_challenge_id") if has_commitment else "",
+        )
+
+
+@dataclass(frozen=True)
+class ContractTransformation:
+    relationship: str
+    transformation_id: str
+    source_contract_id: str
+    source_contract_version: str
+    target_contract_id: str
+    target_contract_version: str
+    objective_id: str
+    objective_generation: int
+    source_id: str
+    authority_generation: int
+    transformation_generation: int
+    boundary: str
+    boundary_epoch: str
+    lineage: str
+    state: str
+    scope: BindingScope
+
+    @classmethod
+    def from_mapping(cls, value: Mapping[str, Any]) -> "ContractTransformation":
+        fields = {
+            "relationship",
+            "transformation_id",
+            "source_contract_id",
+            "source_contract_version",
+            "target_contract_id",
+            "target_contract_version",
+            "objective_id",
+            "objective_generation",
+            "source_id",
+            "authority_generation",
+            "transformation_generation",
+            "boundary",
+            "boundary_epoch",
+            "lineage",
+            "state",
+            "scope",
+        }
+        _require_exact_fields(value, fields, "contract_transformation_binding")
+        relationship = _exact_nonempty_string(
+            value["relationship"], "contract_transformation_binding.relationship"
+        )
+        if relationship != "ADMISSION_PRESERVING":
+            raise ValueError(
+                "contract_transformation_binding.relationship must be ADMISSION_PRESERVING"
+            )
+        state = _exact_nonempty_string(
+            value["state"], "contract_transformation_binding.state"
+        )
+        if state not in {"ACTIVE", "INVALID", "REVOKED", "REJECTED"}:
+            raise ValueError("unsupported contract_transformation_binding.state")
+        scope = value["scope"]
+        if not isinstance(scope, Mapping):
+            raise ValueError("contract_transformation_binding.scope must be an object")
+        return cls(
+            relationship=relationship,
+            transformation_id=_exact_nonempty_string(
+                value["transformation_id"],
+                "contract_transformation_binding.transformation_id",
+            ),
+            source_contract_id=_exact_nonempty_string(
+                value["source_contract_id"],
+                "contract_transformation_binding.source_contract_id",
+            ),
+            source_contract_version=_exact_nonempty_string(
+                value["source_contract_version"],
+                "contract_transformation_binding.source_contract_version",
+            ),
+            target_contract_id=_exact_nonempty_string(
+                value["target_contract_id"],
+                "contract_transformation_binding.target_contract_id",
+            ),
+            target_contract_version=_exact_nonempty_string(
+                value["target_contract_version"],
+                "contract_transformation_binding.target_contract_version",
+            ),
+            objective_id=_exact_nonempty_string(
+                value["objective_id"], "contract_transformation_binding.objective_id"
+            ),
+            objective_generation=_exact_generation(
+                value["objective_generation"],
+                "contract_transformation_binding.objective_generation",
+            ),
+            source_id=_exact_nonempty_string(
+                value["source_id"], "contract_transformation_binding.source_id"
+            ),
+            authority_generation=_exact_generation(
+                value["authority_generation"],
+                "contract_transformation_binding.authority_generation",
+            ),
+            transformation_generation=_exact_generation(
+                value["transformation_generation"],
+                "contract_transformation_binding.transformation_generation",
+            ),
+            boundary=_exact_nonempty_string(
+                value["boundary"], "contract_transformation_binding.boundary"
+            ),
+            boundary_epoch=_exact_nonempty_string(
+                value["boundary_epoch"],
+                "contract_transformation_binding.boundary_epoch",
+            ),
+            lineage=_exact_nonempty_string(
+                value["lineage"], "contract_transformation_binding.lineage"
+            ),
+            state=state,
+            scope=BindingScope.from_mapping(scope),
         )
 
 
@@ -225,6 +1591,104 @@ class Fact:
         return cls(state=state)
 
 
+def _fact_or_unknown(facts: Mapping[str, Fact], name: str) -> Fact:
+    return facts.get(name, Fact(FactState.UNKNOWN))
+
+
+def _known_object(fact: Fact, field: str) -> Mapping[str, Any] | None:
+    if fact.state is not FactState.KNOWN:
+        return None
+    if not isinstance(fact.value, Mapping):
+        raise ValueError(f"KNOWN {field} requires an object value")
+    return fact.value
+
+
+def _known_object_list(fact: Fact, field: str) -> tuple[Mapping[str, Any], ...]:
+    if fact.state is not FactState.KNOWN:
+        return ()
+    if not isinstance(fact.value, (list, tuple)) or not fact.value:
+        raise ValueError(f"KNOWN {field} requires a non-empty array")
+    if not all(isinstance(item, Mapping) for item in fact.value):
+        raise ValueError(f"KNOWN {field} entries must be objects")
+    return tuple(fact.value)
+
+
+@dataclass(frozen=True)
+class ObjectiveBindingFacts:
+    raw: Mapping[str, Fact]
+    objective_identity: ObjectiveIdentity | None
+    decision_contract_identity: DecisionContractIdentity | None
+    authority_root: AuthorityRoot | None
+    candidates: tuple[ObjectiveBinding, ...]
+    sources: tuple[BindingSourceAuthority, ...]
+    lifecycles: tuple[BindingLifecycle, ...]
+    ordering: BindingOrdering | None
+    transformations: tuple[ContractTransformation, ...]
+
+    @classmethod
+    def from_facts(cls, facts: Mapping[str, Fact]) -> "ObjectiveBindingFacts":
+        objective_fact = _fact_or_unknown(facts, "objective_identity")
+        contract_fact = _fact_or_unknown(facts, "decision_contract_identity")
+        root_fact = _fact_or_unknown(facts, "authority_root")
+        candidate_fact = _fact_or_unknown(facts, "objective_binding")
+        source_fact = _fact_or_unknown(facts, "binding_source_authority")
+        lifecycle_fact = _fact_or_unknown(facts, "binding_lifecycle")
+        ordering_fact = _fact_or_unknown(facts, "binding_ordering")
+        transformation_fact = _fact_or_unknown(
+            facts, "contract_transformation_binding"
+        )
+
+        objective_value = _known_object(objective_fact, "objective_identity")
+        contract_value = _known_object(contract_fact, "decision_contract_identity")
+        root_value = _known_object(root_fact, "authority_root")
+        ordering_value = _known_object(ordering_fact, "binding_ordering")
+
+        return cls(
+            raw={
+                name: _fact_or_unknown(facts, name)
+                for name in (*OBJECTIVE_BINDING_FACTS, "contract_transformation_binding")
+            },
+            objective_identity=(
+                ObjectiveIdentity.from_mapping(objective_value)
+                if objective_value is not None
+                else None
+            ),
+            decision_contract_identity=(
+                DecisionContractIdentity.from_mapping(contract_value)
+                if contract_value is not None
+                else None
+            ),
+            authority_root=(
+                AuthorityRoot.from_mapping(root_value) if root_value is not None else None
+            ),
+            candidates=tuple(
+                ObjectiveBinding.from_mapping(value)
+                for value in _known_object_list(candidate_fact, "objective_binding")
+            ),
+            sources=tuple(
+                BindingSourceAuthority.from_mapping(value)
+                for value in _known_object_list(
+                    source_fact, "binding_source_authority"
+                )
+            ),
+            lifecycles=tuple(
+                BindingLifecycle.from_mapping(value)
+                for value in _known_object_list(lifecycle_fact, "binding_lifecycle")
+            ),
+            ordering=(
+                BindingOrdering.from_mapping(ordering_value)
+                if ordering_value is not None
+                else None
+            ),
+            transformations=tuple(
+                ContractTransformation.from_mapping(value)
+                for value in _known_object_list(
+                    transformation_fact, "contract_transformation_binding"
+                )
+            ),
+        )
+
+
 @dataclass(frozen=True)
 class Prohibition:
     state: FactState
@@ -242,23 +1706,388 @@ class Prohibition:
         return cls(state=state, applies=applies, identifier=str(value.get("id", "unspecified")))
 
 
+_MUTATION_FIELD_PATTERN = re.compile(r"[a-z][a-z0-9_]*", re.ASCII)
+
+def _mutation_spec(
+    canonical_field: str,
+    target_kind: MutationTargetKind,
+    target: str,
+    effects: tuple[ContinuityEffect, ...],
+    scopes: tuple[str, ...],
+    aliases: tuple[str, ...] = (),
+) -> MutationSpec:
+    return MutationSpec(canonical_field, target_kind, target, effects, scopes, aliases)
+
+
+MUTATION_SPECS = (
+    _mutation_spec("subject", MutationTargetKind.STATE, "subject", (ContinuityEffect.IDENTITY_DISCONTINUITY,), ("SUBJECT_AND_DELEGATION",), ("principal",)),
+    _mutation_spec("artifact", MutationTargetKind.STATE, "artifact", (ContinuityEffect.EVIDENCE_OR_EFFECT_REESTABLISHMENT,), ("ARTIFACT_AND_TRANSFORMATION",)),
+    _mutation_spec("control_state", MutationTargetKind.STATE, "control_state", (ContinuityEffect.CONTROL_REESTABLISHMENT,), ("EXECUTION_CONTROL",), ("privilege",)),
+    _mutation_spec("identity_basis", MutationTargetKind.STATE, "identity_basis", (ContinuityEffect.IDENTITY_DISCONTINUITY,), ("SUBJECT_AND_DELEGATION", "CREDENTIAL_AND_IDENTITY")),
+    _mutation_spec("boundary_epoch", MutationTargetKind.STATE, "boundary_epoch", (ContinuityEffect.NON_RESTORABLE_LINEAGE,), ("BOUNDARY_AND_EPOCH",)),
+    _mutation_spec("decision", MutationTargetKind.STATE, "decision", (ContinuityEffect.OBJECTIVE_AUTHORITY_REESTABLISHMENT,), ("OBJECTIVE_AUTHORITY_LIFECYCLE",)),
+    _mutation_spec("applicable_boundary", MutationTargetKind.STATE, "applicable_boundary", (ContinuityEffect.NON_RESTORABLE_LINEAGE,), ("BOUNDARY_AND_EPOCH",)),
+    _mutation_spec("consumption_state", MutationTargetKind.STATE, "consumption_state", (ContinuityEffect.GRANT_USE_DISCONTINUITY,), ("GRANT_USE_AND_CONSUMPTION",), ("consumption",)),
+    _mutation_spec("decision_binding", MutationTargetKind.STATE, "evidence_id", (ContinuityEffect.EVIDENCE_OR_EFFECT_REESTABLISHMENT,), ("ARTIFACT_AND_TRANSFORMATION",)),
+    _mutation_spec("evidence_id", MutationTargetKind.STATE, "evidence_id", (ContinuityEffect.EVIDENCE_OR_EFFECT_REESTABLISHMENT,), ("ARTIFACT_AND_TRANSFORMATION",)),
+    _mutation_spec("execution_context", MutationTargetKind.STATE, "execution_context", (ContinuityEffect.IDENTITY_DISCONTINUITY,), ("EXECUTION_CONTROL", "CREDENTIAL_AND_IDENTITY"), ("actor_context",)),
+    _mutation_spec("grant_id", MutationTargetKind.STATE, "grant_id", (ContinuityEffect.GRANT_USE_DISCONTINUITY,), ("GRANT_USE_AND_CONSUMPTION",)),
+    _mutation_spec("subject_mode", MutationTargetKind.STATE, "subject_mode", (ContinuityEffect.IDENTITY_DISCONTINUITY,), ("SUBJECT_AND_DELEGATION",)),
+    _mutation_spec("boundary_epoch_binding", MutationTargetKind.RELATION, "boundary_epoch_binding", (ContinuityEffect.NON_RESTORABLE_LINEAGE,), ("BOUNDARY_AND_EPOCH",)),
+    _mutation_spec("closure_binding", MutationTargetKind.RELATION, "closure_binding", (ContinuityEffect.EVIDENCE_OR_EFFECT_REESTABLISHMENT,), ("ARTIFACT_AND_TRANSFORMATION",)),
+    _mutation_spec("consumption_binding", MutationTargetKind.RELATION, "consumption_binding", (ContinuityEffect.GRANT_USE_DISCONTINUITY,), ("GRANT_USE_AND_CONSUMPTION",)),
+    _mutation_spec("delegation_binding", MutationTargetKind.RELATION, "delegation_binding", (ContinuityEffect.IDENTITY_DISCONTINUITY,), ("SUBJECT_AND_DELEGATION",)),
+    _mutation_spec("evidence_binding", MutationTargetKind.RELATION, "evidence_binding", (ContinuityEffect.EVIDENCE_OR_EFFECT_REESTABLISHMENT,), ("OBSERVATION_PIPELINE",)),
+    _mutation_spec("execution_control_binding", MutationTargetKind.RELATION, "execution_control_binding", (ContinuityEffect.CONTROL_REESTABLISHMENT,), ("EXECUTION_CONTROL",)),
+    _mutation_spec("freshness", MutationTargetKind.RELATION, "freshness", (ContinuityEffect.EVIDENCE_OR_EFFECT_REESTABLISHMENT,), ("OBSERVATION_PIPELINE",)),
+    _mutation_spec("authority_root", MutationTargetKind.BINDING, "authority_root", (ContinuityEffect.NON_RESTORABLE_LINEAGE, ContinuityEffect.OBJECTIVE_AUTHORITY_REESTABLISHMENT), ("BOUNDARY_AND_EPOCH", "OBJECTIVE_AUTHORITY_LIFECYCLE")),
+    _mutation_spec("binding_lifecycle", MutationTargetKind.BINDING, "binding_lifecycle", (ContinuityEffect.OBJECTIVE_AUTHORITY_REESTABLISHMENT,), ("OBJECTIVE_AUTHORITY_LIFECYCLE",)),
+    _mutation_spec("binding_ordering", MutationTargetKind.BINDING, "binding_ordering", (ContinuityEffect.OBJECTIVE_AUTHORITY_REESTABLISHMENT,), ("OBJECTIVE_AUTHORITY_LIFECYCLE",)),
+    _mutation_spec("binding_source_authority", MutationTargetKind.BINDING, "binding_source_authority", (ContinuityEffect.OBJECTIVE_AUTHORITY_REESTABLISHMENT,), ("OBJECTIVE_AUTHORITY_LIFECYCLE",)),
+    _mutation_spec("contract_transformation_binding", MutationTargetKind.BINDING, "contract_transformation_binding", (ContinuityEffect.EVIDENCE_OR_EFFECT_REESTABLISHMENT,), ("ARTIFACT_AND_TRANSFORMATION",)),
+    _mutation_spec("decision_contract_identity", MutationTargetKind.BINDING, "decision_contract_identity", (ContinuityEffect.OBJECTIVE_AUTHORITY_REESTABLISHMENT,), ("OBJECTIVE_AUTHORITY_LIFECYCLE",)),
+    _mutation_spec("objective_binding", MutationTargetKind.BINDING, "objective_binding", (ContinuityEffect.OBJECTIVE_AUTHORITY_REESTABLISHMENT,), ("OBJECTIVE_AUTHORITY_LIFECYCLE",)),
+    _mutation_spec("objective_identity", MutationTargetKind.BINDING, "objective_identity", (ContinuityEffect.OBJECTIVE_AUTHORITY_REESTABLISHMENT,), ("OBJECTIVE_AUTHORITY_LIFECYCLE",)),
+    _mutation_spec("commit_state", MutationTargetKind.FACT, "commit_state", (ContinuityEffect.TERMINAL_DISCONTINUITY,), ("EXECUTION_CONTROL", "GRANT_USE_AND_CONSUMPTION")),
+    _mutation_spec("credential_identity", MutationTargetKind.FACT, "credential_identity", (ContinuityEffect.IDENTITY_DISCONTINUITY,), ("CREDENTIAL_AND_IDENTITY",), ("credential",)),
+    _mutation_spec("tool_connector_identity", MutationTargetKind.FACT, "tool_connector_identity", (ContinuityEffect.CONTROL_REESTABLISHMENT,), ("EXECUTION_CONTROL",), ("connector_endpoint",)),
+)
+
+
+def _build_mutation_registry() -> Mapping[str, MutationSpec]:
+    registry: dict[str, MutationSpec] = {}
+    for spec in MUTATION_SPECS:
+        if not spec.continuity_effects or len(spec.continuity_effects) != len(
+            set(spec.continuity_effects)
+        ):
+            raise RuntimeError(
+                f"mutation registry field lacks exact continuity metadata: {spec.canonical_field}"
+            )
+        if not spec.observation_scope_families or (
+            set(spec.observation_scope_families) - set(OBSERVATION_SCOPE_FAMILIES)
+        ):
+            raise RuntimeError(
+                f"mutation registry field lacks exact observation metadata: {spec.canonical_field}"
+            )
+        for field in (spec.canonical_field, *spec.legacy_aliases):
+            if field in registry:
+                raise RuntimeError(f"duplicate mutation registry field: {field}")
+            registry[field] = spec
+    return MappingProxyType(registry)
+
+
+MUTATION_REGISTRY = _build_mutation_registry()
+MUTATION_CANONICAL_FIELDS = tuple(spec.canonical_field for spec in MUTATION_SPECS)
+MUTATION_LEGACY_ALIASES = MappingProxyType(
+    {
+        alias: spec.canonical_field
+        for spec in MUTATION_SPECS
+        for alias in spec.legacy_aliases
+    }
+)
+
+
+def _validate_relation_mutation_value(spec: MutationSpec, value: Mapping[str, Any], field: str) -> None:
+    exact_fields = {
+        "boundary_epoch_binding": {"applicable_boundary", "boundary_epoch"},
+        "execution_control_binding": {"execution_context", "control_state"},
+        "consumption_binding": {"grant_id", "subject", "artifact", "boundary_epoch"},
+        "closure_binding": {"relationship", "source_artifact", "target_artifact"},
+    }
+    if spec.target == "delegation_binding":
+        relationship = value.get("relationship")
+        if relationship == "DIRECT":
+            fields = {
+                "relationship",
+                "subject",
+                "artifact",
+                "control_state",
+                "boundary_epoch",
+                "applicable_boundary",
+            }
+        elif relationship == "EXACT_DELEGATION":
+            fields = {
+                "relationship",
+                "delegator",
+                "delegate",
+                "artifact",
+                "control_state",
+                "boundary_epoch",
+                "applicable_boundary",
+            }
+        else:
+            raise ValueError(f"{field}.relationship is unsupported")
+    else:
+        fields = exact_fields[spec.target]
+    _require_exact_fields(value, fields, field)
+    for name in fields:
+        _exact_nonempty_string(value[name], f"{field}.{name}")
+
+
+def _validate_mutation_value(spec: MutationSpec, value: Any, field: str) -> None:
+    if spec.target_kind in {MutationTargetKind.STATE, MutationTargetKind.FACT}:
+        _exact_string(value, field)
+        if spec.target == "decision":
+            AuthorityOutcome(value)
+        return
+    if (
+        spec.target_kind is MutationTargetKind.RELATION
+        and spec.target in {"evidence_binding", "freshness"}
+    ):
+        if isinstance(value, str):
+            _exact_string(value, field)
+        elif isinstance(value, Mapping):
+            parser = (
+                ObservationBinding.from_mapping
+                if spec.target == "evidence_binding"
+                else ObservationFreshness.from_mapping
+            )
+            parser(value)
+        else:
+            raise ValueError(f"{field} must be a typed object or legacy string marker")
+        return
+    if isinstance(value, str):
+        if value not in {FactState.UNKNOWN.value, FactState.CONFLICTING.value}:
+            raise ValueError(f"{field} relation marker must be UNKNOWN or CONFLICTING")
+        return
+    if spec.target_kind is MutationTargetKind.RELATION:
+        if not isinstance(value, Mapping):
+            raise ValueError(f"{field} must be an object or fact-state marker")
+        _validate_relation_mutation_value(spec, value, field)
+        return
+    if spec.target in {
+        "objective_binding",
+        "binding_source_authority",
+        "binding_lifecycle",
+        "contract_transformation_binding",
+    }:
+        if not isinstance(value, (list, tuple)) or not value:
+            raise ValueError(f"{field} must be a non-empty array or fact-state marker")
+        if not all(isinstance(item, Mapping) for item in value):
+            raise ValueError(f"{field} entries must be objects")
+        parsers = {
+            "objective_binding": ObjectiveBinding.from_mapping,
+            "binding_source_authority": BindingSourceAuthority.from_mapping,
+            "binding_lifecycle": BindingLifecycle.from_mapping,
+            "contract_transformation_binding": ContractTransformation.from_mapping,
+        }
+        for item in value:
+            parsers[spec.target](item)
+        return
+    if not isinstance(value, Mapping):
+        raise ValueError(f"{field} must be an object or fact-state marker")
+    parsers = {
+        "objective_identity": ObjectiveIdentity.from_mapping,
+        "decision_contract_identity": DecisionContractIdentity.from_mapping,
+        "authority_root": AuthorityRoot.from_mapping,
+        "binding_ordering": BindingOrdering.from_mapping,
+    }
+    parsers[spec.target](value)
+
+
 @dataclass(frozen=True)
 class Mutation:
     field: str
     before: Any
     after: Any
+    canonical_field: str | None
+    target_kind: MutationTargetKind | None
+    target: str | None
+    continuity_effects: tuple[ContinuityEffect, ...]
+    observation_scope_families: tuple[str, ...]
+
+    @classmethod
+    def from_mapping(cls, value: Mapping[str, Any]) -> "Mutation":
+        if not isinstance(value, Mapping):
+            raise ValueError("t2.mutations entries must be objects")
+        _require_exact_fields(value, {"field", "before", "after"}, "t2.mutations entry")
+        field = _exact_string(value["field"], "t2.mutations.field")
+        if _MUTATION_FIELD_PATTERN.fullmatch(field) is None:
+            raise ValueError("t2.mutations.field must be exact ASCII lower snake case")
+        before = value["before"]
+        after = value["after"]
+        if exact_value_equal(before, after):
+            raise ValueError("t2.mutations must describe a change")
+        spec = MUTATION_REGISTRY.get(field)
+        if spec is not None:
+            _validate_mutation_value(spec, before, f"t2.mutations.{field}.before")
+            _validate_mutation_value(spec, after, f"t2.mutations.{field}.after")
+        return cls(
+            field=field,
+            before=before,
+            after=after,
+            canonical_field=spec.canonical_field if spec is not None else None,
+            target_kind=spec.target_kind if spec is not None else None,
+            target=spec.target if spec is not None else None,
+            continuity_effects=spec.continuity_effects if spec is not None else (),
+            observation_scope_families=(
+                spec.observation_scope_families if spec is not None else ()
+            ),
+        )
+
+
+HUMAN_APPROVAL_BINDING_FIELDS = frozenset({
+    "relationship", "policy_id", "policy_generation", "request_id",
+    "request_generation", "request_digest", "effect_digest", "artifact",
+    "effect", "subject_id", "subject_identity_basis", "executor_id",
+    "delegation_chain_id", "tool_backend_id", "credential_generation",
+    "execution_context", "boundary", "boundary_epoch", "objective_id",
+    "objective_generation", "decision_contract_id", "decision_contract_version",
+    "grant_id", "session_id", "session_generation", "transformation_id",
+    "display_digest", "approval_envelopes", "approval_verifications", "approval_use",
+})
+HUMAN_APPROVAL_ENVELOPE_FIELDS = frozenset({
+    "approval_id", "approval_generation", "approver_id", "approver_generation",
+    "approver_identity_basis", "approval_source_id", "approval_source_generation",
+    "role", "effective_domain", "policy_id", "policy_generation", "request_id",
+    "request_generation", "request_digest", "effect_digest", "artifact", "effect",
+    "subject_id", "executor_id", "delegation_chain_id", "tool_backend_id",
+    "execution_context", "boundary", "boundary_epoch", "session_id",
+    "session_generation", "issuance_order", "expiry_order", "lifecycle_state",
+    "disposition", "use_policy", "maximum_uses", "freshness_challenge_id",
+    "canonical_payload_digest", "signature_evidence_id",
+})
+HUMAN_APPROVAL_USE_FIELDS = frozenset({
+    "relationship", "use_id", "approval_ids", "request_id", "request_generation",
+    "request_digest", "effect_digest", "subject_id", "executor_id",
+    "delegation_chain_id", "tool_backend_id", "execution_context", "boundary",
+    "boundary_epoch", "session_id", "session_generation", "grant_id",
+    "use_position", "use_event_order", "freshness_challenge_id",
+})
+TOOL_CONNECTOR_USE_FIELDS = frozenset({
+    "relationship", "policy_id", "policy_generation", "context_id",
+    "context_generation", "context_digest", "logical_tool_id", "tool_generation",
+    "connector_id", "connector_generation", "backend_id", "backend_generation",
+    "target_id", "target_generation", "credential_id", "credential_generation",
+    "permission_scope_id", "permission_scope_generation", "permissions",
+    "operator_lineage", "subject_id", "executor_id", "artifact", "effect",
+    "delegation_chain_id", "approval_policy_id", "boundary", "boundary_epoch",
+    "execution_context", "objective_id", "objective_generation",
+    "decision_contract_id", "decision_contract_version", "grant_id",
+    "use_id", "use_event_order", "freshness_challenge_id",
+})
+HUMAN_APPROVAL_VERIFICATION_FIELDS = frozenset({
+    "relationship", "approval_id", "approval_generation", "envelope_digest",
+    "verifier_id", "verifier_generation", "approval_source_id",
+    "approval_source_generation", "disposition", "verification_event_order",
+    "freshness_challenge_id", "source_id", "authority_generation", "boundary",
+    "boundary_epoch", "lifecycle_state",
+})
+
+
+def _strict_approval_record(
+    value: Any, fields: frozenset[str], name: str,
+    *, integer_fields: frozenset[str] = frozenset(),
+    array_fields: frozenset[str] = frozenset(),
+) -> Mapping[str, Any]:
+    if not isinstance(value, Mapping):
+        raise ValueError(f"{name} must be an object")
+    _require_exact_fields(value, fields, name)
+    result: dict[str, Any] = {}
+    for field in fields:
+        item = value[field]
+        qualified = f"{name}.{field}"
+        if field in integer_fields:
+            result[field] = _exact_generation(item, qualified)
+        elif field in array_fields:
+            if not isinstance(item, (list, tuple)) or not item:
+                raise ValueError(f"{qualified} must be a non-empty array")
+            parts = tuple(_exact_nonempty_string(part, qualified) for part in item)
+            if len(parts) != len(set(parts)):
+                raise ValueError(f"{qualified} must not contain duplicates")
+            result[field] = parts
+        else:
+            result[field] = _exact_nonempty_string(item, qualified)
+    return MappingProxyType(result)
+
+
+def _human_approval_binding(value: Mapping[str, Any]) -> Mapping[str, Any]:
+    scalar_fields = HUMAN_APPROVAL_BINDING_FIELDS - {
+        "approval_envelopes", "approval_verifications", "approval_use"
+    }
+    if not isinstance(value, Mapping):
+        raise ValueError("human_approval_binding must be an object")
+    _require_exact_fields(value, HUMAN_APPROVAL_BINDING_FIELDS, "human_approval_binding")
+    result = dict(_strict_approval_record(
+        {field: value[field] for field in scalar_fields}, scalar_fields,
+        "human_approval_binding",
+        integer_fields=frozenset({
+            "policy_generation", "request_generation", "credential_generation",
+            "objective_generation", "session_generation",
+        }),
+    ))
+    raw_envelopes = value["approval_envelopes"]
+    if not isinstance(raw_envelopes, (list, tuple)) or not raw_envelopes:
+        raise ValueError("human_approval_binding.approval_envelopes must be non-empty")
+    result["approval_envelopes"] = tuple(
+        _strict_approval_record(
+            item, HUMAN_APPROVAL_ENVELOPE_FIELDS, "approval envelope",
+            integer_fields=frozenset({
+                "approval_generation", "approver_generation",
+                "approval_source_generation", "policy_generation",
+                "request_generation", "session_generation", "issuance_order",
+                "expiry_order", "maximum_uses",
+            }),
+        )
+        for item in raw_envelopes
+    )
+    raw_verifications = value["approval_verifications"]
+    if not isinstance(raw_verifications, (list, tuple)) or not raw_verifications:
+        raise ValueError("human_approval_binding.approval_verifications must be non-empty")
+    result["approval_verifications"] = tuple(
+        _strict_approval_record(
+            item, HUMAN_APPROVAL_VERIFICATION_FIELDS, "approval verification",
+            integer_fields=frozenset({
+                "approval_generation", "verifier_generation",
+                "approval_source_generation", "verification_event_order",
+                "authority_generation",
+            }),
+        )
+        for item in raw_verifications
+    )
+    result["approval_use"] = _strict_approval_record(
+        value["approval_use"], HUMAN_APPROVAL_USE_FIELDS, "approval use",
+        integer_fields=frozenset({
+            "request_generation", "session_generation", "use_position",
+            "use_event_order",
+        }),
+        array_fields=frozenset({"approval_ids"}),
+    )
+    return MappingProxyType(result)
+
+
+def _tool_connector_use_binding(value: Mapping[str, Any]) -> Mapping[str, Any]:
+    return _strict_approval_record(
+        value, TOOL_CONNECTOR_USE_FIELDS, "tool_connector_use_binding",
+        integer_fields=frozenset({
+            "policy_generation", "context_generation", "tool_generation",
+            "connector_generation", "backend_generation", "target_generation",
+            "credential_generation", "permission_scope_generation",
+            "objective_generation", "use_event_order",
+        }),
+        array_fields=frozenset({"permissions"}),
+    )
 
 
 @dataclass(frozen=True)
 class OracleInput:
+    schema_version: str
     case_id: str
     authority_tuple: AuthorityTuple
     t1_result: AuthorityOutcome
     t1_evidence: tuple[str, ...]
     t1_authority_state: AuthorityStateBinding
+    t1_binding_facts: ObjectiveBindingFacts
     t2_creates_authority: bool
     t2_mutations: tuple[Mutation, ...]
     facts: Mapping[str, Fact]
+    t3_binding_facts: ObjectiveBindingFacts
+    observation_binding: ObservationBinding | None
+    observation_freshness: ObservationFreshness | None
+    human_approval_binding: Mapping[str, Any] | None
+    tool_connector_use_binding: Mapping[str, Any] | None
+    trusted_commitment_context: tuple[Mapping[str, Any], ...]
+    trusted_anchor_context: tuple[Mapping[str, Any], ...]
     required_facts: tuple[str, ...]
     required_values: Mapping[str, Any]
     reestablishment_state: FactState
@@ -271,6 +2100,9 @@ class OracleInput:
 
     @classmethod
     def from_fixture(cls, fixture: Mapping[str, Any]) -> "OracleInput":
+        schema_version = _exact_string(fixture.get("schema_version"), "schema_version")
+        if schema_version not in {"authority-lab-v0", "authority-lab-v1"}:
+            raise ValueError("unsupported fixture schema_version")
         t1 = fixture["t1"]
         t2 = fixture["t2"]
         t3 = fixture["t3"]
@@ -287,6 +2119,12 @@ class OracleInput:
         if len(required_facts) != len(set(required_facts)):
             raise ValueError("required_facts must not contain duplicates")
         facts = {name: Fact.from_mapping(raw) for name, raw in t3["facts"].items()}
+        raw_t1_binding_facts = t1.get("binding_facts", {})
+        if not isinstance(raw_t1_binding_facts, Mapping):
+            raise ValueError("t1.binding_facts must be an object")
+        t1_binding_fact_map = {
+            name: Fact.from_mapping(raw) for name, raw in raw_t1_binding_facts.items()
+        }
         required_values = dict(t3.get("required_values", {}))
         evidence = tuple(t1["evidence"])
         if not all(isinstance(item, str) for item in evidence):
@@ -307,23 +2145,84 @@ class OracleInput:
             if not isinstance(raw_grant_transition.value, Mapping):
                 raise ValueError("KNOWN grant_transition requires an object value")
             grant_transition = GrantTransition.from_mapping(raw_grant_transition.value)
-        mutations = tuple(
-            Mutation(
-                _exact_string(item["field"], "t2.mutations.field"),
-                item.get("before"),
-                item.get("after"),
+        raw_mutations = t2["mutations"]
+        if not isinstance(raw_mutations, (list, tuple)):
+            raise ValueError("t2.mutations must be an array")
+        mutations = tuple(Mutation.from_mapping(item) for item in raw_mutations)
+        observation_binding = None
+        observation_binding_fact = facts.get("evidence_binding")
+        if (
+            observation_binding_fact is not None
+            and observation_binding_fact.state is FactState.KNOWN
+            and isinstance(observation_binding_fact.value, Mapping)
+        ):
+            observation_binding = ObservationBinding.from_mapping(
+                observation_binding_fact.value
             )
-            for item in t2["mutations"]
-        )
+        elif (
+            observation_binding_fact is not None
+            and observation_binding_fact.state is FactState.KNOWN
+            and not isinstance(observation_binding_fact.value, str)
+        ):
+            raise ValueError("KNOWN evidence_binding requires a typed object or legacy string")
+        observation_freshness = None
+        observation_freshness_fact = facts.get("freshness")
+        if (
+            observation_freshness_fact is not None
+            and observation_freshness_fact.state is FactState.KNOWN
+            and isinstance(observation_freshness_fact.value, Mapping)
+        ):
+            observation_freshness = ObservationFreshness.from_mapping(
+                observation_freshness_fact.value
+            )
+        elif (
+            observation_freshness_fact is not None
+            and observation_freshness_fact.state is FactState.KNOWN
+            and not isinstance(observation_freshness_fact.value, str)
+        ):
+            raise ValueError("KNOWN freshness requires a typed object or legacy string")
+        human_approval_binding = None
+        approval_fact = facts.get("human_approval_binding")
+        if approval_fact is not None and approval_fact.state is FactState.KNOWN:
+            if not isinstance(approval_fact.value, Mapping):
+                raise ValueError("KNOWN human_approval_binding requires a typed object")
+            human_approval_binding = _human_approval_binding(approval_fact.value)
+        tool_connector_use_binding = None
+        tool_use_fact = facts.get("tool_connector_use_binding")
+        if tool_use_fact is not None and tool_use_fact.state is FactState.KNOWN:
+            if not isinstance(tool_use_fact.value, Mapping):
+                raise ValueError("KNOWN tool_connector_use_binding requires a typed object")
+            tool_connector_use_binding = _tool_connector_use_binding(tool_use_fact.value)
+        raw_context = fixture.get("_trusted_commitment_context", ())
+        if not isinstance(raw_context, (list, tuple)) or not all(
+            isinstance(item, Mapping) for item in raw_context
+        ):
+            raise ValueError("trusted commitment context must be a harness-owned array")
+        raw_anchor_context = fixture.get("_trusted_anchor_context", ())
+        if not isinstance(raw_anchor_context, (list, tuple)) or not all(
+            isinstance(item, Mapping) for item in raw_anchor_context
+        ):
+            raise ValueError("trusted anchor context must be a harness-owned array")
         return cls(
+            schema_version=schema_version,
             case_id=str(fixture["case_id"]),
             authority_tuple=AuthorityTuple.from_mapping(fixture["authority_tuple"]),
             t1_result=AuthorityOutcome(t1["result"]),
             t1_evidence=evidence,
             t1_authority_state=AuthorityStateBinding.from_mapping(t1["authority_state"]),
+            t1_binding_facts=ObjectiveBindingFacts.from_facts(t1_binding_fact_map),
             t2_creates_authority=creates_authority,
             t2_mutations=mutations,
             facts=facts,
+            t3_binding_facts=ObjectiveBindingFacts.from_facts(facts),
+            observation_binding=observation_binding,
+            observation_freshness=observation_freshness,
+            human_approval_binding=human_approval_binding,
+            tool_connector_use_binding=tool_connector_use_binding,
+            trusted_commitment_context=tuple(MappingProxyType(dict(item)) for item in raw_context),
+            trusted_anchor_context=tuple(
+                validate_trusted_anchor_context(item) for item in raw_anchor_context
+            ),
             required_facts=required_facts,
             required_values=required_values,
             reestablishment_state=raw_reestablishment.state,
@@ -358,3 +2257,679 @@ class RunResult:
     actual: OracleResult
     status: HarnessStatus
     oracle_input: OracleInput
+
+
+TRUSTED_ADAPTER_ADMISSION_FIELDS = frozenset({
+    "relationship", "adapter_id", "adapter_generation", "adapter_identity_basis",
+    "adapter_observation_id", "adapter_observation_generation",
+    "anchor_source_id", "anchor_source_generation", "source_lineage",
+    "control_domain", "independence_domain", "rollback_domain",
+    "covered_scope_families", "stream_id", "stream_generation", "boundary",
+    "boundary_epoch", "source_id", "authority_generation", "ordering_source_id",
+    "start_event_order", "end_event_order", "freshness_challenge_id",
+    "lifecycle_state", "predecessor_adapter_id", "rotation_id",
+})
+
+TRUSTED_DOMAIN_POLICY_FIELDS = frozenset({
+    "relationship", "policy_id", "policy_generation", "membership_epoch",
+    "required_domains", "optional_domains", "selection_rule", "boundary",
+    "boundary_epoch", "source_id", "authority_generation", "ordering_source_id",
+    "freshness_challenge_id", "lifecycle_state",
+})
+
+TRUSTED_DOMAIN_VIEW_FIELDS = frozenset({
+    "relationship", "domain_id", "adapter_id", "anchor_position", "anchor_digest",
+    "head_commitment_digest", "stream_id", "stream_generation", "boundary",
+    "boundary_epoch", "freshness_challenge_id", "lifecycle_state",
+})
+
+TRUSTED_SOURCE_MEMBERSHIP_FIELDS = frozenset({
+    "relationship", "member_kind", "member_id", "member_generation",
+    "identity_basis", "source_lineage", "control_domain", "independence_domain",
+    "upstream_dependency", "rollback_domain", "membership_epoch", "boundary",
+    "boundary_epoch", "source_id", "authority_generation", "ordering_source_id",
+    "freshness_challenge_id", "lifecycle_state",
+})
+
+TRUSTED_RECONCILIATION_FIELDS = frozenset({
+    "relationship", "reconciliation_id", "policy_id", "membership_epoch",
+    "competing_domain_ids", "competing_anchor_digests", "selected_anchor_digest",
+    "selected_head_commitment_digest", "consistency_evidence_id", "boundary",
+    "boundary_epoch", "source_id", "authority_generation", "ordering_source_id",
+    "freshness_challenge_id", "lifecycle_state",
+})
+
+TRUSTED_SOURCE_TRANSITION_FIELDS = frozenset({
+    "relationship", "transition_id", "member_kind", "old_member_id",
+    "old_member_generation", "new_member_id", "new_member_generation",
+    "old_source_lineage", "new_source_lineage", "independence_domain",
+    "boundary", "boundary_epoch", "source_id", "authority_generation",
+    "ordering_source_id", "freshness_challenge_id", "lifecycle_state",
+})
+
+TRUSTED_CONTROL_PLANE_POLICY_FIELDS = frozenset({
+    "relationship", "policy_id", "policy_generation", "membership_epoch",
+    "required_roles", "required_separation_sets", "allowed_consolidation_ids",
+    "required_appraisal_root_ids", "selection_rule", "boundary",
+    "boundary_epoch", "source_id", "authority_generation",
+    "ordering_source_id", "freshness_challenge_id", "lifecycle_state",
+})
+
+TRUSTED_CONTROL_PLANE_MEMBERSHIP_FIELDS = frozenset({
+    "relationship", "role", "member_id", "member_generation",
+    "identity_basis", "credential_or_key_id", "credential_or_key_generation",
+    "process_or_instance_id", "process_or_instance_generation",
+    "source_lineage", "upstream_dependency", "control_domain",
+    "rollback_domain", "independence_domain", "membership_epoch",
+    "authority_scope", "covered_scope_families", "boundary", "boundary_epoch",
+    "start_event_order", "end_event_order", "appraiser_id",
+    "appraiser_generation", "appraisal_root_id", "source_id",
+    "authority_generation", "ordering_source_id", "freshness_challenge_id",
+    "lifecycle_state",
+})
+
+TRUSTED_INDEPENDENCE_APPRAISAL_ROOT_FIELDS = frozenset({
+    "relationship", "appraisal_root_id", "appraisal_root_generation",
+    "identity_basis", "authority_scope", "source_lineage", "control_domain",
+    "rollback_domain", "independence_domain", "membership_epoch", "boundary",
+    "boundary_epoch", "start_event_order", "end_event_order", "source_id",
+    "authority_generation", "ordering_source_id", "freshness_challenge_id",
+    "lifecycle_state", "predecessor_appraisal_root_id", "rotation_id",
+})
+
+TRUSTED_CONTROL_PLANE_TRANSITION_FIELDS = frozenset({
+    "relationship", "transition_id", "role", "old_member_id",
+    "old_member_generation", "new_member_id", "new_member_generation",
+    "old_effective_domain", "new_effective_domain", "transition_reason",
+    "policy_id", "membership_epoch", "appraisal_root_id", "boundary",
+    "boundary_epoch", "source_id", "authority_generation",
+    "ordering_source_id", "freshness_challenge_id", "lifecycle_state",
+})
+
+TRUSTED_ROLE_CONSOLIDATION_FIELDS = frozenset({
+    "relationship", "consolidation_id", "consolidation_generation", "roles",
+    "member_keys", "effective_domain", "policy_id", "membership_epoch",
+    "appraisal_root_id", "boundary", "boundary_epoch", "source_id",
+    "authority_generation", "ordering_source_id", "freshness_challenge_id",
+    "lifecycle_state",
+})
+
+TRUSTED_DELEGATION_POLICY_FIELDS = frozenset({
+    "relationship", "policy_id", "policy_generation", "selection_rule",
+    "boundary", "boundary_epoch", "source_id", "authority_generation",
+    "ordering_source_id", "freshness_challenge_id", "lifecycle_state",
+    "maximum_chain_depth",
+})
+
+TRUSTED_DELEGATION_PRINCIPAL_FIELDS = frozenset({
+    "relationship", "principal_id", "principal_generation", "identity_basis",
+    "principal_kind", "roles", "objective_id", "objective_generation",
+    "decision_contract_id", "decision_contract_version", "boundary",
+    "boundary_epoch", "execution_context", "root_id", "source_id",
+    "authority_generation", "lineage", "ordering_source_id",
+    "start_event_order", "end_event_order", "freshness_challenge_id",
+    "lifecycle_state",
+})
+
+TRUSTED_DELEGATION_SCOPE_FIELDS = frozenset({
+    "actions", "artifacts", "tools", "semantic_scopes", "boundaries",
+    "subject_classes", "valid_from_order", "valid_until_order", "maximum_depth",
+})
+
+TRUSTED_DELEGATION_GRANT_FIELDS = frozenset({
+    "relationship", "grant_id", "grant_generation", "chain_id",
+    "parent_grant_id", "parent_grant_generation", "delegator_id",
+    "delegator_generation", "delegator_identity_basis", "delegate_id",
+    "delegate_generation", "delegate_identity_basis", "root_id", "source_id",
+    "authority_generation", "lineage", "objective_id", "objective_generation",
+    "decision_contract_id", "decision_contract_version", "action_scope",
+    "delegable_scope", "boundary", "boundary_epoch", "execution_context",
+    "created_event_order", "effective_start_order", "effective_end_order",
+    "hop_depth", "maximum_depth", "further_delegation", "lifecycle_state",
+    "ordering_head_id", "terminal_execution_grant_id",
+})
+
+TRUSTED_DELEGATION_LIFECYCLE_FIELDS = frozenset({
+    "relationship", "record_id", "target_kind", "target_id",
+    "target_generation", "state", "event_id", "event_order", "source_id",
+    "authority_generation", "lineage", "boundary", "boundary_epoch",
+})
+
+TRUSTED_DELEGATION_ORDERING_FIELDS = frozenset({
+    "relationship", "ordering_head_id", "chain_id", "root_id",
+    "head_grant_id", "head_grant_generation", "head_event_order", "source_id",
+    "authority_generation", "lineage", "boundary", "boundary_epoch",
+    "freshness_challenge_id", "lifecycle_state",
+})
+
+TRUSTED_DELEGATION_PRINCIPAL_TRANSITION_FIELDS = frozenset({
+    "relationship", "transition_id", "old_principal_id", "old_principal_generation",
+    "new_principal_id", "new_principal_generation", "event_order", "reason",
+    "source_id", "authority_generation", "lineage", "boundary", "boundary_epoch",
+    "lifecycle_state",
+})
+
+TRUSTED_DELEGATION_GRANT_TRANSITION_FIELDS = frozenset({
+    "relationship", "transition_id", "old_grant_id", "old_grant_generation",
+    "new_grant_id", "new_grant_generation", "event_order", "reason",
+    "source_id", "authority_generation", "lineage", "boundary", "boundary_epoch",
+    "lifecycle_state",
+})
+
+TRUSTED_DELEGATION_TERMINAL_USE_FIELDS = frozenset({
+    "relationship", "chain_id", "terminal_grant_id", "terminal_grant_generation",
+    "execution_grant_id", "subject_id", "subject_generation",
+    "subject_identity_basis", "artifact", "effect", "tool", "boundary",
+    "boundary_epoch", "execution_context", "consumption_state", "objective_id",
+    "objective_generation", "decision_contract_id", "decision_contract_version",
+    "use_event_order", "freshness_challenge_id", "lifecycle_state",
+})
+
+TRUSTED_HUMAN_APPROVAL_POLICY_FIELDS = frozenset({
+    "relationship", "policy_id", "policy_generation", "requirement",
+    "selection_rule", "required_roles", "required_approver_count",
+    "required_effective_domains", "use_policy", "maximum_uses", "artifact",
+    "effect", "subject_id", "executor_id", "delegation_chain_id",
+    "tool_backend_id", "credential_generation", "execution_context", "boundary",
+    "boundary_epoch", "objective_id", "objective_generation",
+    "decision_contract_id", "decision_contract_version", "grant_id", "session_id",
+    "session_generation", "transformation_id", "source_id", "authority_generation",
+    "ordering_source_id", "freshness_challenge_id", "lifecycle_state",
+    "approval_verifier_id", "approval_verifier_generation",
+})
+TRUSTED_HUMAN_APPROVER_FIELDS = frozenset({
+    "relationship", "approver_id", "approver_generation", "identity_basis",
+    "approval_source_id", "approval_source_generation", "roles",
+    "effective_domain", "start_event_order", "end_event_order", "boundary",
+    "boundary_epoch", "source_id", "authority_generation", "ordering_source_id",
+    "freshness_challenge_id", "lifecycle_state",
+})
+TRUSTED_HUMAN_APPROVAL_LIFECYCLE_FIELDS = frozenset({
+    "relationship", "approval_id", "approval_generation", "state", "event_order",
+    "source_id", "authority_generation", "boundary", "boundary_epoch",
+})
+TRUSTED_HUMAN_APPROVAL_HEAD_FIELDS = frozenset({
+    "relationship", "policy_id", "policy_generation", "request_id",
+    "request_generation", "request_digest", "effect_digest", "approval_ids",
+    "head_event_order", "source_id",
+    "authority_generation", "ordering_source_id", "boundary", "boundary_epoch",
+    "freshness_challenge_id", "lifecycle_state",
+})
+TRUSTED_HUMAN_APPROVAL_USE_STATE_FIELDS = frozenset({
+    "relationship", "approval_id", "approval_generation", "request_id",
+    "request_generation", "session_id", "session_generation", "accepted_use_count",
+    "next_use_position", "last_use_id", "source_id", "authority_generation",
+    "boundary", "boundary_epoch", "freshness_challenge_id", "lifecycle_state",
+})
+
+TRUSTED_TOOL_CONNECTOR_POLICY_FIELDS = frozenset({
+    "relationship", "policy_id", "policy_generation", "requirement",
+    "selection_rule", "objective_id", "objective_generation",
+    "decision_contract_id", "decision_contract_version", "artifact", "effect",
+    "subject_id", "executor_id", "boundary", "boundary_epoch",
+    "execution_context", "source_id", "authority_generation", "lineage",
+    "ordering_source_id", "freshness_challenge_id", "lifecycle_state",
+})
+TRUSTED_TOOL_CONNECTOR_CONTEXT_FIELDS = frozenset({
+    "relationship", "context_id", "context_generation", "context_digest",
+    "logical_tool_id", "tool_generation", "tool_identity_basis",
+    "connector_id", "connector_generation", "connector_identity_basis",
+    "backend_id", "backend_generation", "backend_identity_basis",
+    "target_id", "target_generation", "target_identity_basis", "target_type",
+    "credential_id", "credential_generation", "credential_identity_basis",
+    "credential_issuer_id", "permission_scope_id", "permission_scope_generation",
+    "permissions", "operator_id", "operator_generation", "operator_lineage",
+    "source_lineage", "subject_id", "executor_id", "artifact", "effect",
+    "delegation_chain_id", "approval_policy_id", "boundary", "boundary_epoch",
+    "execution_context", "objective_id", "objective_generation",
+    "decision_contract_id", "decision_contract_version", "grant_id",
+    "start_event_order", "end_event_order", "source_id", "authority_generation",
+    "lineage", "ordering_source_id", "freshness_challenge_id", "lifecycle_state",
+})
+TRUSTED_TOOL_CONNECTOR_TRANSITION_FIELDS = frozenset({
+    "relationship", "transition_id", "transition_class", "component_kind",
+    "old_context_id", "old_context_generation", "old_context_digest",
+    "new_context_id", "new_context_generation", "new_context_digest",
+    "old_permissions", "new_permissions",
+    "approval_revalidation", "delegation_revalidation", "event_order",
+    "source_id", "authority_generation", "lineage", "ordering_source_id",
+    "boundary", "boundary_epoch", "freshness_challenge_id", "lifecycle_state",
+})
+TRUSTED_TOOL_CONNECTOR_SELECTION_FIELDS = frozenset({
+    "relationship", "policy_id", "policy_generation", "context_id",
+    "context_generation", "context_digest", "head_event_order", "source_id",
+    "authority_generation", "lineage", "ordering_source_id", "boundary",
+    "boundary_epoch", "freshness_challenge_id", "lifecycle_state",
+})
+TRUSTED_TOOL_CONNECTOR_TERMINAL_USE_FIELDS = frozenset({
+    "relationship", "context_id", "context_generation", "context_digest",
+    "subject_id", "executor_id", "artifact", "effect", "delegation_chain_id",
+    "approval_policy_id", "grant_id", "boundary", "boundary_epoch",
+    "execution_context", "use_id", "use_event_order", "source_id",
+    "authority_generation", "freshness_challenge_id", "lifecycle_state",
+})
+
+TRUSTED_T3_EXECUTION_EVENT_FIELDS = frozenset({
+    "relationship", "execution_event_id", "execution_event_generation",
+    "execution_event_digest", "event_order", "t3_anchor_id", "subject_id",
+    "subject_identity_basis", "executor_id", "artifact", "effect",
+    "boundary", "boundary_epoch", "execution_context", "objective_id",
+    "objective_generation", "decision_contract_id", "decision_contract_version",
+    "delegation_chain_id", "delegation_use_id", "approval_policy_id",
+    "approval_use_id", "tool_context_id", "tool_context_generation",
+    "tool_context_digest", "tool_use_id", "grant_id", "consumption_state",
+    "terminal_use_id", "verifier_id", "verifier_generation",
+    "verifier_state_digest", "anchor_id", "anchor_generation",
+    "anchor_position", "anchor_digest", "policy_set_digest", "source_id",
+    "authority_generation", "lineage", "ordering_source_id",
+    "freshness_challenge_id", "lifecycle_state",
+})
+
+
+def _trusted_exact_record(value: Any, fields: frozenset[str], name: str) -> Mapping[str, Any]:
+    if not isinstance(value, Mapping):
+        raise ValueError(f"{name} must be an object")
+    _require_exact_fields(value, fields, name)
+    return MappingProxyType(dict(value))
+
+
+def _trusted_control_record(
+    value: Any,
+    fields: frozenset[str],
+    name: str,
+    *,
+    integer_fields: frozenset[str] = frozenset(),
+    array_fields: frozenset[str] = frozenset(),
+    nested_array_fields: frozenset[str] = frozenset(),
+) -> Mapping[str, Any]:
+    """Strict, immutable parser for protected control-plane relations."""
+    if not isinstance(value, Mapping):
+        raise ValueError(f"{name} must be an object")
+    _require_exact_fields(value, fields, name)
+    parsed: dict[str, Any] = {}
+    for field in fields:
+        item = value[field]
+        qualified = f"{name}.{field}"
+        if field in integer_fields:
+            parsed[field] = _exact_generation(item, qualified)
+        elif field in nested_array_fields:
+            if not isinstance(item, (list, tuple)):
+                raise ValueError(f"{qualified} must be an array")
+            groups = tuple(
+                tuple(_exact_nonempty_string(part, qualified) for part in group)
+                if isinstance(group, (list, tuple)) and group
+                else ()
+                for group in item
+            )
+            if any(not group for group in groups):
+                raise ValueError(f"{qualified} entries must be non-empty arrays")
+            parsed[field] = groups
+        elif field in array_fields:
+            if not isinstance(item, (list, tuple)):
+                raise ValueError(f"{qualified} must be an array")
+            parsed[field] = tuple(_exact_nonempty_string(part, qualified) for part in item)
+        else:
+            parsed[field] = _exact_nonempty_string(item, qualified)
+    return MappingProxyType(parsed)
+
+
+def _trusted_delegation_scope(value: Any, name: str) -> Mapping[str, Any]:
+    if not isinstance(value, Mapping):
+        raise ValueError(f"{name} must be an object")
+    _require_exact_fields(value, TRUSTED_DELEGATION_SCOPE_FIELDS, name)
+    parsed: dict[str, Any] = {}
+    for field in TRUSTED_DELEGATION_SCOPE_FIELDS:
+        item = value[field]
+        qualified = f"{name}.{field}"
+        if field in {"valid_from_order", "valid_until_order", "maximum_depth"}:
+            parsed[field] = _exact_generation(item, qualified)
+        else:
+            if not isinstance(item, (list, tuple)) or not item:
+                raise ValueError(f"{qualified} must be a non-empty array")
+            values = tuple(_exact_nonempty_string(part, qualified) for part in item)
+            if len(values) != len(set(values)):
+                raise ValueError(f"{qualified} must not contain duplicates")
+            parsed[field] = values
+    return MappingProxyType(parsed)
+
+
+def _trusted_delegation_grant(value: Any) -> Mapping[str, Any]:
+    name = "trusted delegation grant"
+    if not isinstance(value, Mapping):
+        raise ValueError(f"{name} must be an object")
+    _require_exact_fields(value, TRUSTED_DELEGATION_GRANT_FIELDS, name)
+    parsed: dict[str, Any] = {}
+    integer_fields = {
+        "grant_generation", "parent_grant_generation", "delegator_generation",
+        "delegate_generation", "authority_generation", "objective_generation",
+        "created_event_order", "effective_start_order", "effective_end_order",
+        "hop_depth", "maximum_depth",
+    }
+    for field in TRUSTED_DELEGATION_GRANT_FIELDS:
+        item = value[field]
+        qualified = f"{name}.{field}"
+        if field in integer_fields:
+            parsed[field] = _exact_generation(item, qualified)
+        elif field == "further_delegation":
+            if not isinstance(item, bool):
+                raise ValueError(f"{qualified} must be boolean")
+            parsed[field] = item
+        elif field in {"action_scope", "delegable_scope"}:
+            parsed[field] = _trusted_delegation_scope(item, qualified)
+        else:
+            parsed[field] = _exact_nonempty_string(item, qualified)
+    return MappingProxyType(parsed)
+
+
+def _trusted_delegation_context(value: Any) -> Mapping[str, Any]:
+    name = "trusted delegation_authority_context"
+    fields = {
+        "delegation_policy", "delegation_principals", "delegation_grants",
+        "delegation_lifecycle_records", "delegation_ordering_heads",
+        "delegation_principal_transitions", "delegation_grant_transitions",
+        "delegation_terminal_uses",
+    }
+    if not isinstance(value, Mapping):
+        raise ValueError(f"{name} must be an object")
+    _require_exact_fields(value, fields, name)
+    result: dict[str, Any] = {}
+    result["delegation_policy"] = _trusted_control_record(
+        value["delegation_policy"], TRUSTED_DELEGATION_POLICY_FIELDS,
+        "trusted delegation policy",
+        integer_fields=frozenset({
+            "policy_generation", "authority_generation", "maximum_chain_depth",
+        }),
+    )
+    specs = (
+        ("delegation_principals", TRUSTED_DELEGATION_PRINCIPAL_FIELDS,
+         frozenset({
+             "principal_generation", "objective_generation", "authority_generation",
+             "start_event_order", "end_event_order",
+         }), frozenset({"roles"})),
+        ("delegation_lifecycle_records", TRUSTED_DELEGATION_LIFECYCLE_FIELDS,
+         frozenset({"target_generation", "event_order", "authority_generation"}), frozenset()),
+        ("delegation_ordering_heads", TRUSTED_DELEGATION_ORDERING_FIELDS,
+         frozenset({"head_grant_generation", "head_event_order", "authority_generation"}), frozenset()),
+        ("delegation_principal_transitions", TRUSTED_DELEGATION_PRINCIPAL_TRANSITION_FIELDS,
+         frozenset({
+             "old_principal_generation", "new_principal_generation", "event_order",
+             "authority_generation",
+         }), frozenset()),
+        ("delegation_grant_transitions", TRUSTED_DELEGATION_GRANT_TRANSITION_FIELDS,
+         frozenset({
+             "old_grant_generation", "new_grant_generation", "event_order",
+             "authority_generation",
+         }), frozenset()),
+        ("delegation_terminal_uses", TRUSTED_DELEGATION_TERMINAL_USE_FIELDS,
+         frozenset({
+             "terminal_grant_generation", "subject_generation", "objective_generation",
+             "use_event_order",
+         }), frozenset()),
+    )
+    for field, record_fields, integer_fields, array_fields in specs:
+        raw = value[field]
+        if not isinstance(raw, list):
+            raise ValueError(f"trusted {field} must be an array")
+        result[field] = tuple(
+            _trusted_control_record(
+                item, record_fields, f"trusted {field} record",
+                integer_fields=integer_fields, array_fields=array_fields,
+            )
+            for item in raw
+        )
+    grants = value["delegation_grants"]
+    if not isinstance(grants, list):
+        raise ValueError("trusted delegation_grants must be an array")
+    result["delegation_grants"] = tuple(_trusted_delegation_grant(item) for item in grants)
+    return MappingProxyType(result)
+
+
+def _trusted_human_approval_context(value: Any) -> Mapping[str, Any]:
+    name = "trusted human_approval_authority_context"
+    fields = {
+        "approval_policy", "approver_admissions", "approval_lifecycle_records",
+        "approval_ordering_heads", "approval_use_states",
+    }
+    if not isinstance(value, Mapping):
+        raise ValueError(f"{name} must be an object")
+    _require_exact_fields(value, fields, name)
+    result: dict[str, Any] = {}
+    result["approval_policy"] = _trusted_control_record(
+        value["approval_policy"], TRUSTED_HUMAN_APPROVAL_POLICY_FIELDS,
+        "trusted human approval policy",
+        integer_fields=frozenset({
+            "policy_generation", "required_approver_count", "maximum_uses",
+            "credential_generation", "objective_generation", "session_generation",
+            "authority_generation", "approval_verifier_generation",
+        }),
+        array_fields=frozenset({"required_roles", "required_effective_domains"}),
+    )
+    specs = (
+        ("approver_admissions", TRUSTED_HUMAN_APPROVER_FIELDS,
+         frozenset({
+             "approver_generation", "approval_source_generation",
+             "start_event_order", "end_event_order", "authority_generation",
+         }), frozenset({"roles"})),
+        ("approval_lifecycle_records", TRUSTED_HUMAN_APPROVAL_LIFECYCLE_FIELDS,
+         frozenset({"approval_generation", "event_order", "authority_generation"}),
+         frozenset()),
+        ("approval_ordering_heads", TRUSTED_HUMAN_APPROVAL_HEAD_FIELDS,
+         frozenset({
+             "policy_generation", "request_generation", "head_event_order",
+             "authority_generation",
+         }), frozenset({"approval_ids"})),
+        ("approval_use_states", TRUSTED_HUMAN_APPROVAL_USE_STATE_FIELDS,
+         frozenset({
+             "approval_generation", "request_generation", "session_generation",
+             "accepted_use_count", "next_use_position", "authority_generation",
+         }), frozenset()),
+    )
+    for field, record_fields, integer_fields, array_fields in specs:
+        raw = value[field]
+        if not isinstance(raw, list):
+            raise ValueError(f"trusted {field} must be an array")
+        result[field] = tuple(
+            _trusted_control_record(
+                item, record_fields, f"trusted {field} record",
+                integer_fields=integer_fields, array_fields=array_fields,
+            )
+            for item in raw
+        )
+    return MappingProxyType(result)
+
+
+def _trusted_tool_connector_context(value: Any) -> Mapping[str, Any]:
+    name = "trusted tool_connector_authority_context"
+    fields = {
+        "tool_connector_policy", "execution_contexts", "component_transitions",
+        "execution_target_selection", "protected_terminal_uses",
+    }
+    if not isinstance(value, Mapping):
+        raise ValueError(f"{name} must be an object")
+    _require_exact_fields(value, fields, name)
+    result: dict[str, Any] = {}
+    result["tool_connector_policy"] = _trusted_control_record(
+        value["tool_connector_policy"], TRUSTED_TOOL_CONNECTOR_POLICY_FIELDS,
+        "trusted tool connector policy",
+        integer_fields=frozenset({
+            "policy_generation", "objective_generation", "authority_generation",
+        }),
+    )
+    specs = (
+        ("execution_contexts", TRUSTED_TOOL_CONNECTOR_CONTEXT_FIELDS,
+         frozenset({
+             "context_generation", "tool_generation", "connector_generation",
+             "backend_generation", "target_generation", "credential_generation",
+             "permission_scope_generation", "operator_generation",
+             "objective_generation", "start_event_order", "end_event_order",
+             "authority_generation",
+         }), frozenset({"permissions"})),
+        ("component_transitions", TRUSTED_TOOL_CONNECTOR_TRANSITION_FIELDS,
+         frozenset({
+             "old_context_generation", "new_context_generation", "event_order",
+             "authority_generation",
+         }), frozenset({"old_permissions", "new_permissions"})),
+        ("execution_target_selection", TRUSTED_TOOL_CONNECTOR_SELECTION_FIELDS,
+         frozenset({
+             "policy_generation", "context_generation", "head_event_order",
+             "authority_generation",
+         }), frozenset()),
+        ("protected_terminal_uses", TRUSTED_TOOL_CONNECTOR_TERMINAL_USE_FIELDS,
+         frozenset({"context_generation", "use_event_order", "authority_generation"}),
+         frozenset()),
+    )
+    for field, record_fields, integer_fields, array_fields in specs:
+        raw = value[field]
+        if not isinstance(raw, list):
+            raise ValueError(f"trusted {field} must be an array")
+        result[field] = tuple(
+            _trusted_control_record(
+                item, record_fields, f"trusted {field} record",
+                integer_fields=integer_fields, array_fields=array_fields,
+            )
+            for item in raw
+        )
+    return MappingProxyType(result)
+
+
+def validate_trusted_anchor_context(value: Mapping[str, Any]) -> Mapping[str, Any]:
+    """Validate harness-owned adapter/domain authority without trusting fixture input."""
+    result = dict(value)
+    result["adapter_admission"] = _trusted_exact_record(
+        value.get("adapter_admission"), TRUSTED_ADAPTER_ADMISSION_FIELDS,
+        "trusted adapter_admission",
+    )
+    result["required_domain_policy"] = _trusted_exact_record(
+        value.get("required_domain_policy"), TRUSTED_DOMAIN_POLICY_FIELDS,
+        "trusted required_domain_policy",
+    )
+    result["domain_view"] = _trusted_exact_record(
+        value.get("domain_view"), TRUSTED_DOMAIN_VIEW_FIELDS,
+        "trusted domain_view",
+    )
+    memberships = value.get("source_domain_memberships")
+    if not isinstance(memberships, list) or not memberships:
+        raise ValueError("trusted source_domain_memberships must be a non-empty array")
+    result["source_domain_memberships"] = tuple(
+        _trusted_exact_record(item, TRUSTED_SOURCE_MEMBERSHIP_FIELDS, "trusted source membership")
+        for item in memberships
+    )
+    witnesses = value.get("witness_source_memberships")
+    if not isinstance(witnesses, list):
+        raise ValueError("trusted witness_source_memberships must be an array")
+    result["witness_source_memberships"] = tuple(
+        _trusted_exact_record(item, TRUSTED_SOURCE_MEMBERSHIP_FIELDS, "trusted witness membership")
+        for item in witnesses
+    )
+    transitions = value.get("source_domain_transitions")
+    if not isinstance(transitions, list):
+        raise ValueError("trusted source_domain_transitions must be an array")
+    result["source_domain_transitions"] = tuple(
+        _trusted_exact_record(item, TRUSTED_SOURCE_TRANSITION_FIELDS, "trusted source transition")
+        for item in transitions
+    )
+    result["control_plane_policy"] = _trusted_control_record(
+        value.get("control_plane_policy"), TRUSTED_CONTROL_PLANE_POLICY_FIELDS,
+        "trusted control_plane_policy",
+        integer_fields=frozenset({"policy_generation", "membership_epoch", "authority_generation"}),
+        array_fields=frozenset({"required_roles", "allowed_consolidation_ids", "required_appraisal_root_ids"}),
+        nested_array_fields=frozenset({"required_separation_sets"}),
+    )
+    control_memberships = value.get("control_plane_memberships")
+    if not isinstance(control_memberships, list) or not control_memberships:
+        raise ValueError("trusted control_plane_memberships must be a non-empty array")
+    result["control_plane_memberships"] = tuple(
+        _trusted_control_record(
+            item, TRUSTED_CONTROL_PLANE_MEMBERSHIP_FIELDS,
+            "trusted control-plane membership",
+            integer_fields=frozenset({
+                "member_generation", "credential_or_key_generation",
+                "process_or_instance_generation", "membership_epoch",
+                "start_event_order", "end_event_order", "appraiser_generation",
+                "authority_generation",
+            }),
+            array_fields=frozenset({"authority_scope", "covered_scope_families"}),
+        )
+        for item in control_memberships
+    )
+    appraisal_roots = value.get("independence_appraisal_roots")
+    if not isinstance(appraisal_roots, list) or not appraisal_roots:
+        raise ValueError("trusted independence_appraisal_roots must be a non-empty array")
+    result["independence_appraisal_roots"] = tuple(
+        _trusted_control_record(
+            item, TRUSTED_INDEPENDENCE_APPRAISAL_ROOT_FIELDS,
+            "trusted independence appraisal root",
+            integer_fields=frozenset({
+                "appraisal_root_generation", "membership_epoch",
+                "start_event_order", "end_event_order", "authority_generation",
+            }),
+            array_fields=frozenset({"authority_scope"}),
+        )
+        for item in appraisal_roots
+    )
+    control_transitions = value.get("control_plane_membership_transitions")
+    if not isinstance(control_transitions, list):
+        raise ValueError("trusted control_plane_membership_transitions must be an array")
+    result["control_plane_membership_transitions"] = tuple(
+        _trusted_control_record(
+            item, TRUSTED_CONTROL_PLANE_TRANSITION_FIELDS,
+            "trusted control-plane membership transition",
+            integer_fields=frozenset({
+                "old_member_generation", "new_member_generation",
+                "membership_epoch", "authority_generation",
+            }),
+            array_fields=frozenset({"old_effective_domain", "new_effective_domain"}),
+        )
+        for item in control_transitions
+    )
+    consolidations = value.get("authorized_consolidations")
+    if not isinstance(consolidations, list):
+        raise ValueError("trusted authorized_consolidations must be an array")
+    result["authorized_consolidations"] = tuple(
+        _trusted_control_record(
+            item, TRUSTED_ROLE_CONSOLIDATION_FIELDS,
+            "trusted role consolidation",
+            integer_fields=frozenset({
+                "consolidation_generation", "membership_epoch", "authority_generation",
+            }),
+            array_fields=frozenset({"roles", "member_keys", "effective_domain"}),
+        )
+        for item in consolidations
+    )
+    result["delegation_authority_context"] = _trusted_delegation_context(
+        value.get("delegation_authority_context")
+    )
+    result["human_approval_authority_context"] = _trusted_human_approval_context(
+        value.get("human_approval_authority_context")
+    )
+    result["tool_connector_authority_context"] = _trusted_tool_connector_context(
+        value.get("tool_connector_authority_context")
+    )
+    result["t3_execution_event"] = _trusted_control_record(
+        value.get("t3_execution_event"), TRUSTED_T3_EXECUTION_EVENT_FIELDS,
+        "trusted t3_execution_event",
+        integer_fields=frozenset({
+            "execution_event_generation", "event_order", "objective_generation",
+            "tool_context_generation", "verifier_generation", "anchor_generation",
+            "anchor_position", "authority_generation",
+        }),
+    )
+    reconciliation = value.get("cross_domain_reconciliation")
+    result["cross_domain_reconciliation"] = (
+        None if reconciliation is None else _trusted_exact_record(
+            reconciliation, TRUSTED_RECONCILIATION_FIELDS, "trusted reconciliation"
+        )
+    )
+    rotation = value.get("adapter_rotation")
+    if rotation is not None:
+        if not isinstance(rotation, Mapping):
+            raise ValueError("trusted adapter_rotation must be an object")
+        required = {
+            "relationship", "rotation_id", "old_adapter_id", "old_adapter_generation",
+            "new_adapter_id", "new_adapter_generation", "source_lineage", "boundary",
+            "boundary_epoch", "source_id", "authority_generation", "ordering_source_id",
+            "freshness_challenge_id", "lifecycle_state",
+        }
+        _require_exact_fields(rotation, required, "trusted adapter_rotation")
+        result["adapter_rotation"] = MappingProxyType(dict(rotation))
+    return MappingProxyType(result)

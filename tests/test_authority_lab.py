@@ -1,24 +1,54 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import subprocess
 import sys
+import tempfile
 import unittest
 from copy import deepcopy
 from pathlib import Path
 from unittest.mock import patch
 
+from authority_lab.commitment import (
+    anchor_digest,
+    anchor_key_digest,
+    commitment_digest,
+    state_key_digest,
+    verifier_state_digest,
+)
 from authority_lab.model import (
     AuthorityOutcome,
+    ContinuityEffect,
     FactState,
     HarnessStatus,
     INVARIANTS,
     MANDATORY_T3_FACTS,
+    MUTATION_CANONICAL_FIELDS,
+    MUTATION_LEGACY_ALIASES,
+    MUTATION_REGISTRY,
+    MUTATION_SPECS,
+    MutationTargetKind,
+    OBSERVATION_PROFILE_ID,
+    OBSERVATION_PROFILE_VERSION,
+    OBSERVATION_SCOPE_FAMILIES,
+    ObservationSegment,
     OracleInput,
     RELATIONAL_T3_FACTS,
     TUPLE_FIELDS,
 )
-from authority_lab.oracle import evaluate
+from authority_lab.oracle import (
+    BINDING_MUTATION_TARGETS,
+    FACT_MUTATION_TARGETS,
+    RELATIONAL_MUTATION_TARGETS,
+    STATE_MUTATION_TARGETS,
+    evaluate,
+    human_approval_effect_digest,
+    human_approval_envelope_digest,
+    human_approval_request_digest,
+    tool_connector_context_digest,
+    t3_execution_event_digest,
+)
 from authority_lab.runner import discover, format_trace, load_fixture, run_fixture, run_path
 
 
@@ -32,6 +62,285 @@ def fixture(case_id: str) -> dict:
 
 def actual(payload: dict) -> AuthorityOutcome:
     return evaluate(OracleInput.from_fixture(payload)).outcome
+
+
+def _test_digest(domain: str, value: dict) -> str:
+    body = json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+    return hashlib.sha256(f"{domain}\0{body}".encode()).hexdigest()
+
+
+def refresh_t3_execution_event(payload: dict) -> None:
+    """Reissue protected T3 state after an explicitly authorized test transition."""
+    contexts = payload["_trusted_anchor_context"]
+    facts = payload["t3"]["facts"]
+    observation = facts["evidence_binding"]["value"]
+    freshness = facts["freshness"]["value"]
+    objective = facts["objective_identity"]["value"]
+    contract = facts["decision_contract_identity"]["value"]
+    active = payload["t1"]["authority_state"]
+    if payload["t3"].get("reestablishment", {}).get("state") == "KNOWN":
+        active = payload["t3"]["reestablishment"]["value"]["current"]
+    anchor_set = sorted(({
+        "verifier_id": item["verifier_id"],
+        "verifier_generation": item["verifier_generation"],
+        "verifier_state_digest": item["verifier_state_digest"],
+        "anchor_id": item["anchor_id"],
+        "anchor_generation": item["anchor_generation"],
+        "anchor_position": item["anchor_position"],
+        "anchor_digest": item["anchor_digest"],
+    } for item in contexts), key=lambda item: (item["anchor_id"], item["anchor_generation"]))
+    anchor_set_digest = _test_digest("authority-lab-v1/t3-anchor-set", {"anchors": anchor_set})
+    for protected in contexts:
+        approval = protected["human_approval_authority_context"]
+        delegation = protected["delegation_authority_context"]
+        tool = protected["tool_connector_authority_context"]
+        approval_policy = approval["approval_policy"]
+        delegation_policy = delegation["delegation_policy"]
+        tool_policy = tool["tool_connector_policy"]
+        policy_set = {
+            "approval": [approval_policy["policy_id"], approval_policy["policy_generation"]],
+            "delegation": [delegation_policy["policy_id"], delegation_policy["policy_generation"]],
+            "tool": [tool_policy["policy_id"], tool_policy["policy_generation"]],
+            "control_plane": [protected["control_plane_policy"]["policy_id"], protected["control_plane_policy"]["policy_generation"]],
+            "required_domains": [protected["required_domain_policy"]["policy_id"], protected["required_domain_policy"]["policy_generation"]],
+        }
+        tool_context = tool["execution_contexts"][0] if len(tool["execution_contexts"]) == 1 else None
+        tool_use = tool["protected_terminal_uses"][0] if len(tool["protected_terminal_uses"]) == 1 else None
+        delegation_use = delegation["delegation_terminal_uses"][0] if len(delegation["delegation_terminal_uses"]) == 1 else None
+        approval_binding = facts.get("human_approval_binding", {}).get("value")
+        approval_use = approval_binding.get("approval_use") if isinstance(approval_binding, dict) else None
+        event = protected["t3_execution_event"]
+        chain_id = delegation_use["chain_id"] if delegation_use else "DIRECT"
+        event.update(
+            event_order=observation["t3_anchor"]["event_order"],
+            t3_anchor_id=observation["t3_anchor"]["anchor_id"],
+            subject_id=payload["authority_tuple"]["subject"],
+            subject_identity_basis=payload["authority_tuple"]["identity_basis"],
+            executor_id=tool_policy["executor_id"], artifact=payload["authority_tuple"]["artifact"],
+            effect=tool_policy["effect"], boundary=observation["boundary"],
+            boundary_epoch=observation["boundary_epoch"],
+            execution_context=facts["execution_context"]["value"],
+            objective_id=objective["objective_id"], objective_generation=objective["objective_generation"],
+            decision_contract_id=contract["contract_id"], decision_contract_version=contract["contract_version"],
+            delegation_chain_id=chain_id,
+            delegation_use_id=f"DELEGATION-USE-{chain_id}" if delegation_use else "NONE",
+            approval_policy_id=approval_policy["policy_id"] if approval_policy["requirement"] == "REQUIRED" else "NONE",
+            approval_use_id=approval_use["use_id"] if approval_use else "NONE",
+            tool_context_id=tool_context["context_id"] if tool_context else "NONE",
+            tool_context_generation=tool_context["context_generation"] if tool_context else 0,
+            tool_context_digest=tool_context["context_digest"] if tool_context else "NONE",
+            tool_use_id=tool_use["use_id"] if tool_use else "NONE",
+            grant_id=active["grant_id"], consumption_state=facts["consumption_state"]["value"],
+            terminal_use_id=tool_use["use_id"] if tool_use else active["grant_id"],
+            verifier_id="T3-VERIFIER-SET", verifier_generation=max(item["verifier_generation"] for item in anchor_set),
+            verifier_state_digest=anchor_set_digest, anchor_id="T3-ANCHOR-SET",
+            anchor_generation=max(item["anchor_generation"] for item in anchor_set),
+            anchor_position=max(item["anchor_position"] for item in anchor_set), anchor_digest=anchor_set_digest,
+            policy_set_digest=_test_digest("authority-lab-v1/t3-policy-set", policy_set),
+            source_id=observation["source_id"], authority_generation=observation["authority_generation"],
+            lineage=observation["lineage"], ordering_source_id=observation["ordering_source_id"],
+            freshness_challenge_id=freshness["freshness_challenge_id"], lifecycle_state="ACTIVE",
+        )
+        event["execution_event_digest"] = t3_execution_event_digest(event)
+
+
+def reissue_observation_commitment(payload: dict) -> None:
+    """Reissue the exact test commitment after an authorized scope change."""
+    facts = payload["t3"]["facts"]
+    binding = facts["evidence_binding"]["value"]
+    objective = facts["objective_binding"]["value"][-1]
+    envelope = binding["commitment_envelopes"][0]
+    envelope.update(
+        objective_binding_id=objective["binding_id"],
+        objective_binding_generation=objective["binding_generation"],
+        decision_contract_id=binding["decision_contract_id"],
+        decision_contract_version=binding["decision_contract_version"],
+        source_id=binding["source_id"],
+        authority_generation=binding["authority_generation"],
+        boundary=binding["boundary"],
+        boundary_epoch=binding["boundary_epoch"],
+        lineage=binding["lineage"],
+        ordering_source_id=binding["ordering_source_id"],
+    )
+    segments = [
+        ObservationSegment.from_mapping(item)
+        for item in binding["segments"]
+        if item["segment_id"] in envelope["segment_ids"]
+    ]
+    digest = commitment_digest(envelope, segments)
+    envelope.update(commitment_digest=digest, canonical_payload_digest=digest)
+    for segment in binding["segments"]:
+        if segment["segment_id"] in envelope["segment_ids"]:
+            segment["stream_commitment"] = digest
+    verification = binding["commitment_verifications"][0]
+    verification.update(commitment_digest=digest, canonical_payload_digest=digest)
+    binding["commitment_links"][0]["to_commitment_digest"] = digest
+    checkpoint = binding["commitment_checkpoints"][0]
+    checkpoint["head_commitment_digest"] = digest
+    checkpoint["current_verifier_state_digest"] = verifier_state_digest(checkpoint)
+    facts["freshness"]["value"].update(
+        commitment_digest=digest,
+        verifier_state_digest=checkpoint["current_verifier_state_digest"],
+    )
+    context = payload["_trusted_commitment_context"][0]
+    context.update(
+        exact_state_key_digest=state_key_digest(envelope),
+        current_verifier_state_digest=checkpoint["current_verifier_state_digest"],
+        head_commitment_digest=digest,
+    )
+    anchor = binding["verifier_state_anchors"][0]
+    anchor.update(
+        exact_state_key_digest=state_key_digest(envelope),
+        head_commitment_id=checkpoint["head_commitment_id"],
+        head_commitment_digest=digest,
+        verifier_state_digest=checkpoint["current_verifier_state_digest"],
+        checkpoint_id=checkpoint["checkpoint_id"],
+        checkpoint_generation=checkpoint["checkpoint_generation"],
+        freshness_challenge_id=checkpoint["freshness_challenge_id"],
+        source_id=binding["source_id"],
+        authority_generation=binding["authority_generation"],
+        boundary=binding["boundary"],
+        boundary_epoch=binding["boundary_epoch"],
+        lineage=binding["lineage"],
+        ordering_source_id=binding["ordering_source_id"],
+    )
+    digest = anchor_digest(anchor)
+    anchor.update(anchor_digest=digest, canonical_payload_digest=digest)
+    trusted_anchor = payload["_trusted_anchor_context"][0]
+    trusted_anchor.update(
+        exact_anchor_key_digest=anchor_key_digest(anchor),
+        anchor_digest=digest,
+        exact_state_key_digest=anchor["exact_state_key_digest"],
+        head_commitment_digest=anchor["head_commitment_digest"],
+        verifier_state_digest=anchor["verifier_state_digest"],
+        freshness_challenge_id=anchor["freshness_challenge_id"],
+    )
+    adapter = trusted_anchor["adapter_admission"]
+    adapter.update(
+        anchor_source_id=anchor["anchor_source_id"],
+        anchor_source_generation=anchor["anchor_source_generation"],
+        stream_id=anchor["stream_id"],
+        stream_generation=anchor["stream_generation"],
+        boundary=anchor["boundary"],
+        boundary_epoch=anchor["boundary_epoch"],
+        source_id=anchor["source_id"],
+        authority_generation=anchor["authority_generation"],
+        ordering_source_id=anchor["ordering_source_id"],
+        freshness_challenge_id=anchor["freshness_challenge_id"],
+    )
+    policy = trusted_anchor["required_domain_policy"]
+    policy.update(
+        boundary=anchor["boundary"], boundary_epoch=anchor["boundary_epoch"],
+        source_id=anchor["source_id"], authority_generation=anchor["authority_generation"],
+        ordering_source_id=anchor["ordering_source_id"],
+        freshness_challenge_id=anchor["freshness_challenge_id"],
+    )
+    view = trusted_anchor["domain_view"]
+    view.update(
+        anchor_digest=digest, head_commitment_digest=anchor["head_commitment_digest"],
+        stream_id=anchor["stream_id"], stream_generation=anchor["stream_generation"],
+        boundary=anchor["boundary"], boundary_epoch=anchor["boundary_epoch"],
+        freshness_challenge_id=anchor["freshness_challenge_id"],
+    )
+    for member in (
+        *trusted_anchor["source_domain_memberships"],
+        *trusted_anchor["witness_source_memberships"],
+    ):
+        member.update(
+            boundary=anchor["boundary"], boundary_epoch=anchor["boundary_epoch"],
+            source_id=anchor["source_id"], authority_generation=anchor["authority_generation"],
+            ordering_source_id=anchor["ordering_source_id"],
+            freshness_challenge_id=anchor["freshness_challenge_id"],
+        )
+    refresh_t3_execution_event(payload)
+
+
+def rebind_objective_binding(payload: dict, *, suffix: str) -> dict:
+    """Create exact current binding relations for a changed test authority scope."""
+    facts = payload["t3"]["facts"]
+    scope = {
+        "subject": payload["authority_tuple"]["subject"],
+        "artifact": payload["authority_tuple"]["artifact"],
+        "control_state": payload["authority_tuple"]["control_state"],
+        "identity_basis": payload["authority_tuple"]["identity_basis"],
+        "boundary_epoch": payload["authority_tuple"]["boundary_epoch"],
+        "decision": payload["authority_tuple"]["decision"],
+        "applicable_boundary": facts["applicable_boundary"]["value"],
+    }
+    before_values = {
+        name: deepcopy(facts[name]["value"])
+        for name in (
+            "objective_binding",
+            "binding_source_authority",
+            "binding_lifecycle",
+            "binding_ordering",
+        )
+    }
+    binding = facts["objective_binding"]["value"][0]
+    binding["binding_id"] = f"{binding['binding_id']}-{suffix}"
+    binding["scope"] = deepcopy(scope)
+    source = facts["binding_source_authority"]["value"][0]
+    source["scope"] = deepcopy(scope)
+    lifecycle = facts["binding_lifecycle"]["value"][0]
+    lifecycle.update(
+        {
+            "binding_id": binding["binding_id"],
+            "event_id": f"{lifecycle['event_id']}-{suffix}",
+        }
+    )
+    facts["binding_ordering"]["value"]["head_binding_id"] = binding["binding_id"]
+    for name, before in before_values.items():
+        after = deepcopy(facts[name]["value"])
+        if before != after:
+            payload["t2"]["mutations"].append(
+                {"field": name, "before": before, "after": after}
+            )
+    # Observation admission is independently root-issued, but it must identify
+    # the exact current objective binding and decision contract it covers.
+    observation = facts["evidence_binding"]["value"]
+    freshness = facts["freshness"]["value"]
+    observation.update(
+        {
+            "objective_binding_id": binding["binding_id"],
+            "objective_binding_generation": binding["binding_generation"],
+            "decision_contract_id": binding["contract_id"],
+            "decision_contract_version": binding["contract_version"],
+            "source_id": source["root_id"],
+            "authority_generation": source["authority_generation"],
+            "boundary": source["boundary"],
+            "boundary_epoch": source["boundary_epoch"],
+            "lineage": source["lineage"],
+            "ordering_source_id": facts["binding_ordering"]["value"][
+                "ordering_source_id"
+            ],
+        }
+    )
+    freshness.update(
+        {
+            "source_id": source["root_id"],
+            "authority_generation": source["authority_generation"],
+            "boundary": source["boundary"],
+            "boundary_epoch": source["boundary_epoch"],
+            "lineage": source["lineage"],
+            "ordering_source_id": facts["binding_ordering"]["value"][
+                "ordering_source_id"
+            ],
+        }
+    )
+    for record in observation["lifecycle_records"]:
+        record.update(
+            {
+                "source_id": source["root_id"],
+                "authority_generation": source["authority_generation"],
+                "boundary": source["boundary"],
+                "boundary_epoch": source["boundary_epoch"],
+                "lineage": source["lineage"],
+            }
+        )
+    for segment in observation["segments"]:
+        segment["boundary_epoch"] = source["boundary_epoch"]
+    reissue_observation_commitment(payload)
+    return payload
 
 
 def reestablish_artifact(
@@ -100,6 +409,7 @@ def reestablish_artifact(
                 "current": deepcopy(current),
             },
         }
+    rebind_objective_binding(payload, suffix="CURRENT-SCOPE")
     return payload
 
 
@@ -133,6 +443,7 @@ def reestablish_grant(
                 "current": deepcopy(current),
             },
         }
+    refresh_t3_execution_event(payload)
     return payload
 
 
@@ -142,9 +453,9 @@ class AuthorityLabTests(unittest.TestCase):
         self.assertIs(AuthorityOutcome.UNAVAILABLE, result.outcome)
         self.assertIn(reason_code, {reason.code for reason in result.reasons})
 
-    def test_v0_contains_twelve_deterministic_fixtures(self) -> None:
+    def test_v1_contains_four_hundred_sixty_six_deterministic_fixtures(self) -> None:
         paths = discover(CASES)
-        self.assertEqual(12, len(paths))
+        self.assertEqual(466, len(paths))
         self.assertEqual(paths, discover(CASES))
 
     def test_every_v0_fixture_matches_its_expected_outcome(self) -> None:
@@ -153,6 +464,72 @@ class AuthorityLabTests(unittest.TestCase):
 
     def test_fresh_positive_is_authorized(self) -> None:
         self.assertIs(AuthorityOutcome.AUTHORIZED, actual(fixture("LAB-V0-001")))
+
+    def test_t3_hostile_matrix_matches_independent_expectations(self) -> None:
+        for number in range(412, 444):
+            with self.subTest(case_id=number):
+                self.assertIs(HarnessStatus.PASS, run_path(CASES / f"LAB-V1-{number:03}.json").status)
+
+    def test_approval_and_delegation_local_heads_cannot_precede_t3(self) -> None:
+        for case_id in ("LAB-V1-412", "LAB-V1-413"):
+            with self.subTest(case_id=case_id):
+                self.assert_unavailable_with_reason(fixture(case_id), "T3_AUTHORITY_CONVERGENCE_UNAVAILABLE")
+
+    def test_candidate_cached_authorized_result_is_not_authority(self) -> None:
+        self.assert_unavailable_with_reason(fixture("LAB-V1-426"), "T3_AUTHORITY_CONVERGENCE_UNAVAILABLE")
+
+    def test_candidate_cannot_supply_trusted_t3_event(self) -> None:
+        payload = json.loads((CASES / "LAB-V1-337.json").read_text())
+        payload["_trusted_t3_execution_event"] = {}
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "candidate.json"
+            path.write_text(json.dumps(payload))
+            with self.assertRaisesRegex(ValueError, "trusted T3"):
+                load_fixture(path)
+
+    def test_t3_event_digest_commits_to_every_member(self) -> None:
+        payload = fixture("LAB-V1-436")
+        event = payload["_trusted_anchor_context"][0]["t3_execution_event"]
+        original = t3_execution_event_digest(event)
+        for field in event:
+            if field == "execution_event_digest":
+                continue
+            changed = deepcopy(event)
+            changed[field] = changed[field] + 1 if isinstance(changed[field], int) else changed[field] + "-CHANGED"
+            self.assertNotEqual(original, t3_execution_event_digest(changed), field)
+
+    def test_duplicate_and_conflicting_t3_events_fail_closed(self) -> None:
+        for case_id in ("LAB-V1-430", "LAB-V1-431", "LAB-V1-433"):
+            with self.subTest(case_id=case_id):
+                self.assertIs(AuthorityOutcome.UNAVAILABLE, actual(fixture(case_id)))
+        payload = fixture("LAB-V1-058")
+        competing = payload["_trusted_anchor_context"][1]["t3_execution_event"]
+        competing["execution_event_id"] = "COMPETING-T3-EVENT"
+        competing["execution_event_digest"] = t3_execution_event_digest(competing)
+        self.assert_unavailable_with_reason(payload, "T3_EXECUTION_EVENT_CONFLICTING")
+
+    def test_t3_positive_paths_remain_reachable(self) -> None:
+        for case_id in range(436, 444):
+            with self.subTest(case_id=case_id):
+                self.assertIs(AuthorityOutcome.AUTHORIZED, actual(fixture(f"LAB-V1-{case_id:03}")))
+
+    def test_protected_t3_record_is_strictly_typed(self) -> None:
+        payload = fixture("LAB-V1-436")
+        payload["_trusted_anchor_context"][0]["t3_execution_event"]["trusted"] = True
+        with self.assertRaises(ValueError):
+            OracleInput.from_fixture(payload)
+
+    def test_t3_refresh_requires_protected_underlying_transition(self) -> None:
+        payload = fixture("LAB-V1-436")
+        payload["_trusted_anchor_context"][0]["t3_execution_event"]["event_order"] = 4
+        event = payload["_trusted_anchor_context"][0]["t3_execution_event"]
+        event["execution_event_digest"] = t3_execution_event_digest(event)
+        self.assert_unavailable_with_reason(payload, "T3_AUTHORITY_CONVERGENCE_UNAVAILABLE")
+
+    def test_current_revocation_at_t3_remains_denied(self) -> None:
+        for case_id in ("LAB-V1-414", "LAB-V1-415", "LAB-V1-428"):
+            with self.subTest(case_id=case_id):
+                self.assertIs(AuthorityOutcome.DENIED, actual(fixture(case_id)))
 
     def test_second_fresh_positive_is_authorized(self) -> None:
         self.assertIs(AuthorityOutcome.AUTHORIZED, actual(fixture("LAB-V0-010")))
@@ -199,12 +576,12 @@ class AuthorityLabTests(unittest.TestCase):
     def test_stale_freshness_cannot_authorize(self) -> None:
         payload = fixture("LAB-V0-001")
         payload["t3"]["facts"]["freshness"]["value"] = "STALE"
-        self.assert_unavailable_with_reason(payload, "REQUIRED_VALUE_MISMATCH")
+        self.assert_unavailable_with_reason(payload, "OBSERVATION_FRESHNESS_UNAVAILABLE")
 
     def test_wrong_evidence_binding_cannot_authorize(self) -> None:
         payload = fixture("LAB-V0-001")
         payload["t3"]["facts"]["evidence_binding"]["value"] = "STALE"
-        self.assert_unavailable_with_reason(payload, "REQUIRED_VALUE_MISMATCH")
+        self.assert_unavailable_with_reason(payload, "OBSERVATION_ADMISSION_UNAVAILABLE")
 
     def test_changed_execution_context_cannot_authorize_without_rebinding(self) -> None:
         payload = fixture("LAB-V0-001")
@@ -246,11 +623,7 @@ class AuthorityLabTests(unittest.TestCase):
         self.assert_unavailable_with_reason(payload, "REQUIRED_VALUE_UNSPECIFIED")
 
     def test_fixture_required_values_cannot_launder_nonpermitting_core_values(self) -> None:
-        for field, value in (
-            ("consumption_state", "CONSUMED"),
-            ("freshness", "STALE"),
-            ("evidence_binding", "STALE"),
-        ):
+        for field, value in (("consumption_state", "CONSUMED"),):
             with self.subTest(field=field):
                 payload = fixture("LAB-V0-001")
                 payload["t3"]["facts"][field]["value"] = value
@@ -267,7 +640,7 @@ class AuthorityLabTests(unittest.TestCase):
                     )
                 )
                 self.assertTrue(
-                    set(payload["t3"]["required_facts"]).issubset(
+                    (set(payload["t3"]["required_facts"]) - set(RELATIONAL_T3_FACTS)).issubset(
                         payload["t3"]["required_values"]
                     )
                 )
@@ -294,6 +667,14 @@ class AuthorityLabTests(unittest.TestCase):
         changed["title"] = "Everything is authorized"
         changed["expected_outcome"] = AuthorityOutcome.AUTHORIZED.value
         self.assertIs(baseline, actual(changed))
+
+    def test_identical_canonical_input_replays_deterministically(self) -> None:
+        payload = fixture("LAB-V1-464")
+        results = [evaluate(OracleInput.from_fixture(deepcopy(payload))) for _ in range(5)]
+        baseline = results[0]
+        self.assertTrue(all(result == baseline for result in results[1:]))
+        self.assertIs(AuthorityOutcome.AUTHORIZED, baseline.outcome)
+        self.assertEqual("CURRENT_AUTHORITY_ESTABLISHED", baseline.reasons[0].code)
 
     def test_derivative_and_aggregate_artifacts_do_not_inherit_authority(self) -> None:
         self.assertIs(AuthorityOutcome.UNAVAILABLE, actual(fixture("LAB-V0-011")))
@@ -331,40 +712,7 @@ class AuthorityLabTests(unittest.TestCase):
         }
         self.assertIs(AuthorityOutcome.DENIED, actual(denied))
 
-        authorized = deepcopy(denied)
-        authorized["t3"]["prohibition"] = {"state": "KNOWN", "applies": False, "id": "none"}
-        authorized["t3"]["facts"]["decision_binding"]["value"] = "EV-E2"
-        authorized["t3"]["required_values"]["decision_binding"] = "EV-E2"
-        authorized["t3"]["facts"]["consumption_binding"]["value"]["grant_id"] = (
-            "GRANT-003-E2"
-        )
-        authorized["t2"]["mutations"].append(
-            {
-                "field": "grant_id",
-                "before": "GRANT-003-E1",
-                "after": "GRANT-003-E2",
-            }
-        )
-        authorized["t3"]["reestablishment"] = {
-            "state": "KNOWN",
-            "value": {
-                "previous_evidence_id": "EV-E1",
-                "current": {
-                    "subject": "S",
-                    "artifact": "A",
-                    "control_state": "E2",
-                    "identity_basis": "I1",
-                    "boundary_epoch": "B1",
-                    "decision": "AUTHORIZED",
-                    "evidence_id": "EV-E2",
-                    "execution_context": "E2",
-                    "applicable_boundary": "AUTH-BOUNDARY-1",
-                    "grant_id": "GRANT-003-E2",
-                    "consumption_state": "UNUSED",
-                    "subject_mode": "DIRECT",
-                },
-            },
-        }
+        authorized = fixture("LAB-V1-084")
         self.assertIs(AuthorityOutcome.AUTHORIZED, actual(authorized))
 
     def test_exact_tuple_and_invariant_sets_are_frozen(self) -> None:
@@ -376,7 +724,7 @@ class AuthorityLabTests(unittest.TestCase):
             ("INV-CONT", "INV-DISC", "INV-BND", "INV-EVD", "INV-USE", "INV-CLO"),
             INVARIANTS,
         )
-        self.assertEqual(16, len(MANDATORY_T3_FACTS))
+        self.assertEqual(23, len(MANDATORY_T3_FACTS))
 
     def test_artifact_rebinding_cannot_reuse_old_evidence(self) -> None:
         payload = fixture("LAB-V0-001")
@@ -517,7 +865,7 @@ class AuthorityLabTests(unittest.TestCase):
             "execution_context"
         ] = "E2"
         self.assert_unavailable_with_reason(
-            payload, "GRANT_EFFECT_RELATIONSHIP_UNAVAILABLE"
+            payload, "PREDECESSOR_GRANT_NONPORTABLE"
         )
 
     def test_delegation_cannot_retarget_old_grant(self) -> None:
@@ -646,7 +994,7 @@ class AuthorityLabTests(unittest.TestCase):
         )
         self.assertIs(AuthorityOutcome.AUTHORIZED, actual(payload))
 
-    def test_exact_grant_transition_can_establish_explicit_return_path(self) -> None:
+    def test_exact_grant_transition_cannot_erase_explicit_return_path(self) -> None:
         payload = reestablish_grant(
             fixture("LAB-V0-001"), grant_id="GRANT-001", evidence_id="EV-G1-RETURN"
         )
@@ -665,7 +1013,7 @@ class AuthorityLabTests(unittest.TestCase):
                 "current": current,
             },
         }
-        self.assertIs(AuthorityOutcome.AUTHORIZED, actual(payload))
+        self.assert_unavailable_with_reason(payload, "PREDECESSOR_GRANT_NONPORTABLE")
 
     def test_disappearing_decision_binding_mutation_is_unavailable(self) -> None:
         payload = fixture("LAB-V0-001")
@@ -706,6 +1054,306 @@ class AuthorityLabTests(unittest.TestCase):
         payload["t3"]["facts"]["artifact_identity"]["value"] = "OTHER"
         self.assertIs(AuthorityOutcome.UNAVAILABLE, actual(payload))
 
+    def test_every_maintained_fixture_is_migrated_to_v1(self) -> None:
+        for path in discover(CASES):
+            with self.subTest(path=path.name):
+                self.assertEqual("authority-lab-v1", load_fixture(path)["schema_version"])
+
+    def test_unmigrated_v0_schema_cannot_authorize(self) -> None:
+        payload = fixture("LAB-V0-001")
+        payload["schema_version"] = "authority-lab-v0"
+        self.assert_unavailable_with_reason(payload, "LEGACY_SCHEMA_UNAVAILABLE")
+
+    def test_unknown_schema_version_fails_closed(self) -> None:
+        payload = fixture("LAB-V0-001")
+        payload["schema_version"] = "authority-lab-v2"
+        with self.assertRaisesRegex(ValueError, "unsupported fixture schema_version"):
+            OracleInput.from_fixture(payload)
+
+    def test_binding_valid_shortcut_is_rejected(self) -> None:
+        payload = fixture("LAB-V1-032")
+        payload["t3"]["facts"]["objective_binding"]["value"][0][
+            "binding_valid"
+        ] = True
+        with self.assertRaisesRegex(ValueError, "objective_binding candidate"):
+            OracleInput.from_fixture(payload)
+
+    def test_boolean_generation_is_rejected(self) -> None:
+        payload = fixture("LAB-V1-032")
+        payload["t3"]["facts"]["objective_binding"]["value"][0][
+            "binding_generation"
+        ] = True
+        with self.assertRaisesRegex(ValueError, "non-negative integer"):
+            OracleInput.from_fixture(payload)
+
+    def test_missing_binding_is_unavailable(self) -> None:
+        self.assertIs(AuthorityOutcome.UNAVAILABLE, actual(fixture("LAB-V1-013")))
+
+    def test_unknown_binding_source_authority_is_unavailable(self) -> None:
+        self.assertIs(AuthorityOutcome.UNAVAILABLE, actual(fixture("LAB-V1-014")))
+
+    def test_unordered_binding_conflict_is_unavailable(self) -> None:
+        self.assertIs(AuthorityOutcome.UNAVAILABLE, actual(fixture("LAB-V1-015")))
+
+    def test_revoked_binding_is_denied(self) -> None:
+        self.assertIs(AuthorityOutcome.DENIED, actual(fixture("LAB-V1-016")))
+
+    def test_superseding_rejection_is_denied(self) -> None:
+        self.assertIs(AuthorityOutcome.DENIED, actual(fixture("LAB-V1-017")))
+
+    def test_t1_binding_revoked_at_t2_is_denied_at_t3(self) -> None:
+        payload = fixture("LAB-V1-018")
+        self.assertTrue(
+            any(mutation["field"] == "binding_lifecycle" for mutation in payload["t2"]["mutations"])
+        )
+        self.assertIs(AuthorityOutcome.DENIED, actual(payload))
+
+    def test_binding_producers_cannot_establish_source_authority(self) -> None:
+        for case_id in ("LAB-V1-019", "LAB-V1-020", "LAB-V1-021"):
+            with self.subTest(case_id=case_id):
+                self.assertIs(AuthorityOutcome.UNAVAILABLE, actual(fixture(case_id)))
+
+    def test_verifier_pass_without_binding_is_unavailable(self) -> None:
+        self.assertIs(AuthorityOutcome.UNAVAILABLE, actual(fixture("LAB-V1-022")))
+
+    def test_signature_does_not_establish_source_authority(self) -> None:
+        payload = fixture("LAB-V1-023")
+        self.assertEqual("VALID", payload["t3"]["facts"]["signature"]["value"])
+        self.assertIs(AuthorityOutcome.UNAVAILABLE, actual(payload))
+
+    def test_provenance_and_consensus_do_not_launder_source_authority(self) -> None:
+        payload = fixture("LAB-V1-014")
+        payload["t3"]["facts"].update(
+            {
+                "provenance": {"state": "KNOWN", "value": "EXACT"},
+                "consensus": {"state": "KNOWN", "value": "UNANIMOUS"},
+            }
+        )
+        self.assertIs(AuthorityOutcome.UNAVAILABLE, actual(payload))
+
+    def test_model_producer_cannot_launder_an_authorized_root_identity(self) -> None:
+        payload = fixture("LAB-V1-032")
+        candidate = payload["t3"]["facts"]["objective_binding"]["value"][0]
+        before = deepcopy(payload["t3"]["facts"]["objective_binding"]["value"])
+        candidate["producer_kind"] = "MODEL"
+        candidate["producer_id"] = "MODEL-M"
+        payload["t2"]["mutations"].append(
+            {
+                "field": "objective_binding",
+                "before": before,
+                "after": deepcopy(
+                    payload["t3"]["facts"]["objective_binding"]["value"]
+                ),
+            }
+        )
+        self.assertIs(AuthorityOutcome.UNAVAILABLE, actual(payload))
+
+    def test_same_contract_under_wrong_objective_is_unavailable(self) -> None:
+        self.assertIs(AuthorityOutcome.UNAVAILABLE, actual(fixture("LAB-V1-024")))
+
+    def test_wrong_objective_generation_is_unavailable(self) -> None:
+        self.assertIs(AuthorityOutcome.UNAVAILABLE, actual(fixture("LAB-V1-025")))
+
+    def test_wrong_decision_contract_is_unavailable(self) -> None:
+        payload = fixture("LAB-V1-032")
+        payload["t3"]["facts"]["objective_binding"]["value"][0][
+            "contract_id"
+        ] = "OTHER-D"
+        self.assertIs(AuthorityOutcome.UNAVAILABLE, actual(payload))
+
+    def test_cross_boundary_binding_is_unavailable(self) -> None:
+        self.assertIs(AuthorityOutcome.UNAVAILABLE, actual(fixture("LAB-V1-026")))
+
+    def test_revoked_binding_delegate_is_denied(self) -> None:
+        self.assertIs(AuthorityOutcome.DENIED, actual(fixture("LAB-V1-027")))
+
+    def test_derived_contract_without_transformation_admission_is_unavailable(self) -> None:
+        self.assertIs(AuthorityOutcome.UNAVAILABLE, actual(fixture("LAB-V1-028")))
+
+    def test_exact_transformation_admission_can_authorize(self) -> None:
+        self.assertIs(AuthorityOutcome.AUTHORIZED, actual(fixture("LAB-V1-029")))
+
+    def test_stable_transformation_identity_cannot_hide_semantic_change(self) -> None:
+        payload = fixture("LAB-V1-029")
+        fact = payload["t3"]["facts"]["contract_transformation_binding"]
+        payload["t1"]["binding_facts"]["decision_contract_identity"] = deepcopy(
+            payload["t3"]["facts"]["decision_contract_identity"]
+        )
+        payload["t1"]["binding_facts"]["contract_transformation_binding"] = deepcopy(
+            fact
+        )
+        payload["t2"]["mutations"] = []
+        before = deepcopy(fact["value"])
+        fact["value"][0]["target_contract_version"] = "3"
+        payload["t3"]["facts"]["decision_contract_identity"]["value"][
+            "contract_version"
+        ] = "3"
+        payload["t2"]["mutations"].extend(
+            (
+                {
+                    "field": "contract_transformation_binding",
+                    "before": before,
+                    "after": deepcopy(fact["value"]),
+                },
+                {
+                    "field": "decision_contract_identity",
+                    "before": deepcopy(
+                        payload["t1"]["binding_facts"]["decision_contract_identity"][
+                            "value"
+                        ]
+                    ),
+                    "after": deepcopy(
+                        payload["t3"]["facts"]["decision_contract_identity"]["value"]
+                    ),
+                },
+            )
+        )
+        self.assert_unavailable_with_reason(
+            payload, "OBJECTIVE_BINDING_IDENTITY_REUSED"
+        )
+
+    def test_rollback_cannot_outrank_current_rejection(self) -> None:
+        self.assertIs(AuthorityOutcome.DENIED, actual(fixture("LAB-V1-030")))
+
+    def test_missing_authoritative_ordering_is_unavailable(self) -> None:
+        self.assertIs(AuthorityOutcome.UNAVAILABLE, actual(fixture("LAB-V1-031")))
+
+    def test_exact_objective_binding_positive_path_is_authorized(self) -> None:
+        self.assertIs(AuthorityOutcome.AUTHORIZED, actual(fixture("LAB-V1-032")))
+
+    def test_pr15_objective_fidelity_regression_has_three_outcomes(self) -> None:
+        self.assertIs(AuthorityOutcome.UNAVAILABLE, actual(fixture("LAB-V1-013")))
+        self.assertIs(AuthorityOutcome.DENIED, actual(fixture("LAB-V1-016")))
+        self.assertIs(AuthorityOutcome.AUTHORIZED, actual(fixture("LAB-V1-032")))
+
+    def test_cached_t1_binding_does_not_survive_unrecorded_t3_change(self) -> None:
+        payload = fixture("LAB-V1-032")
+        payload["t3"]["facts"]["objective_identity"]["value"][
+            "objective_generation"
+        ] = 2
+        payload["t3"]["facts"]["objective_binding"]["value"][0][
+            "objective_generation"
+        ] = 2
+        self.assert_unavailable_with_reason(
+            payload, "OBJECTIVE_BINDING_IDENTITY_REUSED"
+        )
+
+    def test_missing_t1_binding_cannot_be_repaired_only_at_t3(self) -> None:
+        payload = fixture("LAB-V1-032")
+        payload["t1"]["binding_facts"]["objective_binding"] = {"state": "UNKNOWN"}
+        self.assert_unavailable_with_reason(
+            payload, "T1_OBJECTIVE_BINDING_UNAVAILABLE"
+        )
+
+    def test_current_revocation_precedes_irrelevant_missing_operational_fact(self) -> None:
+        payload = fixture("LAB-V1-016")
+        payload["t3"]["facts"]["execution_context"] = {"state": "UNKNOWN"}
+        self.assertIs(AuthorityOutcome.DENIED, actual(payload))
+
+    def test_unknown_tuple_fact_prevents_speculative_binding_denial(self) -> None:
+        payload = fixture("LAB-V1-016")
+        payload["t3"]["facts"]["subject_identity"] = {"state": "UNKNOWN"}
+        self.assertIs(AuthorityOutcome.UNAVAILABLE, actual(payload))
+
+    def test_ordering_source_must_match_the_admitted_root(self) -> None:
+        payload = fixture("LAB-V1-032")
+        payload["t3"]["facts"]["binding_ordering"]["value"][
+            "ordering_source_id"
+        ] = "REQUESTER-ORDER"
+        self.assertIs(AuthorityOutcome.UNAVAILABLE, actual(payload))
+
+    def test_expected_outcome_remains_outside_v1_oracle_input(self) -> None:
+        payload = fixture("LAB-V1-032")
+        payload["expected_outcome"] = AuthorityOutcome.DENIED.value
+        result = run_fixture(payload)
+        self.assertIs(AuthorityOutcome.AUTHORIZED, result.actual.outcome)
+        self.assertIs(HarnessStatus.CASE_MISMATCH, result.status)
+
+    def test_newer_authoritatively_ordered_admission_can_authorize(self) -> None:
+        payload = fixture("LAB-V1-032")
+        facts = payload["t3"]["facts"]
+        before = {
+            name: deepcopy(facts[name]["value"])
+            for name in ("objective_binding", "binding_lifecycle", "binding_ordering")
+        }
+        old_binding = facts["objective_binding"]["value"][0]
+        new_binding = deepcopy(old_binding)
+        new_binding.update(
+            {
+                "binding_id": f"{old_binding['binding_id']}-G2",
+                "binding_generation": 2,
+            }
+        )
+        old_lifecycle = facts["binding_lifecycle"]["value"][0]
+        new_lifecycle = deepcopy(old_lifecycle)
+        new_lifecycle.update(
+            {
+                "binding_id": new_binding["binding_id"],
+                "binding_generation": 2,
+                "event_id": f"{old_lifecycle['event_id']}-G2",
+                "event_order": 2,
+            }
+        )
+        facts["objective_binding"]["value"] = [old_binding, new_binding]
+        facts["binding_lifecycle"]["value"] = [old_lifecycle, new_lifecycle]
+        facts["binding_ordering"]["value"].update(
+            {
+                "head_binding_id": new_binding["binding_id"],
+                "head_binding_generation": 2,
+                "head_event_order": 2,
+            }
+        )
+        observation = facts["evidence_binding"]["value"]
+        observation["objective_binding_id"] = new_binding["binding_id"]
+        observation["objective_binding_generation"] = new_binding[
+            "binding_generation"
+        ]
+        reissue_observation_commitment(payload)
+        for name, old_value in before.items():
+            payload["t2"]["mutations"].append(
+                {
+                    "field": name,
+                    "before": old_value,
+                    "after": deepcopy(facts[name]["value"]),
+                }
+            )
+        self.assertIs(AuthorityOutcome.AUTHORIZED, actual(payload))
+
+    def test_stable_binding_identity_cannot_hide_policy_change(self) -> None:
+        payload = fixture("LAB-V1-032")
+        facts = payload["t3"]["facts"]
+        for name in ("objective_identity", "objective_binding"):
+            before = deepcopy(facts[name]["value"])
+            if name == "objective_identity":
+                facts[name]["value"]["policy_version"] = "2"
+            else:
+                facts[name]["value"][0]["policy_version"] = "2"
+            payload["t2"]["mutations"].append(
+                {
+                    "field": name,
+                    "before": before,
+                    "after": deepcopy(facts[name]["value"]),
+                }
+            )
+        self.assert_unavailable_with_reason(
+            payload, "OBJECTIVE_BINDING_IDENTITY_REUSED"
+        )
+
+    def test_candidate_array_order_cannot_overrule_authoritative_head(self) -> None:
+        payload = fixture("LAB-V1-030")
+        self.assertEqual(
+            "REJECT",
+            payload["t3"]["facts"]["objective_binding"]["value"][0][
+                "disposition"
+            ],
+        )
+        self.assertIs(AuthorityOutcome.DENIED, actual(payload))
+
+    def test_v1_trace_includes_t1_and_transformation_admission_facts(self) -> None:
+        trace = format_trace(run_path(CASES / "LAB-V1-029.json"))
+        self.assertIn("T1\nresult: AUTHORIZED\nobjective_identity: KNOWN", trace)
+        self.assertIn("contract_transformation_binding: KNOWN", trace)
+
     def test_oracle_execution_requires_no_network(self) -> None:
         with patch("socket.socket", side_effect=AssertionError("network access attempted")):
             results = [run_path(path) for path in discover(CASES)]
@@ -727,6 +1375,1409 @@ class AuthorityLabTests(unittest.TestCase):
         self.assertEqual(0, completed.returncode, completed.stderr)
         self.assertIn("CASE: LAB-V0-003", completed.stdout)
         self.assertIn("HARNESS_STATUS:\nPASS", completed.stdout)
+
+    def test_mutation_registry_canonical_vocabulary_is_exact(self) -> None:
+        self.assertEqual(
+            (
+                "subject",
+                "artifact",
+                "control_state",
+                "identity_basis",
+                "boundary_epoch",
+                "decision",
+                "applicable_boundary",
+                "consumption_state",
+                "decision_binding",
+                "evidence_id",
+                "execution_context",
+                "grant_id",
+                "subject_mode",
+                "boundary_epoch_binding",
+                "closure_binding",
+                "consumption_binding",
+                "delegation_binding",
+                "evidence_binding",
+                "execution_control_binding",
+                "freshness",
+                "authority_root",
+                "binding_lifecycle",
+                "binding_ordering",
+                "binding_source_authority",
+                "contract_transformation_binding",
+                "decision_contract_identity",
+                "objective_binding",
+                "objective_identity",
+                "commit_state",
+                "credential_identity",
+                "tool_connector_identity",
+            ),
+            MUTATION_CANONICAL_FIELDS,
+        )
+
+    def test_mutation_registry_legacy_aliases_are_exact(self) -> None:
+        self.assertEqual(
+            {
+                "principal": "subject",
+                "privilege": "control_state",
+                "consumption": "consumption_state",
+                "actor_context": "execution_context",
+                "credential": "credential_identity",
+                "connector_endpoint": "tool_connector_identity",
+            },
+            dict(MUTATION_LEGACY_ALIASES),
+        )
+
+    def test_mutation_registry_is_immutable(self) -> None:
+        with self.assertRaises(TypeError):
+            MUTATION_REGISTRY["execution_host"] = MUTATION_SPECS[0]  # type: ignore[index]
+        with self.assertRaises(TypeError):
+            MUTATION_LEGACY_ALIASES["host"] = "control_state"  # type: ignore[index]
+
+    def test_every_registry_spec_has_an_evaluator_target(self) -> None:
+        target_sets = {
+            MutationTargetKind.STATE: set(STATE_MUTATION_TARGETS),
+            MutationTargetKind.RELATION: set(RELATIONAL_MUTATION_TARGETS),
+            MutationTargetKind.BINDING: set(BINDING_MUTATION_TARGETS),
+            MutationTargetKind.FACT: set(FACT_MUTATION_TARGETS),
+        }
+        for spec in MUTATION_SPECS:
+            with self.subTest(field=spec.canonical_field):
+                self.assertIn(spec.target, target_sets[spec.target_kind])
+                self.assertIs(spec, MUTATION_REGISTRY[spec.canonical_field])
+                for alias in spec.legacy_aliases:
+                    self.assertIs(spec, MUTATION_REGISTRY[alias])
+
+    def test_original_execution_host_counterexample_is_unavailable(self) -> None:
+        payload = fixture("LAB-V1-032")
+        payload["t2"]["mutations"].append(
+            {
+                "field": "execution_host",
+                "before": "SANDBOX-S1",
+                "after": "HOST-S2",
+            }
+        )
+        self.assert_unavailable_with_reason(payload, "UNKNOWN_MUTATION_FIELD")
+
+    def test_all_fourteen_demonstrated_unregistered_mutations_fail_closed(self) -> None:
+        counterexamples = (
+            ("execution_host", "SANDBOX-S1", "HOST-S2"),
+            ("process_identity", "PROCESS-P1", "CHILD-P2"),
+            ("acting_agent", "AGENT-A", "AGENT-B"),
+            ("tool_identity", "TOOL-X", "TOOL-Y"),
+            ("connector_identity", "CONNECTOR-X", "CONNECTOR-Y"),
+            ("credential_context", "CRED-A", "CRED-B"),
+            ("trust_domain", "DOMAIN-A", "DOMAIN-B"),
+            ("tenant_account", "TENANT-A", "TENANT-B"),
+            ("network_boundary", "PRIVATE-NET", "EXTERNAL-NET"),
+            ("process_instance", "INSTANCE-1", "INSTANCE-2"),
+            ("authority_state_representation", "RAW", "SUMMARY"),
+            ("authority_consumer", "AGENT-A", "AGENT-B"),
+            ("relay_actor", "AUTHORIZED-A", "UNAUTHORIZED-B"),
+            ("execution_principal", "PRINCIPAL-A", "PRINCIPAL-B"),
+        )
+        for field, before, after in counterexamples:
+            with self.subTest(field=field):
+                payload = fixture("LAB-V1-032")
+                payload["t2"]["mutations"].append(
+                    {"field": field, "before": before, "after": after}
+                )
+                self.assert_unavailable_with_reason(payload, "UNKNOWN_MUTATION_FIELD")
+
+    def test_unknown_mutation_precedes_otherwise_established_denial(self) -> None:
+        payload = fixture("LAB-V1-032")
+        payload["t2"]["mutations"].append(
+            {"field": "execution_host", "before": "S1", "after": "S2"}
+        )
+        payload["t3"]["prohibition"] = {
+            "state": "KNOWN",
+            "applies": True,
+            "id": "APPARENT_PROHIBITION",
+        }
+        self.assert_unavailable_with_reason(payload, "UNKNOWN_MUTATION_FIELD")
+
+    def test_structurally_valid_unknown_names_are_unavailable(self) -> None:
+        for field in (
+            "executionhost",
+            "wrapper_execution_host",
+            "runtime_execution_host",
+            "execution_host_v2",
+            "host",
+            "acting_subject",
+            "acknowledgment",
+            "monitor_context",
+        ):
+            with self.subTest(field=field):
+                payload = fixture("LAB-V1-032")
+                payload["t2"]["mutations"].append(
+                    {"field": field, "before": "BEFORE", "after": "AFTER"}
+                )
+                self.assert_unavailable_with_reason(payload, "UNKNOWN_MUTATION_FIELD")
+
+    def test_malformed_mutation_names_remain_input_failures(self) -> None:
+        for field in (
+            "Execution_Host",
+            " execution_host",
+            "execution_host ",
+            "execution-host",
+            "runtime.execution_host",
+            "wrapper.execution_host",
+            "executiοn_host",
+            "execution_\u200bhost",
+        ):
+            with self.subTest(field=field):
+                payload = fixture("LAB-V1-032")
+                payload["t2"]["mutations"].append(
+                    {"field": field, "before": "BEFORE", "after": "AFTER"}
+                )
+                with self.assertRaises(ValueError):
+                    OracleInput.from_fixture(payload)
+
+    def test_malformed_mutation_structures_remain_input_failures(self) -> None:
+        malformed = (
+            {"field": "control_state", "before": "C1"},
+            {"field": "control_state", "before": "C1", "after": "C2", "extra": True},
+            {"field": {"wrapped": "control_state"}, "before": "C1", "after": "C2"},
+            {"wrapper": {"field": "control_state", "before": "C1", "after": "C2"}},
+        )
+        for mutation in malformed:
+            with self.subTest(mutation=mutation):
+                payload = fixture("LAB-V1-032")
+                payload["t2"]["mutations"] = [mutation]
+                with self.assertRaises(ValueError):
+                    OracleInput.from_fixture(payload)
+
+    def test_malformed_typed_mutation_values_remain_input_failures(self) -> None:
+        for mutation in (
+            {"field": "control_state", "before": 1, "after": "C2"},
+            {"field": "boundary_epoch_binding", "before": [], "after": {}},
+            {"field": "objective_binding", "before": {}, "after": {}},
+        ):
+            with self.subTest(mutation=mutation):
+                payload = fixture("LAB-V1-032")
+                payload["t2"]["mutations"] = [mutation]
+                with self.assertRaises(ValueError):
+                    OracleInput.from_fixture(payload)
+
+    def test_noop_mutation_is_an_input_failure(self) -> None:
+        payload = fixture("LAB-V1-032")
+        payload["t2"]["mutations"].append(
+            {"field": "control_state", "before": "C1", "after": "C1"}
+        )
+        with self.assertRaises(ValueError):
+            OracleInput.from_fixture(payload)
+
+    def test_retained_legacy_aliases_resolve_to_checked_targets(self) -> None:
+        aliases = (
+            ("principal", "S", "S2", "subject"),
+            ("privilege", "C1", "C2", "control_state"),
+            ("consumption", "UNUSED", "CONSUMED", "consumption_state"),
+            ("actor_context", "E1", "E2", "execution_context"),
+            ("credential", "CREDENTIAL-1", "CREDENTIAL-2", "credential_identity"),
+            ("connector_endpoint", "CONNECTOR-1", "CONNECTOR-2", "tool_connector_identity"),
+        )
+        for field, before, after, target in aliases:
+            with self.subTest(field=field):
+                payload = fixture("LAB-V1-032")
+                payload["t2"]["mutations"].append(
+                    {"field": field, "before": before, "after": after}
+                )
+                oracle_input = OracleInput.from_fixture(payload)
+                self.assertEqual(target, oracle_input.t2_mutations[0].target)
+                self.assertIsNotNone(oracle_input.t2_mutations[0].canonical_field)
+                self.assertIs(AuthorityOutcome.UNAVAILABLE, evaluate(oracle_input).outcome)
+
+    def test_duplicate_same_transition_is_unavailable(self) -> None:
+        payload = fixture("LAB-V1-032")
+        payload["t2"]["mutations"].extend(
+            [
+                {"field": "control_state", "before": "C1", "after": "C2"},
+                {"field": "control_state", "before": "C1", "after": "C2"},
+            ]
+        )
+        self.assert_unavailable_with_reason(payload, "T2_T3_HYBRID_STATE")
+
+    def test_duplicate_conflicting_transition_is_unavailable(self) -> None:
+        payload = fixture("LAB-V1-032")
+        payload["t2"]["mutations"].extend(
+            [
+                {"field": "control_state", "before": "C1", "after": "C2"},
+                {"field": "control_state", "before": "C1", "after": "C3"},
+            ]
+        )
+        self.assert_unavailable_with_reason(payload, "T2_T3_HYBRID_STATE")
+
+    def test_reversed_transition_order_is_unavailable(self) -> None:
+        payload = fixture("LAB-V1-032")
+        payload["t2"]["mutations"].extend(
+            [
+                {"field": "control_state", "before": "C2", "after": "C3"},
+                {"field": "control_state", "before": "C1", "after": "C2"},
+            ]
+        )
+        self.assert_unavailable_with_reason(payload, "T2_T3_HYBRID_STATE")
+
+    def test_canonical_and_alias_conflict_share_one_chain(self) -> None:
+        payload = fixture("LAB-V1-032")
+        payload["t2"]["mutations"].extend(
+            [
+                {"field": "control_state", "before": "C1", "after": "C2"},
+                {"field": "privilege", "before": "C1", "after": "C3"},
+            ]
+        )
+        self.assert_unavailable_with_reason(payload, "T2_T3_HYBRID_STATE")
+
+    def test_canonical_and_unknown_combination_is_unavailable_as_unknown(self) -> None:
+        payload = fixture("LAB-V1-032")
+        payload["t2"]["mutations"].extend(
+            [
+                {"field": "control_state", "before": "C1", "after": "C2"},
+                {"field": "execution_host", "before": "S1", "after": "S2"},
+            ]
+        )
+        self.assert_unavailable_with_reason(payload, "UNKNOWN_MUTATION_FIELD")
+
+    def test_round_trip_state_transition_requires_fresh_reestablishment(self) -> None:
+        payload = fixture("LAB-V1-032")
+        payload["t2"]["mutations"].extend(
+            [
+                {"field": "control_state", "before": "C1", "after": "C2"},
+                {"field": "control_state", "before": "C2", "after": "C1"},
+            ]
+        )
+        self.assert_unavailable_with_reason(payload, "T1_T3_RELATIONSHIP_UNAVAILABLE")
+
+    def test_hostile_mutation_fixture_matrix_matches_independent_expectations(self) -> None:
+        expected = {
+            **{f"LAB-V1-{number:03d}": AuthorityOutcome.UNAVAILABLE for number in range(33, 46)},
+            "LAB-V1-046": AuthorityOutcome.DENIED,
+            "LAB-V1-047": AuthorityOutcome.UNAVAILABLE,
+            "LAB-V1-048": AuthorityOutcome.AUTHORIZED,
+        }
+        for case_id, outcome in expected.items():
+            with self.subTest(case_id=case_id):
+                result = run_path(CASES / f"{case_id}.json")
+                self.assertIs(HarnessStatus.PASS, result.status)
+                self.assertIs(outcome, result.actual.outcome)
+
+    def test_prohibited_cross_boundary_transition_is_denied(self) -> None:
+        result = evaluate(OracleInput.from_fixture(fixture("LAB-V1-046")))
+        self.assertIs(AuthorityOutcome.DENIED, result.outcome)
+        self.assertIn("ESTABLISHED_PROHIBITION", {reason.code for reason in result.reasons})
+
+    def test_fresh_cross_boundary_reestablishment_is_authorized(self) -> None:
+        result = evaluate(OracleInput.from_fixture(fixture("LAB-V1-048")))
+        self.assertIs(AuthorityOutcome.AUTHORIZED, result.outcome)
+        self.assertIn("CURRENT_AUTHORITY_ESTABLISHED", {reason.code for reason in result.reasons})
+
+    def test_stale_cross_boundary_reestablishment_is_unavailable(self) -> None:
+        payload = fixture("LAB-V1-048")
+        payload["t3"]["reestablishment"]["value"]["current"]["evidence_id"] = "EV-A-B1"
+        self.assert_unavailable_with_reason(payload, "REESTABLISHMENT_EVIDENCE_REUSED")
+
+    def test_unknown_value_comparison_is_type_exact(self) -> None:
+        payload = fixture("LAB-V1-032")
+        payload["t2"]["mutations"].append(
+            {"field": "unknown_numeric_context", "before": 1, "after": True}
+        )
+        self.assert_unavailable_with_reason(payload, "UNKNOWN_MUTATION_FIELD")
+
+    def test_boundary_laundering_fixtures_remain_unavailable(self) -> None:
+        for case_id in (
+            "LAB-V1-036",
+            "LAB-V1-042",
+            "LAB-V1-043",
+        ):
+            with self.subTest(case_id=case_id):
+                self.assertIs(AuthorityOutcome.UNAVAILABLE, actual(fixture(case_id)))
+
+    def test_unknown_mutation_expectation_cannot_control_oracle(self) -> None:
+        payload = fixture("LAB-V1-033")
+        payload["expected_outcome"] = "AUTHORIZED"
+        result = run_fixture(payload)
+        self.assertIs(AuthorityOutcome.UNAVAILABLE, result.actual.outcome)
+        self.assertIs(HarnessStatus.CASE_MISMATCH, result.status)
+
+    def test_trace_exposes_mutation_resolution(self) -> None:
+        unknown_trace = format_trace(run_path(CASES / "LAB-V1-033.json"))
+        alias_trace = format_trace(run_path(CASES / "LAB-V1-044.json"))
+        self.assertIn("execution_host [UNKNOWN]", unknown_trace)
+        self.assertIn(
+            "actor_context [canonical=execution_context; target=STATE:execution_context]",
+            alias_trace,
+        )
+
+    def test_observation_hostile_fixture_matrix_matches_independent_expectations(self) -> None:
+        expected = {
+            **{f"LAB-V1-{number:03d}": AuthorityOutcome.UNAVAILABLE for number in range(49, 58)},
+            "LAB-V1-058": AuthorityOutcome.AUTHORIZED,
+            **{f"LAB-V1-{number:03d}": AuthorityOutcome.UNAVAILABLE for number in range(59, 66)},
+            "LAB-V1-066": AuthorityOutcome.AUTHORIZED,
+            "LAB-V1-067": AuthorityOutcome.DENIED,
+            "LAB-V1-068": AuthorityOutcome.AUTHORIZED,
+        }
+        for case_id, outcome in expected.items():
+            with self.subTest(case_id=case_id):
+                result = run_path(CASES / f"{case_id}.json")
+                self.assertIs(HarnessStatus.PASS, result.status)
+                self.assertIs(outcome, result.actual.outcome)
+
+    def test_observation_profile_and_scope_vocabulary_are_frozen(self) -> None:
+        self.assertEqual("AUTHORITY-LAB-OBSERVATION-PROFILE-1", OBSERVATION_PROFILE_ID)
+        self.assertEqual(1, OBSERVATION_PROFILE_VERSION)
+        self.assertEqual(
+            (
+                "SUBJECT_AND_DELEGATION",
+                "ARTIFACT_AND_TRANSFORMATION",
+                "EXECUTION_CONTROL",
+                "BOUNDARY_AND_EPOCH",
+                "CREDENTIAL_AND_IDENTITY",
+                "GRANT_USE_AND_CONSUMPTION",
+                "OBJECTIVE_AUTHORITY_LIFECYCLE",
+                "OBSERVATION_PIPELINE",
+            ),
+            OBSERVATION_SCOPE_FAMILIES,
+        )
+
+    def test_absence_of_observation_cannot_imply_continuity(self) -> None:
+        payload = fixture("LAB-V1-032")
+        payload["t3"]["facts"]["evidence_binding"]["value"] = "EXACT"
+        payload["t3"]["facts"]["freshness"]["value"] = "CURRENT"
+        self.assert_unavailable_with_reason(payload, "OBSERVATION_ADMISSION_UNAVAILABLE")
+
+    def test_unchecked_observation_completeness_boolean_is_malformed(self) -> None:
+        payload = fixture("LAB-V1-032")
+        payload["t3"]["facts"]["evidence_binding"]["value"][
+            "observations_complete"
+        ] = True
+        with self.assertRaises(ValueError):
+            OracleInput.from_fixture(payload)
+
+    def test_root_observer_cycle_is_unavailable(self) -> None:
+        payload = fixture("LAB-V1-032")
+        root_id = payload["t3"]["facts"]["authority_root"]["value"]["root_id"]
+        observation = payload["t3"]["facts"]["evidence_binding"]["value"]
+        observation["observers"][0]["observer_id"] = root_id
+        observation["segments"][0]["observer_id"] = root_id
+        observation["lifecycle_records"][1]["target_id"] = root_id
+        self.assert_unavailable_with_reason(payload, "OBSERVATION_ADMISSION_UNAVAILABLE")
+
+    def test_delegate_observer_widening_is_unavailable(self) -> None:
+        payload = fixture("LAB-V1-051")
+        self.assert_unavailable_with_reason(payload, "OBSERVATION_ADMISSION_UNAVAILABLE")
+        payload["t3"]["facts"]["evidence_binding"]["value"]["source_id"] = (
+            "ROOT-AUTH-BOUNDARY-1"
+        )
+        observation = payload["t3"]["facts"]["evidence_binding"]["value"]
+        observation["anchor_source_admissions"][0]["source_id"] = (
+            "ROOT-AUTH-BOUNDARY-1"
+        )
+        reissue_observation_commitment(payload)
+        self.assertIs(AuthorityOutcome.AUTHORIZED, actual(payload))
+
+    def test_coverage_and_restart_gaps_are_unavailable(self) -> None:
+        for case_id in ("LAB-V1-054", "LAB-V1-055"):
+            with self.subTest(case_id=case_id):
+                self.assert_unavailable_with_reason(
+                    fixture(case_id), "OBSERVATION_COVERAGE_UNAVAILABLE"
+                )
+
+    def test_substitution_requires_exact_root_issued_handoff(self) -> None:
+        self.assert_unavailable_with_reason(
+            fixture("LAB-V1-057"), "OBSERVER_HANDOFF_UNAVAILABLE"
+        )
+        self.assertIs(AuthorityOutcome.AUTHORIZED, actual(fixture("LAB-V1-058")))
+
+    def test_conflicting_observers_fail_closed_without_voting(self) -> None:
+        self.assert_unavailable_with_reason(
+            fixture("LAB-V1-059"), "OBSERVATION_CONFLICTING"
+        )
+
+    def test_observation_laundering_paths_are_unavailable(self) -> None:
+        expected_reasons = {
+            "LAB-V1-061": "OBSERVATION_TRANSFORMATION_UNAVAILABLE",
+            "LAB-V1-062": "OBSERVATION_TRANSFORMATION_UNAVAILABLE",
+            "LAB-V1-063": "OBSERVATION_ADMISSION_UNAVAILABLE",
+            "LAB-V1-064": "OBSERVATION_ADMISSION_UNAVAILABLE",
+            "LAB-V1-065": "OBSERVATION_TRANSFORMATION_UNAVAILABLE",
+        }
+        for case_id, reason in expected_reasons.items():
+            with self.subTest(case_id=case_id):
+                self.assert_unavailable_with_reason(fixture(case_id), reason)
+
+    def test_duplicate_observation_segment_is_idempotent_but_conflict_is_not(self) -> None:
+        payload = fixture("LAB-V1-032")
+        segments = payload["t3"]["facts"]["evidence_binding"]["value"]["segments"]
+        segments.append(deepcopy(segments[0]))
+        self.assertIs(AuthorityOutcome.AUTHORIZED, actual(payload))
+        segments[-1]["stream_commitment"] = "CONFLICTING-COMMITMENT"
+        self.assert_unavailable_with_reason(payload, "OBSERVATION_CONFLICTING")
+
+    def test_reordered_stream_sequence_cannot_hide_behind_interval_coverage(self) -> None:
+        payload = fixture("LAB-V1-032")
+        segments = payload["t3"]["facts"]["evidence_binding"]["value"]["segments"]
+        segments[0].update(
+            {"end_anchor_id": "MID", "end_event_order": 2, "end_sequence": 10}
+        )
+        after = deepcopy(segments[0])
+        after.update(
+            {
+                "segment_id": "SEGMENT-REORDERED-AFTER",
+                "start_anchor_id": "MID",
+                "start_event_order": 2,
+                "end_anchor_id": payload["t3"]["facts"]["evidence_binding"]["value"][
+                    "t3_anchor"
+                ]["anchor_id"],
+                "end_event_order": 3,
+                "start_sequence": 1,
+                "end_sequence": 2,
+            }
+        )
+        segments.append(after)
+        self.assert_unavailable_with_reason(payload, "OBSERVATION_ORDERING_UNAVAILABLE")
+
+    def test_multihop_transformation_cannot_drop_scope(self) -> None:
+        payload = fixture("LAB-V1-061")
+        transformations = payload["t3"]["facts"]["evidence_binding"]["value"][
+            "transformations"
+        ]
+        first = transformations[0]
+        first["scope_families"] = deepcopy(
+            payload["t3"]["facts"]["evidence_binding"]["value"]["segments"][0][
+                "scope_families"
+            ]
+        )
+        second = deepcopy(first)
+        second.update(
+            {
+                "transformation_id": "TRANSFORM-MULTIHOP-LOSS",
+                "source_stream_id": first["target_stream_id"],
+                "source_stream_generation": first["target_stream_generation"],
+                "source_commitment": first["target_commitment"],
+                "target_stream_id": "SUMMARY-MULTIHOP-LOSS",
+                "target_commitment": "SUMMARY-COMMITMENT-MULTIHOP-LOSS",
+                "scope_families": first["scope_families"][:-1],
+            }
+        )
+        transformations.append(second)
+        self.assert_unavailable_with_reason(
+            payload, "OBSERVATION_TRANSFORMATION_UNAVAILABLE"
+        )
+
+    def test_current_root_issued_observer_revocation_is_denied(self) -> None:
+        result = evaluate(OracleInput.from_fixture(fixture("LAB-V1-067")))
+        self.assertIs(AuthorityOutcome.DENIED, result.outcome)
+        self.assertIn("OBSERVATION_SOURCE_REVOKED", {r.code for r in result.reasons})
+
+    def test_positive_root_issued_observation_path_remains_authorized(self) -> None:
+        for case_id in ("LAB-V1-066", "LAB-V1-068"):
+            with self.subTest(case_id=case_id):
+                result = evaluate(OracleInput.from_fixture(fixture(case_id)))
+                self.assertIs(AuthorityOutcome.AUTHORIZED, result.outcome)
+                self.assertIn(
+                    "CURRENT_AUTHORITY_ESTABLISHED",
+                    {reason.code for reason in result.reasons},
+                )
+
+    def test_trace_exposes_observation_admission_and_coverage(self) -> None:
+        trace = format_trace(run_path(CASES / "LAB-V1-058.json"))
+        self.assertIn("OBSERVATION\nprofile: AUTHORITY-LAB-OBSERVATION-PROFILE-1@1", trace)
+        self.assertIn("handoff: HANDOFF-LAB-V1-058", trace)
+        self.assertIn("gaps: none", trace)
+        self.assertIn("freshness: T3-ANCHOR-LAB-V1-032@3", trace)
+
+    def test_shutdown_successor_fixture_matrix_matches_independent_expectations(self) -> None:
+        expected = {
+            **{f"LAB-V1-{number:03d}": AuthorityOutcome.UNAVAILABLE for number in range(69, 78)},
+            "LAB-V1-078": AuthorityOutcome.DENIED,
+            **{f"LAB-V1-{number:03d}": AuthorityOutcome.UNAVAILABLE for number in range(79, 84)},
+            "LAB-V1-084": AuthorityOutcome.AUTHORIZED,
+            "LAB-V1-085": AuthorityOutcome.AUTHORIZED,
+            **{f"LAB-V1-{number:03d}": AuthorityOutcome.UNAVAILABLE for number in range(86, 89)},
+        }
+        for case_id, outcome in expected.items():
+            with self.subTest(case_id=case_id):
+                result = run_path(CASES / f"{case_id}.json")
+                self.assertIs(HarnessStatus.PASS, result.status)
+                self.assertIs(outcome, result.actual.outcome)
+
+    def test_every_registry_spec_has_immutable_continuity_metadata(self) -> None:
+        for spec in MUTATION_SPECS:
+            with self.subTest(field=spec.canonical_field):
+                self.assertIsInstance(spec.continuity_effects, tuple)
+                self.assertTrue(spec.continuity_effects)
+                self.assertTrue(all(isinstance(item, ContinuityEffect) for item in spec.continuity_effects))
+                self.assertIsInstance(spec.observation_scope_families, tuple)
+                self.assertTrue(spec.observation_scope_families)
+                self.assertLessEqual(
+                    set(spec.observation_scope_families), set(OBSERVATION_SCOPE_FAMILIES)
+                )
+
+    def test_execution_and_subject_aba_paths_remain_unavailable(self) -> None:
+        for case_id in ("LAB-V1-069", "LAB-V1-070"):
+            with self.subTest(case_id=case_id):
+                self.assert_unavailable_with_reason(
+                    fixture(case_id), "PREDECESSOR_GRANT_NONPORTABLE"
+                )
+
+    def test_boundary_epoch_aba_is_non_restorable(self) -> None:
+        self.assert_unavailable_with_reason(
+            fixture("LAB-V1-071"), "BOUNDARY_EPOCH_REUSE_UNAVAILABLE"
+        )
+
+    def test_restart_and_generic_evidence_cannot_reuse_predecessor_grant(self) -> None:
+        for case_id in ("LAB-V1-072", "LAB-V1-073"):
+            with self.subTest(case_id=case_id):
+                self.assert_unavailable_with_reason(
+                    fixture(case_id), "PREDECESSOR_GRANT_NONPORTABLE"
+                )
+
+    def test_fresh_generic_evidence_and_grant_do_not_admit_a_successor(self) -> None:
+        payload = fixture("LAB-V1-069")
+        payload["t2"]["mutations"].append(
+            {"field": "grant_id", "before": "GRANT-001", "after": "GENERIC-GRANT-NEW"}
+        )
+        payload["t3"]["facts"]["consumption_binding"]["value"]["grant_id"] = (
+            "GENERIC-GRANT-NEW"
+        )
+        payload["t3"]["reestablishment"]["value"]["current"]["grant_id"] = (
+            "GENERIC-GRANT-NEW"
+        )
+        self.assert_unavailable_with_reason(payload, "SUCCESSOR_AUTHORITY_UNAVAILABLE")
+
+    def test_credential_checkpoint_and_alternate_path_do_not_port_authority(self) -> None:
+        for case_id in ("LAB-V1-075", "LAB-V1-076", "LAB-V1-077"):
+            with self.subTest(case_id=case_id):
+                self.assert_unavailable_with_reason(
+                    fixture(case_id), "PREDECESSOR_GRANT_NONPORTABLE"
+                )
+
+    def test_restored_labels_do_not_evade_exact_current_revocation(self) -> None:
+        result = evaluate(OracleInput.from_fixture(fixture("LAB-V1-078")))
+        self.assertIs(AuthorityOutcome.DENIED, result.outcome)
+        self.assertIn("ESTABLISHED_PROHIBITION", {reason.code for reason in result.reasons})
+
+    def test_terminal_observation_failures_remain_fail_closed(self) -> None:
+        expected_reasons = {
+            "LAB-V1-079": "OBSERVATION_FRESHNESS_UNAVAILABLE",
+            "LAB-V1-080": "OBSERVATION_TRANSFORMATION_UNAVAILABLE",
+            "LAB-V1-081": "TERMINAL_EVENT_ORDERING_UNAVAILABLE",
+            "LAB-V1-082": "TERMINAL_EVENT_ORDERING_UNAVAILABLE",
+            "LAB-V1-083": "OBSERVATION_CONFLICTING",
+        }
+        for case_id, reason in expected_reasons.items():
+            with self.subTest(case_id=case_id):
+                self.assert_unavailable_with_reason(fixture(case_id), reason)
+
+    def test_fresh_successor_and_legitimate_reentry_are_authorized(self) -> None:
+        for case_id in ("LAB-V1-084", "LAB-V1-085"):
+            with self.subTest(case_id=case_id):
+                result = evaluate(OracleInput.from_fixture(fixture(case_id)))
+                self.assertIs(AuthorityOutcome.AUTHORIZED, result.outcome)
+                self.assertIn(
+                    "CURRENT_AUTHORITY_ESTABLISHED",
+                    {reason.code for reason in result.reasons},
+                )
+
+    def test_handoff_does_not_transfer_execution_authority(self) -> None:
+        self.assert_unavailable_with_reason(
+            fixture("LAB-V1-087"), "PREDECESSOR_GRANT_NONPORTABLE"
+        )
+
+    def test_identical_code_does_not_establish_execution_identity(self) -> None:
+        self.assert_unavailable_with_reason(
+            fixture("LAB-V1-088"), "PREDECESSOR_GRANT_NONPORTABLE"
+        )
+
+    def test_trace_exposes_continuity_effect_and_observation_scope(self) -> None:
+        trace = format_trace(run_path(CASES / "LAB-V1-069.json"))
+        self.assertIn("continuity_effects=IDENTITY_DISCONTINUITY", trace)
+        self.assertIn("observation_scopes=EXECUTION_CONTROL,CREDENTIAL_AND_IDENTITY", trace)
+        self.assertIn("path_aba_targets: execution_context", trace)
+        self.assertIn("successor_admission_required: true", trace)
+
+    def test_commitment_hostile_matrix_matches_independent_expectations(self) -> None:
+        for number in range(89, 113):
+            case_id = f"LAB-V1-{number:03d}"
+            with self.subTest(case_id=case_id):
+                self.assertIs(HarnessStatus.PASS, run_fixture(fixture(case_id)).status)
+
+    def test_commitment_digest_is_recomputed_from_exact_body(self) -> None:
+        payload = fixture("LAB-V1-032")
+        binding = payload["t3"]["facts"]["evidence_binding"]["value"]
+        binding["commitment_envelopes"][0]["objective_binding_id"] += "-ALTERED"
+        self.assert_unavailable_with_reason(payload, "OBSERVATION_COMMITMENT_CONFLICTING")
+
+    def test_isolated_equivocation_is_unavailable(self) -> None:
+        self.assert_unavailable_with_reason(
+            fixture("LAB-V1-090"), "OBSERVATION_COMMITMENT_EQUIVOCATION"
+        )
+
+    def test_replay_after_newer_checkpoint_is_unavailable(self) -> None:
+        self.assert_unavailable_with_reason(
+            fixture("LAB-V1-091"), "OBSERVATION_COMMITMENT_REPLAY"
+        )
+
+    def test_stream_generation_replay_is_unavailable(self) -> None:
+        self.assert_unavailable_with_reason(
+            fixture("LAB-V1-092"), "OBSERVATION_VERIFIER_STATE_UNAVAILABLE"
+        )
+
+    def test_self_updated_freshness_is_unavailable(self) -> None:
+        self.assert_unavailable_with_reason(
+            fixture("LAB-V1-094"), "OBSERVATION_FRESHNESS_UNAVAILABLE"
+        )
+
+    def test_missing_predecessor_relation_is_unavailable(self) -> None:
+        self.assert_unavailable_with_reason(
+            fixture("LAB-V1-095"), "OBSERVATION_COMMITMENT_UNIQUENESS_UNAVAILABLE"
+        )
+
+    def test_verifier_state_loss_and_rollback_fail_closed(self) -> None:
+        expected = {
+            "LAB-V1-103": "OBSERVATION_VERIFIER_STATE_UNAVAILABLE",
+            "LAB-V1-104": "OBSERVATION_VERIFIER_ROLLBACK",
+        }
+        for case_id, reason in expected.items():
+            with self.subTest(case_id=case_id):
+                self.assert_unavailable_with_reason(fixture(case_id), reason)
+
+    def test_subject_cannot_be_commitment_verifier(self) -> None:
+        self.assert_unavailable_with_reason(
+            fixture("LAB-V1-105"), "OBSERVATION_COMMITMENT_AUTHENTICITY_UNAVAILABLE"
+        )
+
+    def test_conflicting_witness_cannot_create_authority(self) -> None:
+        self.assert_unavailable_with_reason(
+            fixture("LAB-V1-106"), "OBSERVATION_WITNESS_CONFLICTING"
+        )
+
+    def test_incomplete_committed_scope_is_unavailable(self) -> None:
+        self.assert_unavailable_with_reason(
+            fixture("LAB-V1-107"), "OBSERVATION_COMMITMENT_CONFLICTING"
+        )
+
+    def test_unverified_commitment_is_unavailable(self) -> None:
+        self.assert_unavailable_with_reason(
+            fixture("LAB-V1-108"), "OBSERVATION_COMMITMENT_AUTHENTICITY_UNAVAILABLE"
+        )
+
+    def test_verification_must_bind_exact_issuer_key(self) -> None:
+        payload = fixture("LAB-V1-032")
+        verification = payload["t3"]["facts"]["evidence_binding"]["value"][
+            "commitment_verifications"
+        ][0]
+        verification["issuer_key_id"] = "UNRELATED-KEY"
+        self.assert_unavailable_with_reason(
+            payload, "OBSERVATION_COMMITMENT_AUTHENTICITY_UNAVAILABLE"
+        )
+
+    def test_commitment_without_checkpoint_is_unavailable(self) -> None:
+        self.assert_unavailable_with_reason(
+            fixture("LAB-V1-109"), "OBSERVATION_COMMITMENT_UNIQUENESS_UNAVAILABLE"
+        )
+
+    def test_candidate_fixture_cannot_supply_trusted_state(self) -> None:
+        path = CASES / "LAB-V1-032.json"
+        raw = json.loads(path.read_text(encoding="utf-8"))
+        raw["_trusted_commitment_context"] = []
+        with self.assertRaises(ValueError):
+            # Disk fixtures are never allowed to choose their own durable anchor.
+            with patch("json.load", return_value=raw):
+                load_fixture(path)
+
+    def test_candidate_fixture_cannot_supply_trusted_anchor_state(self) -> None:
+        path = CASES / "LAB-V1-032.json"
+        raw = json.loads(path.read_text(encoding="utf-8"))
+        raw["_trusted_anchor_context"] = []
+        with self.assertRaisesRegex(ValueError, "trusted anchor"):
+            with patch("json.load", return_value=raw):
+                load_fixture(path)
+
+    def test_anchor_hostile_matrix_matches_independent_expectations(self) -> None:
+        for number in range(113, 147):
+            case_id = f"LAB-V1-{number:03d}"
+            with self.subTest(case_id=case_id):
+                self.assertIs(HarnessStatus.PASS, run_fixture(fixture(case_id)).status)
+
+    def test_verifier_and_candidate_rollback_fails_closed(self) -> None:
+        for case_id in ("LAB-V1-113", "LAB-V1-114", "LAB-V1-115", "LAB-V1-116"):
+            with self.subTest(case_id=case_id):
+                self.assert_unavailable_with_reason(fixture(case_id), "VERIFIER_STATE_ANCHOR_REPLAY")
+
+    def test_anchor_replay_position_reuse_and_split_brain_fail_closed(self) -> None:
+        expected = {
+            "LAB-V1-117": "VERIFIER_STATE_ANCHOR_REPLAY",
+            "LAB-V1-118": "VERIFIER_STATE_REPLICA_CONFLICTING",
+            "LAB-V1-119": "VERIFIER_STATE_REPLICA_CONFLICTING",
+            "LAB-V1-120": "VERIFIER_STATE_REPLICA_CONFLICTING",
+            "LAB-V1-140": "VERIFIER_STATE_REPLICA_CONFLICTING",
+        }
+        for case_id, reason in expected.items():
+            with self.subTest(case_id=case_id):
+                self.assert_unavailable_with_reason(fixture(case_id), reason)
+
+    def test_candidate_reconstruction_and_unanchored_bootstrap_fail_closed(self) -> None:
+        for case_id in ("LAB-V1-121", "LAB-V1-138", "LAB-V1-141", "LAB-V1-144"):
+            with self.subTest(case_id=case_id):
+                self.assert_unavailable_with_reason(fixture(case_id), "VERIFIER_STATE_ANCHOR_UNAVAILABLE")
+
+    def test_incomplete_or_reordered_recovery_fails_closed(self) -> None:
+        for case_id in ("LAB-V1-122", "LAB-V1-123", "LAB-V1-124", "LAB-V1-125"):
+            with self.subTest(case_id=case_id):
+                self.assert_unavailable_with_reason(fixture(case_id), "VERIFIER_STATE_RECOVERY_INCOMPLETE")
+
+    def test_unauthorized_rotations_and_generation_rollback_fail_closed(self) -> None:
+        expected = {
+            "LAB-V1-128": "VERIFIER_ROTATION_UNAVAILABLE",
+            "LAB-V1-130": "VERIFIER_STATE_ANCHOR_ROLLBACK",
+            "LAB-V1-131": "ANCHOR_ROTATION_UNAVAILABLE",
+        }
+        for case_id, reason in expected.items():
+            with self.subTest(case_id=case_id):
+                self.assert_unavailable_with_reason(fixture(case_id), reason)
+
+    def test_witness_count_does_not_establish_source_independence(self) -> None:
+        expected = {
+            "LAB-V1-133": "WITNESS_SOURCE_CONTINUITY_UNAVAILABLE",
+            "LAB-V1-135": "OBSERVATION_WITNESS_CONFLICTING",
+            "LAB-V1-136": "WITNESS_SOURCE_CONTINUITY_UNAVAILABLE",
+            "LAB-V1-137": "WITNESS_SOURCE_CONTINUITY_UNAVAILABLE",
+        }
+        for case_id, reason in expected.items():
+            with self.subTest(case_id=case_id):
+                self.assert_unavailable_with_reason(fixture(case_id), reason)
+
+    def test_anchor_relations_are_strictly_typed(self) -> None:
+        payload = fixture("LAB-V1-032")
+        anchor = payload["t3"]["facts"]["evidence_binding"]["value"]["verifier_state_anchors"][0]
+        anchor["trusted_anchor"] = True
+        with self.assertRaisesRegex(ValueError, "contain exactly"):
+            OracleInput.from_fixture(payload)
+
+    def test_anchored_positive_paths_remain_authorized(self) -> None:
+        for case_id in (
+            "LAB-V1-127", "LAB-V1-129", "LAB-V1-132", "LAB-V1-134",
+            "LAB-V1-142", "LAB-V1-143", "LAB-V1-145",
+        ):
+            with self.subTest(case_id=case_id):
+                result = evaluate(OracleInput.from_fixture(fixture(case_id)))
+                self.assertIs(AuthorityOutcome.AUTHORIZED, result.outcome)
+                self.assertIn("CURRENT_AUTHORITY_ESTABLISHED", {reason.code for reason in result.reasons})
+
+    def test_recovery_receipt_binds_exact_ordered_replay(self) -> None:
+        payload = fixture("LAB-V1-127")
+        recovery = payload["t3"]["facts"]["evidence_binding"]["value"][
+            "recovery_installations"
+        ][0]
+        recovery["replay_commitment_ids"][0] = "REORDERED-OR-REPLACED"
+        self.assert_unavailable_with_reason(
+            payload, "VERIFIER_STATE_RECOVERY_INCOMPLETE"
+        )
+
+    def test_current_authoritative_anchor_revocation_is_denied(self) -> None:
+        result = evaluate(OracleInput.from_fixture(fixture("LAB-V1-146")))
+        self.assertIs(AuthorityOutcome.DENIED, result.outcome)
+        self.assertIn(
+            "VERIFIER_STATE_ANCHOR_PROHIBITED",
+            {reason.code for reason in result.reasons},
+        )
+
+    def test_anchor_currentness_independence_matrix_matches_expectations(self) -> None:
+        for number in range(147, 187):
+            case_id = f"LAB-V1-{number:03d}"
+            with self.subTest(case_id=case_id):
+                self.assertIs(HarnessStatus.PASS, run_fixture(fixture(case_id)).status)
+
+    def test_adapter_relabel_staleness_and_unauthorized_rotation_fail_closed(self) -> None:
+        expected = {
+            "LAB-V1-147": "ANCHOR_ADAPTER_CURRENTNESS_UNAVAILABLE",
+            "LAB-V1-148": "ANCHOR_ADAPTER_CURRENTNESS_UNAVAILABLE",
+            "LAB-V1-150": "ANCHOR_ADAPTER_ROTATION_UNAVAILABLE",
+            "LAB-V1-151": "ANCHOR_ADAPTER_ROTATION_UNAVAILABLE",
+        }
+        for case_id, reason in expected.items():
+            with self.subTest(case_id=case_id):
+                self.assert_unavailable_with_reason(fixture(case_id), reason)
+
+    def test_correlated_adapter_domains_cannot_create_independence(self) -> None:
+        for case_id in ("LAB-V1-149", "LAB-V1-178", "LAB-V1-179"):
+            with self.subTest(case_id=case_id):
+                self.assert_unavailable_with_reason(
+                    fixture(case_id), "SOURCE_DOMAIN_INDEPENDENCE_UNAVAILABLE"
+                )
+
+    def test_witness_labels_scope_interval_and_freshness_are_exact(self) -> None:
+        for case_id in (
+            "LAB-V1-153", "LAB-V1-154", "LAB-V1-156", "LAB-V1-158",
+            "LAB-V1-159", "LAB-V1-160", "LAB-V1-161", "LAB-V1-164",
+        ):
+            with self.subTest(case_id=case_id):
+                self.assert_unavailable_with_reason(
+                    fixture(case_id), "WITNESS_COVERAGE_UNAVAILABLE"
+                )
+        self.assert_unavailable_with_reason(
+            fixture("LAB-V1-176"), "WITNESS_HANDOFF_UNAVAILABLE"
+        )
+
+    def test_required_domain_and_candidate_shopping_fail_closed(self) -> None:
+        for case_id in ("LAB-V1-166", "LAB-V1-169", "LAB-V1-173"):
+            with self.subTest(case_id=case_id):
+                self.assert_unavailable_with_reason(
+                    fixture(case_id), "REQUIRED_SOURCE_DOMAIN_UNAVAILABLE"
+                )
+        for case_id in ("LAB-V1-163", "LAB-V1-165", "LAB-V1-167", "LAB-V1-168"):
+            with self.subTest(case_id=case_id):
+                self.assert_unavailable_with_reason(
+                    fixture(case_id), "WITNESS_SOURCE_CONTINUITY_UNAVAILABLE"
+                )
+
+    def test_cross_domain_conflict_requires_exact_reconciliation(self) -> None:
+        for case_id in ("LAB-V1-171", "LAB-V1-172"):
+            with self.subTest(case_id=case_id):
+                self.assert_unavailable_with_reason(
+                    fixture(case_id), "CROSS_DOMAIN_CHECKPOINT_CONFLICTING"
+                )
+        self.assert_unavailable_with_reason(
+            fixture("LAB-V1-175"), "CROSS_DOMAIN_RECONCILIATION_UNAVAILABLE"
+        )
+
+    def test_protected_context_is_strictly_typed(self) -> None:
+        payload = fixture("LAB-V1-032")
+        payload["_trusted_anchor_context"][0]["adapter_admission"]["trusted"] = True
+        with self.assertRaisesRegex(ValueError, "contain exactly"):
+            OracleInput.from_fixture(payload)
+
+    def test_adapter_and_domain_positive_paths_remain_reachable(self) -> None:
+        for case_id in (
+            "LAB-V1-152", "LAB-V1-157", "LAB-V1-170", "LAB-V1-174",
+            "LAB-V1-177", "LAB-V1-182", "LAB-V1-183", "LAB-V1-184",
+            "LAB-V1-185",
+        ):
+            with self.subTest(case_id=case_id):
+                result = evaluate(OracleInput.from_fixture(fixture(case_id)))
+                self.assertIs(AuthorityOutcome.AUTHORIZED, result.outcome)
+                self.assertIn(
+                    "CURRENT_AUTHORITY_ESTABLISHED",
+                    {reason.code for reason in result.reasons},
+                )
+
+    def test_total_rollback_boundary_is_explicit_but_survivor_rejects_replay(self) -> None:
+        self.assertIs(AuthorityOutcome.AUTHORIZED, actual(fixture("LAB-V1-180")))
+        self.assert_unavailable_with_reason(
+            fixture("LAB-V1-181"), "VERIFIER_STATE_ANCHOR_REPLAY"
+        )
+
+    def test_current_authoritative_adapter_revocation_is_denied(self) -> None:
+        result = evaluate(OracleInput.from_fixture(fixture("LAB-V1-186")))
+        self.assertIs(AuthorityOutcome.DENIED, result.outcome)
+        self.assertIn(
+            "ANCHOR_ADAPTER_PROHIBITED",
+            {reason.code for reason in result.reasons},
+        )
+
+    def test_control_plane_independence_matrix_matches_expectations(self) -> None:
+        for number in range(187, 235):
+            case_id = f"LAB-V1-{number:03d}"
+            with self.subTest(case_id=case_id):
+                self.assertIs(HarnessStatus.PASS, run_fixture(fixture(case_id)).status)
+
+    def test_lab_134_false_independence_reproducer_is_closed(self) -> None:
+        payload = fixture("LAB-V1-134")
+        context = payload["_trusted_anchor_context"][0]
+        root = next(
+            item for item in context["control_plane_memberships"]
+            if item["role"] == "POLICY_ROOT"
+        )
+        verifier = next(
+            item for item in context["control_plane_memberships"]
+            if item["role"] == "COMMITMENT_VERIFIER"
+        )
+        for name in (
+            "source_lineage", "control_domain", "upstream_dependency", "rollback_domain"
+        ):
+            verifier[name] = root[name]
+        self.assert_unavailable_with_reason(
+            payload, "CONTROL_PLANE_INDEPENDENCE_UNAVAILABLE"
+        )
+
+    def test_role_key_process_and_quorum_multiplicity_do_not_create_independence(self) -> None:
+        for case_id in (
+            "LAB-V1-197", "LAB-V1-198", "LAB-V1-199", "LAB-V1-200",
+            "LAB-V1-206", "LAB-V1-207", "LAB-V1-208",
+        ):
+            with self.subTest(case_id=case_id):
+                self.assert_unavailable_with_reason(
+                    fixture(case_id), "CONTROL_PLANE_INDEPENDENCE_UNAVAILABLE"
+                )
+
+    def test_appraisal_self_support_and_cycles_fail_closed(self) -> None:
+        for case_id in (
+            "LAB-V1-224", "LAB-V1-225", "LAB-V1-226", "LAB-V1-227",
+            "LAB-V1-228", "LAB-V1-229",
+        ):
+            with self.subTest(case_id=case_id):
+                self.assert_unavailable_with_reason(
+                    fixture(case_id), "INDEPENDENCE_APPRAISAL_CYCLE"
+                )
+
+    def test_applicable_role_subset_and_stale_membership_fail_closed(self) -> None:
+        self.assert_unavailable_with_reason(
+            fixture("LAB-V1-211"), "APPLICABLE_ROLE_POLICY_UNAVAILABLE"
+        )
+        self.assert_unavailable_with_reason(
+            fixture("LAB-V1-222"), "CONTROL_PLANE_MEMBERSHIP_UNAVAILABLE"
+        )
+
+    def test_correlated_rotations_reconciliation_and_recovery_fail_closed(self) -> None:
+        for case_id in (
+            "LAB-V1-201", "LAB-V1-202", "LAB-V1-203", "LAB-V1-204",
+            "LAB-V1-205", "LAB-V1-212", "LAB-V1-213",
+        ):
+            with self.subTest(case_id=case_id):
+                self.assertIs(AuthorityOutcome.UNAVAILABLE, actual(fixture(case_id)))
+
+    def test_authorized_consolidation_and_separation_remain_reachable(self) -> None:
+        for case_id in ("LAB-V1-218", "LAB-V1-220"):
+            with self.subTest(case_id=case_id):
+                self.assertIs(AuthorityOutcome.AUTHORIZED, actual(fixture(case_id)))
+        self.assert_unavailable_with_reason(
+            fixture("LAB-V1-219"), "CONTROL_PLANE_INDEPENDENCE_UNAVAILABLE"
+        )
+
+    def test_survivor_genesis_recovery_and_successor_paths_remain_reachable(self) -> None:
+        self.assert_unavailable_with_reason(
+            fixture("LAB-V1-231"), "VERIFIER_STATE_ANCHOR_REPLAY"
+        )
+        for case_id in ("LAB-V1-215", "LAB-V1-216", "LAB-V1-218", "LAB-V1-220", "LAB-V1-232", "LAB-V1-233", "LAB-V1-234"):
+            with self.subTest(case_id=case_id):
+                self.assertIs(AuthorityOutcome.AUTHORIZED, actual(fixture(case_id)))
+
+    def test_control_plane_protected_records_are_strictly_typed(self) -> None:
+        payload = fixture("LAB-V1-134")
+        parsed = OracleInput.from_fixture(deepcopy(payload))
+        context = parsed.trusted_anchor_context[0]
+        self.assertIsInstance(context["control_plane_policy"]["required_roles"], tuple)
+        self.assertIsInstance(
+            context["control_plane_memberships"][0]["authority_scope"], tuple
+        )
+        payload["_trusted_anchor_context"][0]["control_plane_policy"]["trusted"] = True
+        with self.assertRaisesRegex(ValueError, "contain exactly"):
+            OracleInput.from_fixture(payload)
+
+    def test_candidate_cannot_supply_trusted_control_plane_context(self) -> None:
+        path = CASES / "LAB-V1-134.json"
+        raw = json.loads(path.read_text(encoding="utf-8"))
+        raw["_trusted_control_plane_context"] = []
+        with patch("authority_lab.runner.Path.open") as opened:
+            opened.return_value.__enter__.return_value.read.return_value = json.dumps(raw)
+            opened.return_value.__enter__.return_value.__iter__.return_value = iter(())
+            with self.assertRaisesRegex(ValueError, "trusted control-plane"):
+                load_fixture(path)
+
+    def test_original_arbitrary_delegator_reproducer_is_closed(self) -> None:
+        payload = fixture("LAB-V0-010")
+        payload["t3"]["facts"]["delegation_binding"]["value"]["delegator"] = (
+            "UNAUTHORIZED-AGENT-X"
+        )
+        self.assert_unavailable_with_reason(
+            payload, "DELEGATION_SOURCE_AUTHORITY_UNAVAILABLE"
+        )
+
+    def test_candidate_cannot_supply_trusted_delegation_context(self) -> None:
+        path = CASES / "LAB-V0-010.json"
+        raw = json.loads(path.read_text(encoding="utf-8"))
+        raw["_trusted_delegation_context"] = {}
+        with patch("authority_lab.runner.Path.open") as opened:
+            opened.return_value.__enter__.return_value.read.return_value = json.dumps(raw)
+            opened.return_value.__enter__.return_value.__iter__.return_value = iter(())
+            with self.assertRaisesRegex(ValueError, "trusted delegation"):
+                load_fixture(path)
+
+    def test_delegation_protected_records_are_strictly_typed(self) -> None:
+        payload = fixture("LAB-V0-010")
+        parsed = OracleInput.from_fixture(deepcopy(payload))
+        context = parsed.trusted_anchor_context[0]["delegation_authority_context"]
+        self.assertIsInstance(context["delegation_principals"], tuple)
+        self.assertIsInstance(
+            context["delegation_grants"][0]["action_scope"]["actions"], tuple
+        )
+        payload["_trusted_anchor_context"][0]["delegation_authority_context"][
+            "delegation_policy"
+        ]["trusted"] = True
+        with self.assertRaisesRegex(ValueError, "contain exactly"):
+            OracleInput.from_fixture(payload)
+
+    def test_delegation_hostile_matrix_matches_independent_expectations(self) -> None:
+        authorized = {252, 253, 258, 262, 269, 271, 277, 278, 282, 286, 287}
+        denied = {247, 273, 285}
+        for number in range(235, 288):
+            case_id = f"LAB-V1-{number:03d}"
+            expected = (
+                AuthorityOutcome.AUTHORIZED
+                if number in authorized
+                else AuthorityOutcome.DENIED
+                if number in denied
+                else AuthorityOutcome.UNAVAILABLE
+            )
+            with self.subTest(case_id=case_id):
+                self.assertIs(expected, actual(fixture(case_id)))
+
+    def test_action_authority_does_not_imply_delegation_authority(self) -> None:
+        self.assert_unavailable_with_reason(
+            fixture("LAB-V1-241"), "DELEGABLE_SCOPE_UNAVAILABLE"
+        )
+
+    def test_delegation_cycles_and_partial_chains_fail_closed(self) -> None:
+        for case_id in (
+            "LAB-V1-254", "LAB-V1-255", "LAB-V1-256",
+            "LAB-V1-263", "LAB-V1-264",
+        ):
+            with self.subTest(case_id=case_id):
+                self.assertIs(AuthorityOutcome.UNAVAILABLE, actual(fixture(case_id)))
+
+    def test_delegation_scope_widening_fails_closed(self) -> None:
+        for case_id in ("LAB-V1-259", "LAB-V1-260", "LAB-V1-261", "LAB-V1-281"):
+            with self.subTest(case_id=case_id):
+                self.assert_unavailable_with_reason(
+                    fixture(case_id), "DELEGATION_SCOPE_WIDENING"
+                )
+
+    def test_delegation_lifecycle_and_successor_semantics(self) -> None:
+        for case_id in ("LAB-V1-246", "LAB-V1-248", "LAB-V1-249"):
+            with self.subTest(case_id=case_id):
+                self.assertIs(AuthorityOutcome.UNAVAILABLE, actual(fixture(case_id)))
+        self.assertIs(AuthorityOutcome.DENIED, actual(fixture("LAB-V1-247")))
+        for case_id in ("LAB-V1-250", "LAB-V1-251", "LAB-V1-276"):
+            with self.subTest(case_id=case_id):
+                self.assert_unavailable_with_reason(
+                    fixture(case_id), "DELEGATION_SUCCESSOR_AUTHORITY_UNAVAILABLE"
+                )
+        for case_id in ("LAB-V1-252", "LAB-V1-277", "LAB-V1-287"):
+            with self.subTest(case_id=case_id):
+                self.assertIs(AuthorityOutcome.AUTHORIZED, actual(fixture(case_id)))
+
+    def test_valid_multihop_service_account_and_planner_paths_reach_authorized(self) -> None:
+        for case_id in (
+            "LAB-V1-253", "LAB-V1-269", "LAB-V1-271",
+            "LAB-V1-278", "LAB-V1-282",
+        ):
+            with self.subTest(case_id=case_id):
+                self.assertIs(AuthorityOutcome.AUTHORIZED, actual(fixture(case_id)))
+
+    def test_human_approval_hostile_matrix_matches_independent_expectations(self) -> None:
+        authorized = {309, 315, 334, 337, 338, 339, 340, 341, 342}
+        denied = {313, 314, 332}
+        for number in range(288, 343):
+            case_id = f"LAB-V1-{number:03d}"
+            expected = (
+                AuthorityOutcome.AUTHORIZED
+                if number in authorized
+                else AuthorityOutcome.DENIED
+                if number in denied
+                else AuthorityOutcome.UNAVAILABLE
+            )
+            with self.subTest(case_id=case_id):
+                self.assertIs(expected, actual(fixture(case_id)))
+
+    def test_generic_yes_and_unadmitted_approvers_fail_closed(self) -> None:
+        self.assert_unavailable_with_reason(
+            fixture("LAB-V1-288"), "HUMAN_APPROVAL_RELATIONSHIP_UNAVAILABLE"
+        )
+        for case_id in ("LAB-V1-289", "LAB-V1-290", "LAB-V1-291"):
+            with self.subTest(case_id=case_id):
+                self.assertIs(AuthorityOutcome.UNAVAILABLE, actual(fixture(case_id)))
+
+    def test_approval_is_exactly_bound_to_effect_and_execution_context(self) -> None:
+        for case_id in (
+            "LAB-V1-292", "LAB-V1-293", "LAB-V1-294", "LAB-V1-295",
+            "LAB-V1-296", "LAB-V1-297", "LAB-V1-298", "LAB-V1-299",
+            "LAB-V1-300", "LAB-V1-301", "LAB-V1-302", "LAB-V1-303",
+            "LAB-V1-304",
+        ):
+            with self.subTest(case_id=case_id):
+                self.assertIs(AuthorityOutcome.UNAVAILABLE, actual(fixture(case_id)))
+
+    def test_approval_lifecycle_and_durable_use_state_fail_closed(self) -> None:
+        for case_id in (
+            "LAB-V1-305", "LAB-V1-306", "LAB-V1-307", "LAB-V1-308",
+            "LAB-V1-310", "LAB-V1-311", "LAB-V1-312", "LAB-V1-316",
+            "LAB-V1-317", "LAB-V1-318", "LAB-V1-319",
+        ):
+            with self.subTest(case_id=case_id):
+                self.assertIs(AuthorityOutcome.UNAVAILABLE, actual(fixture(case_id)))
+        for case_id in ("LAB-V1-313", "LAB-V1-314"):
+            with self.subTest(case_id=case_id):
+                self.assertIs(AuthorityOutcome.DENIED, actual(fixture(case_id)))
+
+    def test_approval_transformation_and_delayed_execution_require_revalidation(self) -> None:
+        for case_id in range(320, 330):
+            with self.subTest(case_id=case_id):
+                self.assertIs(
+                    AuthorityOutcome.UNAVAILABLE,
+                    actual(fixture(f"LAB-V1-{case_id:03d}")),
+                )
+
+    def test_human_approval_cannot_override_other_authority_failures(self) -> None:
+        expected = {
+            "LAB-V1-330": AuthorityOutcome.UNAVAILABLE,
+            "LAB-V1-331": AuthorityOutcome.UNAVAILABLE,
+            "LAB-V1-332": AuthorityOutcome.DENIED,
+        }
+        for case_id, outcome in expected.items():
+            with self.subTest(case_id=case_id):
+                self.assertIs(outcome, actual(fixture(case_id)))
+
+    def test_multi_human_policy_counts_effective_domains(self) -> None:
+        self.assertIs(AuthorityOutcome.UNAVAILABLE, actual(fixture("LAB-V1-333")))
+        self.assertIs(AuthorityOutcome.AUTHORIZED, actual(fixture("LAB-V1-334")))
+        self.assertIs(AuthorityOutcome.UNAVAILABLE, actual(fixture("LAB-V1-335")))
+
+    def test_approval_positive_paths_remain_reachable(self) -> None:
+        for case_id in (
+            "LAB-V1-309", "LAB-V1-315", "LAB-V1-337", "LAB-V1-338",
+            "LAB-V1-339", "LAB-V1-340", "LAB-V1-341", "LAB-V1-342",
+        ):
+            with self.subTest(case_id=case_id):
+                self.assertIs(AuthorityOutcome.AUTHORIZED, actual(fixture(case_id)))
+
+    def test_candidate_cannot_supply_trusted_human_approval_context(self) -> None:
+        path = CASES / "LAB-V1-338.json"
+        raw = json.loads(path.read_text(encoding="utf-8"))
+        raw["_trusted_human_approval_context"] = {}
+        with patch("authority_lab.runner.Path.open") as opened:
+            opened.return_value.__enter__.return_value.read.return_value = json.dumps(raw)
+            opened.return_value.__enter__.return_value.__iter__.return_value = iter(())
+            with self.assertRaisesRegex(ValueError, "trusted human approval"):
+                load_fixture(path)
+
+    def test_human_approval_protected_records_are_strictly_typed(self) -> None:
+        payload = fixture("LAB-V1-338")
+        parsed = OracleInput.from_fixture(deepcopy(payload))
+        context = parsed.trusted_anchor_context[0]["human_approval_authority_context"]
+        self.assertIsInstance(context["approval_policy"]["required_roles"], tuple)
+        self.assertIsInstance(context["approver_admissions"], tuple)
+        payload["_trusted_anchor_context"][0]["human_approval_authority_context"][
+            "approval_policy"
+        ]["trusted"] = True
+        with self.assertRaisesRegex(ValueError, "contain exactly"):
+            OracleInput.from_fixture(payload)
+
+    def test_approval_digests_bind_effect_not_display_authority(self) -> None:
+        binding = fixture("LAB-V1-338")["t3"]["facts"]["human_approval_binding"]["value"]
+        effect = human_approval_effect_digest(binding)
+        request = human_approval_request_digest(binding)
+        changed = deepcopy(binding)
+        changed["display_digest"] = "UNTRUSTED-DISPLAY-CHANGE"
+        self.assertEqual(effect, human_approval_effect_digest(changed))
+        self.assertNotEqual(request, human_approval_request_digest(changed))
+        changed = deepcopy(binding)
+        changed["effect"] = "DELETE"
+        self.assertNotEqual(effect, human_approval_effect_digest(changed))
+
+    def test_candidate_recomputation_cannot_replace_protected_approved_request(self) -> None:
+        payload = fixture("LAB-V1-338")
+        binding = payload["t3"]["facts"]["human_approval_binding"]["value"]
+        binding["display_digest"] = "ATTACKER-REPLACED-DISPLAY"
+        binding["effect_digest"] = human_approval_effect_digest(binding)
+        binding["request_digest"] = human_approval_request_digest(binding)
+        for envelope, verification in zip(
+            binding["approval_envelopes"], binding["approval_verifications"]
+        ):
+            envelope["effect_digest"] = binding["effect_digest"]
+            envelope["request_digest"] = binding["request_digest"]
+            envelope["canonical_payload_digest"] = human_approval_envelope_digest(envelope)
+            verification["envelope_digest"] = envelope["canonical_payload_digest"]
+        binding["approval_use"]["effect_digest"] = binding["effect_digest"]
+        binding["approval_use"]["request_digest"] = binding["request_digest"]
+        self.assert_unavailable_with_reason(
+            payload, "HUMAN_APPROVAL_ORDERING_UNAVAILABLE"
+        )
+
+    def test_tool_connector_hostile_matrix_matches_independent_expectations(self) -> None:
+        authorized = {
+            343, 351, 371, 372, 375, 376, 377, 379, 381, 383, 385, 387,
+            404, 408, 409,
+        }
+        for number in range(343, 410):
+            case_id = f"LAB-V1-{number:03d}"
+            expected = (
+                AuthorityOutcome.AUTHORIZED
+                if number in authorized
+                else AuthorityOutcome.UNAVAILABLE
+            )
+            with self.subTest(case_id=case_id):
+                self.assertIs(expected, actual(fixture(case_id)))
+        for case_id in ("LAB-V1-410", "LAB-V1-411"):
+            with self.subTest(case_id=case_id):
+                self.assertIs(AuthorityOutcome.DENIED, actual(fixture(case_id)))
+
+    def test_original_tool_connector_reproducers_now_fail_closed(self) -> None:
+        for case_id in ("LAB-V1-337", "LAB-V1-338", "LAB-V1-253"):
+            payload = fixture(case_id)
+            payload["t3"]["facts"]["tool_connector_identity"] = {
+                "state": "KNOWN", "value": "payments@BACKEND-B",
+            }
+            payload["t3"]["required_facts"].append("tool_connector_identity")
+            payload["t3"]["required_values"]["tool_connector_identity"] = "payments@BACKEND-B"
+            with self.subTest(case_id=case_id):
+                self.assert_unavailable_with_reason(
+                    payload, "TOOL_CONNECTOR_SELF_ASSERTED"
+                )
+
+    def test_hidden_backend_fails_for_plain_approval_and_delegation_paths(self) -> None:
+        for case_id in ("LAB-V1-343", "LAB-V1-338", "LAB-V1-253"):
+            payload = fixture(case_id)
+            binding = payload["t3"]["facts"]["tool_connector_use_binding"]["value"]
+            binding["backend_id"] = "HIDDEN-BACKEND-B"
+            with self.subTest(case_id=case_id):
+                self.assert_unavailable_with_reason(
+                    payload, "TOOL_CONNECTOR_USE_UNAVAILABLE"
+                )
+
+    def test_tool_context_digest_commits_to_every_authority_component(self) -> None:
+        payload = fixture("LAB-V1-343")
+        context = payload["_trusted_anchor_context"][0][
+            "tool_connector_authority_context"
+        ]["execution_contexts"][0]
+        original = tool_connector_context_digest(context)
+        for field in (
+            "logical_tool_id", "connector_generation", "backend_id", "target_id",
+            "credential_generation", "permissions", "operator_lineage", "boundary_epoch",
+        ):
+            changed = deepcopy(context)
+            changed[field] = [*changed[field], "WRITE"] if field == "permissions" else f"{changed[field]}-CHANGED"
+            with self.subTest(field=field):
+                self.assertNotEqual(original, tool_connector_context_digest(changed))
+
+    def test_candidate_digest_recomputation_cannot_replace_protected_context(self) -> None:
+        payload = fixture("LAB-V1-343")
+        binding = payload["t3"]["facts"]["tool_connector_use_binding"]["value"]
+        protected = deepcopy(payload["_trusted_anchor_context"][0][
+            "tool_connector_authority_context"
+        ]["execution_contexts"][0])
+        protected["backend_id"] = "ATTACKER-BACKEND"
+        binding["backend_id"] = protected["backend_id"]
+        binding["context_digest"] = tool_connector_context_digest(protected)
+        self.assert_unavailable_with_reason(
+            payload, "TOOL_CONNECTOR_USE_UNAVAILABLE"
+        )
+
+    def test_candidate_permission_expansion_and_transition_self_authority_fail_closed(self) -> None:
+        payload = fixture("LAB-V1-343")
+        payload["t3"]["facts"]["tool_connector_use_binding"]["value"][
+            "permissions"
+        ].append("WRITE")
+        self.assert_unavailable_with_reason(payload, "TOOL_CONNECTOR_USE_UNAVAILABLE")
+
+        payload = fixture("LAB-V1-377")
+        transition = payload["_trusted_anchor_context"][0][
+            "tool_connector_authority_context"
+        ]["component_transitions"][0]
+        transition["source_id"] = payload["t3"]["facts"][
+            "tool_connector_use_binding"
+        ]["value"]["logical_tool_id"]
+        self.assert_unavailable_with_reason(
+            payload, "TOOL_CONNECTOR_TRANSITION_UNAVAILABLE"
+        )
+
+    def test_tool_connector_protected_records_are_strictly_typed(self) -> None:
+        payload = fixture("LAB-V1-343")
+        parsed = OracleInput.from_fixture(deepcopy(payload))
+        context = parsed.trusted_anchor_context[0]["tool_connector_authority_context"]
+        self.assertIsInstance(context["execution_contexts"], tuple)
+        self.assertIsInstance(context["execution_contexts"][0]["permissions"], tuple)
+        payload["_trusted_anchor_context"][0]["tool_connector_authority_context"][
+            "execution_contexts"
+        ][0]["trusted"] = True
+        with self.assertRaisesRegex(ValueError, "contain exactly"):
+            OracleInput.from_fixture(payload)
+
+    def test_candidate_cannot_supply_trusted_tool_connector_context(self) -> None:
+        path = CASES / "LAB-V1-337.json"
+        raw = json.loads(path.read_text(encoding="utf-8"))
+        raw["_trusted_tool_connector_context"] = {}
+        with patch("authority_lab.runner.Path.open") as opened:
+            opened.return_value.__enter__.return_value.read.return_value = json.dumps(raw)
+            opened.return_value.__enter__.return_value.__iter__.return_value = iter(())
+            with self.assertRaisesRegex(ValueError, "trusted tool connector"):
+                load_fixture(path)
+
+    def test_tool_shopping_conflicts_and_stale_contexts_fail_closed(self) -> None:
+        for case_id in (
+            "LAB-V1-389", "LAB-V1-390", "LAB-V1-391", "LAB-V1-392",
+            "LAB-V1-393", "LAB-V1-394", "LAB-V1-395", "LAB-V1-396",
+            "LAB-V1-397", "LAB-V1-398", "LAB-V1-399", "LAB-V1-400",
+            "LAB-V1-401", "LAB-V1-402", "LAB-V1-403", "LAB-V1-405",
+            "LAB-V1-406", "LAB-V1-407",
+        ):
+            with self.subTest(case_id=case_id):
+                self.assertIs(AuthorityOutcome.UNAVAILABLE, actual(fixture(case_id)))
+
+    def test_authorized_tool_rotations_and_revalidations_remain_reachable(self) -> None:
+        for case_id in (
+            "LAB-V1-375", "LAB-V1-376", "LAB-V1-377", "LAB-V1-379",
+            "LAB-V1-381", "LAB-V1-383", "LAB-V1-385", "LAB-V1-387",
+            "LAB-V1-404", "LAB-V1-408", "LAB-V1-409",
+        ):
+            with self.subTest(case_id=case_id):
+                self.assertIs(AuthorityOutcome.AUTHORIZED, actual(fixture(case_id)))
+        expansion = fixture("LAB-V1-385")["_trusted_anchor_context"][0][
+            "tool_connector_authority_context"
+        ]["component_transitions"][0]
+        narrowing = fixture("LAB-V1-387")["_trusted_anchor_context"][0][
+            "tool_connector_authority_context"
+        ]["component_transitions"][0]
+        self.assertLess(set(expansion["old_permissions"]), set(expansion["new_permissions"]))
+        self.assertLess(set(narrowing["new_permissions"]), set(narrowing["old_permissions"]))
+
+    def test_grant_shopping_and_conflict_fail_closed(self) -> None:
+        for case_id in ("LAB-V1-283", "LAB-V1-284"):
+            with self.subTest(case_id=case_id):
+                self.assert_unavailable_with_reason(
+                    fixture(case_id), "DELEGATION_ORDERING_UNAVAILABLE"
+                )
+
+    def test_positive_commitment_and_successor_paths_remain_authorized(self) -> None:
+        for case_id in ("LAB-V1-098", "LAB-V1-099", "LAB-V1-102", "LAB-V1-111", "LAB-V1-112"):
+            with self.subTest(case_id=case_id):
+                self.assertIs(AuthorityOutcome.AUTHORIZED, actual(fixture(case_id)))
+
+    def test_composite_adversarial_control_continuity_matrix(self) -> None:
+        unavailable = (
+            "LAB-V1-444", "LAB-V1-447", "LAB-V1-449", "LAB-V1-450",
+            "LAB-V1-451", "LAB-V1-452", "LAB-V1-453", "LAB-V1-454",
+            "LAB-V1-457", "LAB-V1-458", "LAB-V1-459", "LAB-V1-460",
+            "LAB-V1-461",
+        )
+        denied = ("LAB-V1-446", "LAB-V1-456", "LAB-V1-462", "LAB-V1-463")
+        authorized = (
+            "LAB-V1-445", "LAB-V1-448", "LAB-V1-455", "LAB-V1-464",
+            "LAB-V1-465", "LAB-V1-466",
+        )
+        for expected, case_ids in (
+            (AuthorityOutcome.UNAVAILABLE, unavailable),
+            (AuthorityOutcome.DENIED, denied),
+            (AuthorityOutcome.AUTHORIZED, authorized),
+        ):
+            for case_id in case_ids:
+                with self.subTest(case_id=case_id):
+                    self.assertIs(expected, actual(fixture(case_id)))
+
+    def test_full_composite_positive_joins_all_authority_layers_at_t3(self) -> None:
+        payload = fixture("LAB-V1-464")
+        required = set(payload["t3"]["required_facts"])
+        self.assertIn("human_approval_binding", required)
+        self.assertIn("delegation_binding", required)
+        self.assertIn("tool_connector_use_binding", required)
+        anchor = payload["_trusted_anchor_context"][0]
+        self.assertNotEqual("NONE", anchor["t3_execution_event"]["approval_use_id"])
+        self.assertEqual(
+            anchor["t3_execution_event"]["event_order"],
+            anchor["tool_connector_authority_context"]["protected_terminal_uses"][0][
+                "use_event_order"
+            ],
+        )
+        self.assertIs(AuthorityOutcome.AUTHORIZED, actual(payload))
 
     def test_fixture_files_are_valid_json_objects(self) -> None:
         for path in discover(CASES):

@@ -55,9 +55,9 @@ Alpha completion means that bounded lifecycle reached its terminal control state
 
 ## What this repository is
 
-This repository is a **public architecture and evidence exhibit**.
+This repository is a **public architecture, evidence, and falsification exhibit**.
 
-It is not the private engineering repository and is not a source-code mirror of the authority implementation. Security-sensitive implementation details, validators, migrations, adversarial fixtures, operational mechanisms, and protected evidence remain outside this public exhibit.
+It is not the private Ground Truth core and is not a source-code mirror of the private authority implementation. It does include the bounded public Authority Lab v1, its public fixture corpus, reproducibility material, and the exact reviewed research-freeze history. Private-core implementation details, protected operational evidence, secrets, and non-public hostile material remain outside this exhibit.
 
 ## Design rules
 
@@ -71,6 +71,15 @@ It is not the private engineering repository and is not a source-code mirror of 
 
 ## Public materials
 
+- [Ground Truth v1 research freeze](GROUND_TRUTH_RESEARCH_FREEZE.md) — exact frozen release-candidate state and bounded PASS meaning.
+- [Counterexample catalog](GROUND_TRUTH_COUNTEREXAMPLE_CATALOG.md)
+- [Threat model](GROUND_TRUTH_THREAT_MODEL.md)
+- [Limitations](GROUND_TRUTH_LIMITATIONS.md)
+- [Reproducibility](GROUND_TRUTH_REPRODUCIBILITY.md)
+- [Paper evidence manifest](GROUND_TRUTH_PAPER_EVIDENCE_MANIFEST.md)
+- [Canonical contract](GROUND_TRUTH_CANONICAL_CONTRACT.md)
+- [Fixture and canonicalization record](GROUND_TRUTH_FIXTURE_AND_CANONICALIZATION.md)
+
 - [Architecture](ARCHITECTURE.md)
 - [Security model](SECURITY_MODEL.md)
 - [Evidence model](EVIDENCE_MODEL.md)
@@ -81,10 +90,16 @@ It is not the private engineering repository and is not a source-code mirror of 
 - [Historical hostile-review catalog](HOSTILE_REVIEW_CATALOG.md) — historical review evidence for the earlier candidate contract; file presence does not establish current authority.
 - [Layer 2 commit-time authority review](LAYER2_COMMIT_TIME_AUTHORITY_REVIEW.md) — current public Layer 2 analysis.
 - [Research pressure map](RESEARCH_PRESSURE_MAP.md) — current public research-pressure analysis; research is evidence, not authority.
+- [Literature and prior art](LITERATURE_AND_PRIOR_ART.md) — prior-art and adjacent-work context for the v1 paper.
 - [Agent boundary escape frontier delta](FRONTIER_DELTA_AGENT_BOUNDARY_ESCAPE.md) — completed bounded review of sandbox escape, privilege escalation, delegated and derivative actors, connector/tool substitution, credential hopping, browser/computer-use escape, restart and persistence, monitor evasion, and authority-boundary routing.
+- [Public Authority Lab v1](authority_lab/README.md) — deterministic falsification harness for the frozen public contract.
 
-## Current boundary
+## Frozen v1 research state
 
-The agent-boundary-escape review found `NO REPRODUCIBLE IN-SCOPE COUNTEREXAMPLE FOUND`. This is failure to falsify the current six-invariant authority model within the reviewed scope, not proof of completeness, correctness, production safety, or implementation sufficiency. It does not establish that Ground Truth solves sandbox escape or prevents privilege escalation.
+Ground Truth v1 is under **RESEARCH FREEZE — ACTIVE**.
 
-No later phase is authorized by the Alpha completion state. The current public documentation direction is an adversarial casebook and minimal reproducible authority-boundary attack scenarios. A future runnable authority lab may proceed only after a separate explicit implementation-authority decision.
+The frozen research HEAD is `31d78aa158618ca8b72eb61e2f49b434e4319e9e`; the freeze documentation commit is `3d09acc804bc1271965696f2d9561143ca28b835`. The frozen corpus is `LAB-V0-001..012` plus `LAB-V1-013..466` (466 fixtures). The freeze branch records 260/260 public tests and 466/466 Authority Lab fixtures passing under the documented environment.
+
+The exact T3 closure and Composite closure are recorded in the [research freeze](GROUND_TRUTH_RESEARCH_FREEZE.md). Their PASS verdicts are bounded failure-to-falsify statements, not proof of universal security, formal correctness, production safety, or completeness.
+
+No additional authority-model frontier is part of Ground Truth v1 unless a reproducible counterexample against the frozen release candidate reopens the research cycle. Ground Truth Runtime is a separate enforcement product and is not part of the frozen research evidence.

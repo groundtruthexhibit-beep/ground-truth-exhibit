@@ -49,6 +49,8 @@ Vote count, model diversity, vendor diversity, process count, signatures, endpoi
 
 Consensus is not evidence of independence.
 
-## Alpha evidence posture
+## Public evidence posture
 
-The completed Alpha includes adversarial and reproducible validation of the authorized scope. This public repository exposes the evidence model and earned claims at a high level while keeping private fixtures, internal enforcement logic, and sensitive operational details out of the exhibit.
+The completed Alpha and frozen v1 research line include adversarial and reproducible validation within their documented scopes. This public repository exposes the evidence model, the bounded Authority Lab v1 implementation, its public fixture corpus, reproducibility instructions, and exact claim-to-evidence mappings while keeping private-core implementation details, protected operational evidence, and sensitive deployment material outside the exhibit.
+
+Fixture facts are modeled inputs. A passing fixture does not prove that a real external observer, authority root, verifier, witness, or physical system emitted truthful facts; those remain explicit trust boundaries in the frozen threat model.

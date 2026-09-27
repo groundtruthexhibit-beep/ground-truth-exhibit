@@ -12,19 +12,52 @@ from .model import (
     FactState,
     HarnessStatus,
     MANDATORY_T3_FACTS,
+    OBJECTIVE_BINDING_FACTS,
+    OBSERVATION_SCOPE_FAMILIES,
     OracleInput,
     RunResult,
 )
-from .oracle import evaluate
+from .oracle import analyze_continuity_path, evaluate
 
 
 def load_fixture(path: str | Path) -> dict[str, Any]:
-    with Path(path).open("r", encoding="utf-8") as handle:
+    fixture_path = Path(path)
+    with fixture_path.open("r", encoding="utf-8") as handle:
         value = json.load(handle)
     if not isinstance(value, dict):
         raise ValueError("fixture root must be an object")
-    if value.get("schema_version") != "authority-lab-v0":
+    if value.get("schema_version") not in {"authority-lab-v0", "authority-lab-v1"}:
         raise ValueError("unsupported fixture schema_version")
+    if "_trusted_commitment_context" in value:
+        raise ValueError("fixture cannot supply harness-owned trusted commitment state")
+    if "_trusted_anchor_context" in value:
+        raise ValueError("fixture cannot supply harness-owned trusted anchor state")
+    if "_trusted_control_plane_context" in value:
+        raise ValueError("fixture cannot supply harness-owned trusted control-plane state")
+    if "_trusted_delegation_context" in value:
+        raise ValueError("fixture cannot supply harness-owned trusted delegation state")
+    if "_trusted_human_approval_context" in value:
+        raise ValueError("fixture cannot supply harness-owned trusted human approval state")
+    if "_trusted_tool_connector_context" in value:
+        raise ValueError("fixture cannot supply harness-owned trusted tool connector state")
+    if "_trusted_t3_execution_event" in value:
+        raise ValueError("fixture cannot supply harness-owned trusted T3 execution event")
+    manifest_path = fixture_path.parent / "trusted_commitment_state.json"
+    if value.get("schema_version") == "authority-lab-v1" and manifest_path.exists():
+        with manifest_path.open("r", encoding="utf-8") as handle:
+            manifest = json.load(handle)
+        context = manifest.get(fixture_path.name, [])
+        if not isinstance(context, list) or not all(isinstance(item, dict) for item in context):
+            raise ValueError("trusted commitment state manifest entry is invalid")
+        value["_trusted_commitment_context"] = context
+    anchor_manifest_path = fixture_path.parent / "trusted_anchor_state.json"
+    if value.get("schema_version") == "authority-lab-v1" and anchor_manifest_path.exists():
+        with anchor_manifest_path.open("r", encoding="utf-8") as handle:
+            manifest = json.load(handle)
+        context = manifest.get(fixture_path.name, [])
+        if not isinstance(context, list) or not all(isinstance(item, dict) for item in context):
+            raise ValueError("trusted anchor state manifest entry is invalid")
+        value["_trusted_anchor_context"] = context
     return value
 
 
@@ -51,7 +84,177 @@ def run_path(path: str | Path) -> RunResult:
 
 
 def discover(directory: str | Path) -> tuple[Path, ...]:
-    return tuple(sorted(Path(directory).glob("*.json")))
+    return tuple(sorted(Path(directory).glob("LAB-*.json")))
+
+
+def _render_fact(fact: Any) -> str:
+    if fact is None:
+        return "UNKNOWN"
+    if fact.state is FactState.KNOWN:
+        return f"KNOWN({fact.value})"
+    if fact.state is FactState.CONFLICTING:
+        return f"CONFLICTING({','.join(str(value) for value in fact.values)})"
+    return "UNKNOWN"
+
+
+def _observation_trace(case: OracleInput) -> tuple[str, ...]:
+    binding = case.observation_binding
+    freshness = case.observation_freshness
+    if binding is None:
+        return ("OBSERVATION", "binding: UNAVAILABLE", "freshness: UNAVAILABLE")
+
+    gaps: list[str] = []
+    for family in OBSERVATION_SCOPE_FAMILIES:
+        intervals = sorted(
+            (segment.start_event_order, segment.end_event_order)
+            for segment in binding.segments
+            if family in segment.scope_families
+        )
+        cursor = binding.t1_anchor.event_order
+        for start, end in intervals:
+            if start > cursor:
+                gaps.append(f"{family}:{cursor}-{start - 1}")
+            cursor = max(cursor, end + 1)
+        if cursor <= binding.t3_anchor.event_order:
+            gaps.append(f"{family}:{cursor}-{binding.t3_anchor.event_order}")
+
+    lines = [
+        "OBSERVATION",
+        f"profile: {binding.profile_id}@{binding.profile_version}",
+        (
+            "binding: "
+            f"{binding.observation_binding_id}@{binding.observation_binding_generation} "
+            f"source={binding.source_id}"
+        ),
+        (
+            "interval: "
+            f"{binding.t1_anchor.anchor_id}@{binding.t1_anchor.event_order} -> "
+            f"{binding.t3_anchor.anchor_id}@{binding.t3_anchor.event_order}"
+        ),
+    ]
+    lines.extend(
+        "observer: "
+        f"{observer.observer_id}@{observer.observer_generation} "
+        f"state={observer.lifecycle_state} scopes={','.join(observer.scope_families)}"
+        for observer in sorted(
+            binding.observers,
+            key=lambda value: (value.observer_id, value.observer_generation),
+        )
+    )
+    lines.extend(
+        "segment: "
+        f"{segment.segment_id} observer={segment.observer_id}@{segment.observer_generation} "
+        f"events={segment.start_event_order}-{segment.end_event_order} "
+        f"sequence={segment.start_sequence}-{segment.end_sequence} "
+        f"stream={segment.stream_id}@{segment.stream_generation}"
+        for segment in sorted(
+            binding.segments,
+            key=lambda value: (
+                value.start_event_order,
+                value.end_event_order,
+                value.segment_id,
+            ),
+        )
+    )
+    lines.extend(
+        "handoff: "
+        f"{handoff.handoff_id} {handoff.from_observer_id}->{handoff.to_observer_id} "
+        f"at={handoff.handoff_event_order}"
+        for handoff in sorted(binding.handoffs, key=lambda value: value.handoff_id)
+    )
+    lines.extend(
+        "transformation: "
+        f"{item.transformation_id}@{item.transformation_generation} "
+        f"{item.source_stream_id}@{item.source_stream_generation}->"
+        f"{item.target_stream_id}@{item.target_stream_generation}"
+        for item in sorted(
+            binding.transformations,
+            key=lambda value: (value.transformation_id, value.transformation_generation),
+        )
+    )
+    lines.extend(
+        "commitment: "
+        f"{item.values['commitment_id']} position={item.values['logical_position']} "
+        f"digest={item.values['commitment_digest']} stream="
+        f"{item.values['stream_id']}@{item.values['stream_generation']}"
+        for item in binding.commitment_envelopes
+    )
+    lines.extend(
+        "checkpoint: "
+        f"{item.values['checkpoint_id']}@{item.values['checkpoint_generation']} "
+        f"head={item.values['head_commitment_id']} state="
+        f"{item.values['verifier_state_id']}@{item.values['verifier_state_generation']}"
+        for item in binding.commitment_checkpoints
+    )
+    lines.append(f"trusted_commitment_states: {len(case.trusted_commitment_context)}")
+    lines.append(f"trusted_anchor_states: {len(case.trusted_anchor_context)}")
+    lines.extend(
+        "t3_execution_event: "
+        f"{item['t3_execution_event']['execution_event_id']}@"
+        f"{item['t3_execution_event']['event_order']}"
+        for item in case.trusted_anchor_context
+    )
+    approval_requirements = tuple(
+        item["human_approval_authority_context"]["approval_policy"]["requirement"]
+        for item in case.trusted_anchor_context
+    )
+    lines.append(f"protected_human_approval_policies: {len(approval_requirements)}")
+    lines.append(f"human_approval_requirements: {approval_requirements}")
+    tool_requirements = tuple(
+        item["tool_connector_authority_context"]["tool_connector_policy"]["requirement"]
+        for item in case.trusted_anchor_context
+    )
+    lines.append(f"protected_tool_connector_policies: {len(tool_requirements)}")
+    lines.append(f"tool_connector_requirements: {tool_requirements}")
+    lines.extend(
+        "tool_connector_authority: "
+        f"contexts={len(item['tool_connector_authority_context']['execution_contexts'])} "
+        f"transitions={len(item['tool_connector_authority_context']['component_transitions'])} "
+        f"uses={len(item['tool_connector_authority_context']['protected_terminal_uses'])}"
+        for item in case.trusted_anchor_context
+    )
+    lines.extend(
+        "anchor_domain: "
+        f"{item['domain_view']['domain_id']} adapter="
+        f"{item['adapter_admission']['adapter_id']}@"
+        f"{item['adapter_admission']['adapter_generation']} policy="
+        f"{item['required_domain_policy']['policy_id']}"
+        for item in case.trusted_anchor_context
+    )
+    lines.extend(
+        "control_plane: "
+        f"policy={item['control_plane_policy']['policy_id']} roles="
+        f"{','.join(item['control_plane_policy']['required_roles'])} "
+        f"members={len(item['control_plane_memberships'])} "
+        f"appraisal_roots={len(item['independence_appraisal_roots'])}"
+        for item in case.trusted_anchor_context
+    )
+    lines.extend(
+        "delegation_authority: "
+        f"policy={item['delegation_authority_context']['delegation_policy']['policy_id']} "
+        f"principals={len(item['delegation_authority_context']['delegation_principals'])} "
+        f"grants={len(item['delegation_authority_context']['delegation_grants'])} "
+        f"heads={len(item['delegation_authority_context']['delegation_ordering_heads'])}"
+        for item in case.trusted_anchor_context
+    )
+    lines.extend(
+        "verifier_anchor: "
+        f"{item.values['anchor_id']}@{item.values['anchor_position']} "
+        f"head={item.values['head_commitment_digest']} "
+        f"verifier={item.values['verifier_id']}@{item.values['verifier_generation']}"
+        for item in binding.verifier_state_anchors
+    )
+    lines.append(f"gaps: {','.join(gaps) if gaps else 'none'}")
+    lines.append(
+        "freshness: "
+        + (
+            f"{freshness.head_anchor_id}@{freshness.head_event_order} "
+            f"source={freshness.source_id}"
+            if freshness is not None
+            else "UNAVAILABLE"
+        )
+    )
+    return tuple(lines)
 
 
 def format_trace(result: RunResult) -> str:
@@ -62,28 +265,86 @@ def format_trace(result: RunResult) -> str:
         "",
         "T1",
         f"result: {case.t1_result.value}",
-        "",
-        "T2",
-        f"fixture_claims_authority: {str(case.t2_creates_authority).lower()}",
-        "authority_created: false",
     ]
+    t1_binding_fact_names = (
+        *OBJECTIVE_BINDING_FACTS,
+        *(
+            ("contract_transformation_binding",)
+            if case.t1_binding_facts.raw["contract_transformation_binding"].state
+            is not FactState.UNKNOWN
+            else ()
+        ),
+    )
+    for name in t1_binding_fact_names:
+        lines.append(f"{name}: {_render_fact(case.t1_binding_facts.raw[name])}")
+    lines.extend(
+        (
+            "",
+            "T2",
+            f"fixture_claims_authority: {str(case.t2_creates_authority).lower()}",
+            "authority_created: false",
+        )
+    )
     for mutation in case.t2_mutations:
-        lines.append(f"{mutation.field}: {mutation.before} -> {mutation.after}")
+        resolution = (
+            f"canonical={mutation.canonical_field}; target={mutation.target_kind.value}:"
+            f"{mutation.target}"
+            if mutation.target is not None and mutation.target_kind is not None
+            else "UNKNOWN"
+        )
+        metadata = (
+            "; continuity_effects="
+            f"{','.join(effect.value for effect in mutation.continuity_effects)}; "
+            f"observation_scopes={','.join(mutation.observation_scope_families)}"
+            if mutation.target is not None
+            else ""
+        )
+        lines.append(
+            f"{mutation.field} [{resolution}]: {mutation.before} -> {mutation.after}"
+            f"{metadata}"
+        )
+    path = analyze_continuity_path(case)
+    lines.extend(
+        (
+            "path_effects: "
+            + (
+                ",".join(sorted(effect.value for effect in path.effects))
+                if path.effects
+                else "none"
+            ),
+            "path_observation_scopes: "
+            + (
+                ",".join(
+                    family
+                    for family in OBSERVATION_SCOPE_FAMILIES
+                    if family in path.observation_scope_families
+                )
+                if path.observation_scope_families
+                else "none"
+            ),
+            f"path_aba_targets: {','.join(path.aba_targets) if path.aba_targets else 'none'}",
+            f"successor_admission_required: {str(path.successor_break).lower()}",
+        )
+    )
     lines.extend(("", "T3"))
     required_facts = tuple(
-        dict.fromkeys((*MANDATORY_T3_FACTS, *case.required_facts, *case.required_values))
+        dict.fromkeys(
+            (
+                *MANDATORY_T3_FACTS,
+                *case.required_facts,
+                *case.required_values,
+                *(
+                    ("contract_transformation_binding",)
+                    if "contract_transformation_binding" in case.facts
+                    else ()
+                ),
+            )
+        )
     )
     for name in required_facts:
         fact = case.facts.get(name)
-        if fact is None:
-            rendered = "UNKNOWN"
-        elif fact.state is FactState.KNOWN:
-            rendered = f"KNOWN({fact.value})"
-        elif fact.state is FactState.CONFLICTING:
-            rendered = f"CONFLICTING({','.join(str(value) for value in fact.values)})"
-        else:
-            rendered = "UNKNOWN"
-        lines.append(f"{name}: {rendered}")
+        lines.append(f"{name}: {_render_fact(fact)}")
+    lines.extend(("", *_observation_trace(case)))
     lines.extend(
         (
             "",
