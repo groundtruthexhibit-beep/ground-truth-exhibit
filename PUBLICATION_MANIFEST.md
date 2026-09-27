@@ -33,6 +33,10 @@ The public repository already contains a bounded runnable Authority Lab and publ
 
 Later reviewed Authority Lab v1 release-candidate work exists outside the currently transported GitHub history while exact Git transport is pending. Documentation may identify that work as reviewed locally / transport pending, but must not present untransported commits, tests, fixture counts, exact-head verdicts, or freeze checkpoints as remotely verifiable GitHub state.
 
+## Historical checkpoint documents
+
+Design records, hostile reviews, frontier deltas, casebooks, and research-pressure documents may preserve language that was correct at their exact reviewed checkpoint (for example, a future-work statement that later became implemented). Those files are retained as historical evidence and are not silently rewritten to simulate later knowledge. For current publication status, use the README, this manifest, and the exact Git history associated with the claim being made.
+
 ## Claim boundary
 
 The exhibit may state that Ground Truth Alpha reached its terminal authorized lifecycle state.
