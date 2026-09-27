@@ -55,9 +55,9 @@ Alpha completion means that bounded lifecycle reached its terminal control state
 
 ## What this repository is
 
-This repository is a **public architecture and evidence exhibit**.
+This repository is a **public architecture, evidence, and falsification exhibit**.
 
-It is not the private engineering repository and is not a source-code mirror of the authority implementation. Security-sensitive implementation details, validators, migrations, adversarial fixtures, operational mechanisms, and protected evidence remain outside this public exhibit.
+It is not the private Ground Truth core and is not a source-code mirror of the private authority implementation. The repository does include a deliberately bounded public Authority Lab, its public fixtures, and supporting tests so that parts of the published authority model can be attacked deterministically. Private-core implementation details, protected evidence, operational secrets, production enforcement mechanisms, and non-public hostile evidence remain outside this exhibit.
 
 ## Design rules
 
@@ -83,14 +83,17 @@ It is not the private engineering repository and is not a source-code mirror of 
 - [Research pressure map](RESEARCH_PRESSURE_MAP.md) — current public research-pressure analysis; research is evidence, not authority.
 - [Literature and prior art](LITERATURE_AND_PRIOR_ART.md) — current context for complete mediation, authorization continuity, execution-edit safety, shutdown research, and adjacent agent-security work.
 - [Agent boundary escape frontier delta](FRONTIER_DELTA_AGENT_BOUNDARY_ESCAPE.md) — completed bounded review of sandbox escape, privilege escalation, delegated and derivative actors, connector/tool substitution, credential hopping, browser/computer-use escape, restart and persistence, monitor evasion, and authority-boundary routing.
+- [Public Authority Lab](authority_lab/README.md) — bounded deterministic falsification harness published separately from the private core.
 
-## Reviewed work beyond current public main
+## Publication state
 
-Later reviewed Authority Lab work exists beyond the current public `main` history and is awaiting exact Git transport. The transport-pending line includes executable objective binding, mutation-registry closure, observation admission/completeness, a reproducible shutdown/successor ABA authority-continuity counterexample, and a reviewed path-sensitive repair design.
+The remotely inspectable history on this publication branch contains the bounded public Authority Lab v0 and the literature/context documents linked above.
 
-Those results are not presented here as remotely verifiable commits until their exact Git objects are published. See [Literature and prior art](LITERATURE_AND_PRIOR_ART.md) for claim boundaries and adjacent research context.
+A later reviewed Authority Lab v1 release-candidate line exists outside the currently transported GitHub history. Until those exact Git objects are transported, this repository does **not** present later local test counts, fixture counts, exact-head verdicts, or freeze checkpoints as remotely verifiable GitHub evidence. Where later work is mentioned, it is explicitly identified as reviewed locally / transport pending.
 
-A current research principle from that reviewed line is:
+See [Literature and prior art](LITERATURE_AND_PRIOR_ART.md) and the [Publication manifest](PUBLICATION_MANIFEST.md) for the publication boundary.
+
+One research principle established in the reviewed successor/shutdown line is:
 
 > Same apparent state does not imply the same authorized history.
 
@@ -98,4 +101,4 @@ A current research principle from that reviewed line is:
 
 The agent-boundary-escape review found `NO REPRODUCIBLE IN-SCOPE COUNTEREXAMPLE FOUND`. This is failure to falsify the current six-invariant authority model within the reviewed scope, not proof of completeness, correctness, production safety, or implementation sufficiency. It does not establish that Ground Truth solves sandbox escape or prevents privilege escalation.
 
-No later phase is authorized by the Alpha completion state. The current public documentation direction is an adversarial casebook and minimal reproducible authority-boundary attack scenarios. A future runnable authority lab may proceed only after a separate explicit implementation-authority decision.
+No later phase is authorized by the Alpha completion state. The public repository already contains a bounded runnable Authority Lab; its existence is evidence for the published falsification work and does not itself authorize production deployment, private-core modification, or any later lifecycle phase.
