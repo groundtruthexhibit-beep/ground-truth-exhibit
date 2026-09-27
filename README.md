@@ -71,6 +71,15 @@ It is not the private engineering repository and is not a source-code mirror of 
 
 ## Public materials
 
+- [Ground Truth v1 research freeze](GROUND_TRUTH_RESEARCH_FREEZE.md) — exact frozen release-candidate state and bounded PASS meaning.
+- [Counterexample catalog](GROUND_TRUTH_COUNTEREXAMPLE_CATALOG.md)
+- [Threat model](GROUND_TRUTH_THREAT_MODEL.md)
+- [Limitations](GROUND_TRUTH_LIMITATIONS.md)
+- [Reproducibility](GROUND_TRUTH_REPRODUCIBILITY.md)
+- [Paper evidence manifest](GROUND_TRUTH_PAPER_EVIDENCE_MANIFEST.md)
+- [Canonical contract](GROUND_TRUTH_CANONICAL_CONTRACT.md)
+- [Fixture and canonicalization record](GROUND_TRUTH_FIXTURE_AND_CANONICALIZATION.md)
+
 - [Architecture](ARCHITECTURE.md)
 - [Security model](SECURITY_MODEL.md)
 - [Evidence model](EVIDENCE_MODEL.md)

@@ -2,6 +2,11 @@
 
 Authority Lab v1 is a deterministic, local-only public falsification harness for the published Ground Truth authority model. It is not the private Ground Truth core, a production authorization service, a policy engine, a certification system, or evidence that Ground Truth is secure or complete.
 
+The exact frozen v1 state, commands, contract text, counterexample catalog, and
+claim-to-evidence mapping are indexed by
+[`GROUND_TRUTH_RESEARCH_FREEZE.md`](../GROUND_TRUTH_RESEARCH_FREEZE.md) and
+[`GROUND_TRUTH_REPRODUCIBILITY.md`](../GROUND_TRUTH_REPRODUCIBILITY.md).
+
 Run one fixture:
 
 ```text
