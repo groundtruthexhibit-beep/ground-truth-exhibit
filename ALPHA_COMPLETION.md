@@ -37,6 +37,6 @@ It is not a claim of:
 
 ## Public/private custody
 
-The authoritative engineering implementation and detailed evidence chain remain in a private repository.
+The authoritative private-core engineering implementation and its protected evidence chain remain outside this public repository.
 
-This public repository is a curated exhibit intended to communicate architecture, authority semantics, demonstrated properties, limitations, and terminology without mirroring the private core.
+This public repository is a curated exhibit intended to communicate architecture, authority semantics, demonstrated properties, limitations, and terminology. It also contains a separate bounded public Authority Lab and public fixtures for deterministic falsification; those public artifacts do not mirror or replace the private core.
