@@ -77,27 +77,28 @@ The public project should distinguish three categories:
 
 The intended contribution is not the claim that authority continuity, provenance, shutdown safety, or access control are new concepts. The research value is in making authority assumptions explicit enough to attack deterministically and recording when apparently reasonable compositions still permit a false `AUTHORIZED`.
 
-## Reviewed work not yet transported to public GitHub
+## Publication status of later Ground Truth work
 
-As of 2026-09-25, later reviewed Ground Truth work exists beyond the current public `main` history but has not yet been transported to GitHub. Public documentation must not present those commits as remotely verifiable until their exact Git objects and branches are published.
+As of 2026-09-27, this public repository already contains a bounded runnable Authority Lab v0. The later reviewed Authority Lab v1 release-candidate line is broader than the currently transported GitHub history and remains pending exact Git transport.
 
-The reviewed-but-transport-pending line includes work on:
-- executable objective binding;
-- mutation-registry closure;
-- observation admission and completeness;
-- a reproducible shutdown/successor ABA authority-continuity counterexample; and
-- a reviewed design for path-sensitive shutdown/successor continuity.
+The later reviewed line extends the research beyond the public v0 baseline across authority-continuity frontiers including objective binding, mutation closure, observation completeness, successor/restart continuity, replay/rollback handling, source and control-plane independence, delegation, human approval, execution-target continuity, temporal composition, and composite continuity.
 
-The latest reviewed design conclusion is that authority continuity is path-dependent rather than endpoint-dependent: returning to an earlier subject, execution-context, or boundary label after a discontinuity is not by itself sufficient to restore predecessor authority.
+These later results are **not** presented in this document as remotely verifiable GitHub commits, test counts, fixture counts, exact-head verdicts, or freeze checkpoints until their exact Git objects are transported. Publication status is part of the evidence boundary.
 
-This section records publication status only. It does not substitute for the missing Git history, tests, fixtures, or exact reviewed commits.
+A research principle established in the reviewed successor/shutdown line is:
+
+> Same apparent state does not imply the same authorized history.
+
+Operationally, a checkpoint, restart, replacement, re-entry, or label restoration may recover state, but authorization still has to be established under the current applicable authority chain.
 
 ## Claim discipline
 
-Until the later reviewed history is transported and independently inspectable on GitHub, public claims should use language such as:
+Until the later reviewed history is transported and independently inspectable on GitHub, public claims about that later line should use language such as:
 - "reviewed locally; transport pending";
 - "reproducible within the reviewed Authority Lab state";
 - "design-only" where no executable repair has been implemented.
+
+Claims about the already published bounded Authority Lab v0 may be tied directly to the remotely inspectable files and tests in this repository.
 
 Avoid:
 - claims of formal proof;
@@ -108,8 +109,8 @@ Avoid:
 
 ## Working research principle
 
-A concise current principle for the successor/shutdown frontier is:
+A concise principle retained from the successor/shutdown frontier is:
 
 > Same apparent state does not imply the same authorized history.
 
-Operationally, this means a checkpoint, restart, replacement, re-entry, or label restoration may recover state, but authorization must still be established under the current applicable authority chain.
+This principle is consistent with the broader literature above: recovered or apparently equivalent execution state is not, by itself, evidence that current authority has survived the transition.
