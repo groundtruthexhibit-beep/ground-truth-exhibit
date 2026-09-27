@@ -93,6 +93,8 @@ A later reviewed Authority Lab v1 release-candidate line exists outside the curr
 
 See [Literature and prior art](LITERATURE_AND_PRIOR_ART.md) and the [Publication manifest](PUBLICATION_MANIFEST.md) for the publication boundary.
 
+Historical design, frontier, review, and casebook documents intentionally preserve checkpoint-relative wording from the state they reviewed. They are evidence artifacts, not a substitute for the current publication-status boundary stated in this README and the manifest.
+
 One research principle established in the reviewed successor/shutdown line is:
 
 > Same apparent state does not imply the same authorized history.
