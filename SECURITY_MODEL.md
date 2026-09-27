@@ -61,11 +61,15 @@ The private engineering program exercised adversarial cases in categories includ
 - configuration rotation and skew;
 - ambiguous or unavailable state.
 
-This public exhibit intentionally does not publish the private hostile test corpus or exact bypass mechanics.
+This public exhibit publishes the bounded Authority Lab v1 fixture corpus and reproducibility material used for the frozen research claims. It does not publish private-core hostile material, protected operational evidence, secrets, or sensitive production bypass mechanics outside that bounded public model.
+
+## Research-freeze boundary
+
+The v1 research freeze records bounded failure-to-falsify results at exact Git states. It does not establish that every real-world authority source is truthful, that hidden collusion is absent, that physical effects outside the modeled T3 path are controlled, or that the public harness is production-ready.
 
 ## Non-claims
 
-Alpha completion does not claim:
+Alpha completion and the v1 research freeze do not claim:
 
 - immunity to compromise of every trusted boundary;
 - production deployment safety;
