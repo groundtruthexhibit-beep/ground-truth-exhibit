@@ -72,6 +72,7 @@ It is not the private Ground Truth core and is not a source-code mirror of the p
 ## Public materials
 
 - [Ground Truth v1 research freeze](GROUND_TRUTH_RESEARCH_FREEZE.md) — exact frozen release-candidate state and bounded PASS meaning.
+- [Ground Truth paper](paper/README.md) — v1.0 preprint, checksums, and exact evidence-binding metadata.
 - [Counterexample catalog](GROUND_TRUTH_COUNTEREXAMPLE_CATALOG.md)
 - [Threat model](GROUND_TRUTH_THREAT_MODEL.md)
 - [Limitations](GROUND_TRUTH_LIMITATIONS.md)
