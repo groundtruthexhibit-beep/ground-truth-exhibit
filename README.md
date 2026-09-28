@@ -69,6 +69,10 @@ It is not the private Ground Truth core and is not a source-code mirror of the p
 - New artifacts require new evidence.
 - Models and agents cannot vote themselves into authority.
 
+## Public website and paper discovery
+
+A crawler-friendly publication site is prepared at `https://groundtruthexhibit-beep.github.io/ground-truth-exhibit/`, with a dedicated scholarly landing page at `/paper/`, machine-readable citation metadata, sitemap, robots directives, and direct links to the canonical PDF and checksums.
+
 ## Public materials
 
 - [Ground Truth v1 research freeze](GROUND_TRUTH_RESEARCH_FREEZE.md) — exact frozen release-candidate state and bounded PASS meaning.
