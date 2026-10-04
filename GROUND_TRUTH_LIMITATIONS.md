@@ -35,3 +35,16 @@ they are not universal safety claims or formal proofs.
 
 These limits are preserved as publication constraints, not repaired through
 stronger wording.
+
+## PHI disclosure-authority extension limitations
+
+The post-freeze PHI extension adds no legal-compliance claim. In particular:
+
+- semantic PHI classification remains an admitted evidence problem;
+- legal basis, jurisdiction, consent validity, institutional policy, and clinical context remain external authority inputs;
+- a digest proves identity of bytes under the chosen canonicalization, not semantic truth or legal authority;
+- local rollback cannot undo an external disclosure;
+- an ambiguous send outcome does not establish non-disclosure;
+- provider/model labels do not establish a stable effective recipient or operator boundary;
+- privacy-preserving transport, valid authentication, valid payment, or successful routing do not establish semantic disclosure authority;
+- PASS remains bounded failure-to-falsify evidence, not HIPAA, PHIPA, PIPEDA, clinical-safety, production-security, or formal-verification evidence.

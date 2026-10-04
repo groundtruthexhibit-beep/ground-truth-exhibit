@@ -28,3 +28,14 @@ Evidence levels are maturity levels defined in
 
 The determinism evidence is intentionally a separate test-only freeze commit;
 it does not alter Authority Lab semantics.
+
+## Post-freeze PHI paper evidence extension
+
+These entries are later than the frozen v1 paper evidence state and do not rewrite its historical counts.
+
+| Claim ID | Paper topic | Evidence category | Status | Fixture/test | Exact commit | Artifact | Observed outcome | Publication-safe wording | Limitations |
+|---|---|---|---|---|---|---|---|---|---|
+| GT-PAPER-PHI-001 | Semantic disclosure authority is distinct from privacy/payment authority | Case-study property separation | Bounded analysis | pinned zkAPI state | `045b444ea1b52538d1b40273c7cb6ed09468a052` | PHI paper, zkAPI public docs | prompt-free lease authorization is separate from later inference request contents | Privacy/payment authorization does not by itself establish semantic disclosure authority. | No zkAPI vulnerability is claimed. |
+| GT-PAPER-PHI-002 | PHI disclosure gate integrated at canonical T3 | Counterexample -> repair | Merged | `LAB-V1-467..478` | `0b88a4814496c32c2a729f350106e0038f1b8e63` | `authority_lab/phi_disclosure.py`, runner/oracle integration | PHI gate converges on protected execution event and tool context | PHI disclosure authority reuses the existing Ground Truth T3 boundary without adding a new outcome or invariant. | Semantic/legal truth remains external evidence. |
+| GT-PAPER-PHI-003 | Incomplete history precedes cumulative denial | Hostile review -> repair | Merged | `test_incomplete_phi_history_precedes_cumulative_denial` | `0b88a4814496c32c2a729f350106e0038f1b8e63` | tests and PHI verifier | incomplete history -> `UNAVAILABLE / PHI_HISTORY_UNAVAILABLE` | A cumulative denial is issued only after required disclosure-history completeness is established. | Depends on protected history integrity and admitted policy. |
+| GT-PAPER-PHI-004 | Integrated PHI bounded regression | Regression/hostile review | PASS | 265 tests; 478 fixtures | `0b88a4814496c32c2a729f350106e0038f1b8e63` | verification JSON/MD and hostile-review script; merged by `05ab14a7c260e8d94e737a8d4a524385bb673515` | tests PASS; fixtures PASS; hostile review PASS; verifier OVERALL PASS | No reproducible in-scope PHI authority bypass survived the merged bounded test state. | No GitHub CI checks were configured; not universal security or legal compliance. |

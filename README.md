@@ -77,6 +77,8 @@ A crawler-friendly publication site is prepared at `https://groundtruthexhibit-b
 
 - [Ground Truth v1 research freeze](GROUND_TRUTH_RESEARCH_FREEZE.md) — exact frozen release-candidate state and bounded PASS meaning.
 - [Ground Truth paper](paper/README.md) — v1.0 preprint, checksums, and exact evidence-binding metadata.
+- [Ground Truth for PHI paper](paper/Ground_Truth_for_PHI_Preprint_v1_0_David_B_Boyd.md) — post-freeze semantic-disclosure authority extension, merged implementation evidence, and pinned zkAPI case study.
+
 - [Counterexample catalog](GROUND_TRUTH_COUNTEREXAMPLE_CATALOG.md)
 - [Threat model](GROUND_TRUTH_THREAT_MODEL.md)
 - [Limitations](GROUND_TRUTH_LIMITATIONS.md)
@@ -108,3 +110,11 @@ The frozen research HEAD is `31d78aa158618ca8b72eb61e2f49b434e4319e9e`; the free
 The exact T3 closure and Composite closure are recorded in the [research freeze](GROUND_TRUTH_RESEARCH_FREEZE.md). Their PASS verdicts are bounded failure-to-falsify statements, not proof of universal security, formal correctness, production safety, or completeness.
 
 No additional authority-model frontier is part of Ground Truth v1 unless a reproducible counterexample against the frozen release candidate reopens the research cycle. Ground Truth Runtime is a separate enforcement product and is not part of the frozen research evidence.
+
+## Post-freeze PHI disclosure-authority extension
+
+A bounded post-freeze research extension applies the existing Ground Truth authority model to semantic health-information disclosure. Pull request #25 merged at `05ab14a7c260e8d94e737a8d4a524385bb673515`, preserving the six tuple coordinates, six invariants, three outcomes, and `authority-lab-v1` schema.
+
+The merged PHI evidence state records 478 fixtures, 265/265 Authority Lab tests PASS, all-fixture execution PASS, hostile review PASS, and final bounded implementation verification OVERALL PASS. No GitHub CI/status checks were configured for PR #25; the published evidence is local exact-state regression evidence, not CI evidence.
+
+The extension does not revise the historical Ground Truth v1 research-freeze counts above. It is a later, separately identified evidence state.

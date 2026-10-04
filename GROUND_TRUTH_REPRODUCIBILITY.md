@@ -76,3 +76,20 @@ never enters the oracle. A clean reproduction ends with empty
 
 Canonicalization, schema parsing, and protected state are detailed in
 `GROUND_TRUTH_FIXTURE_AND_CANONICALIZATION.md`.
+
+## Post-freeze PHI disclosure-authority reproduction
+
+The following is a later extension and does not replace the frozen v1 evidence above.
+
+- PR: `#25`
+- reviewed feature head: `0b88a4814496c32c2a729f350106e0038f1b8e63`
+- merge commit on `main`: `05ab14a7c260e8d94e737a8d4a524385bb673515`
+- schema: unchanged `authority-lab-v1`
+- fixture corpus after extension: 478 fixtures
+- Authority Lab regression: 265/265 PASS
+- all-fixture runner: PASS
+- hostile PHI review: PASS
+- final bounded implementation verifier: OVERALL PASS
+- GitHub status checks on PR #25: none configured/reported
+
+The final hostile review also fixed denial precedence for incomplete disclosure history: incomplete required history returns `UNAVAILABLE / PHI_HISTORY_UNAVAILABLE`; cumulative `DENIED` is evaluated only after history completeness is established.
