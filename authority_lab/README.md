@@ -66,3 +66,7 @@ Authority Lab v1 assumes fixture-provided root facts and harness-provided durabl
 External engineers are encouraged to submit minimal reproducible break cases with exact facts, contract interpretation, allegedly bypassed invariants, and deterministic reproduction steps. Contributor expectations never control the oracle and create no authority.
 
 This bounded implementation requires no network, implicit wall clock, external service, or model judgment and uses only the Python standard library. Its existence does not authorize deployment, production use, roadmap advancement, a later phase, or private-core modification.
+
+## PHI disclosure authority (research extension)
+
+Authority Lab v1 may require one harness-owned PHI disclosure context and one exact candidate `phi_disclosure_binding`. The join reuses the existing canonical T3 and Tool/Connector context. Exact current prohibition/revocation is `DENIED`; missing, stale, ambiguous, or non-convergent required state is `UNAVAILABLE`. Policy `NONE` preserves legacy fixtures. Protected PHI research state is loaded from `cases/authority_lab/trusted_phi_disclosure_state.json`; raw PHI text is not required in trace state.

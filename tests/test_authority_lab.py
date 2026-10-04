@@ -453,9 +453,9 @@ class AuthorityLabTests(unittest.TestCase):
         self.assertIs(AuthorityOutcome.UNAVAILABLE, result.outcome)
         self.assertIn(reason_code, {reason.code for reason in result.reasons})
 
-    def test_v1_contains_four_hundred_sixty_six_deterministic_fixtures(self) -> None:
+    def test_v1_contains_four_hundred_seventy_eight_deterministic_fixtures(self) -> None:
         paths = discover(CASES)
-        self.assertEqual(466, len(paths))
+        self.assertEqual(478, len(paths))
         self.assertEqual(paths, discover(CASES))
 
     def test_every_v0_fixture_matches_its_expected_outcome(self) -> None:
@@ -2778,6 +2778,46 @@ class AuthorityLabTests(unittest.TestCase):
             ],
         )
         self.assertIs(AuthorityOutcome.AUTHORIZED, actual(payload))
+
+    def test_phi_disclosure_authority_matrix(self) -> None:
+        unavailable=("LAB-V1-468","LAB-V1-471","LAB-V1-473","LAB-V1-475","LAB-V1-476","LAB-V1-477","LAB-V1-478")
+        denied=("LAB-V1-470","LAB-V1-472","LAB-V1-474")
+        authorized=("LAB-V1-467","LAB-V1-469")
+        for expected,case_ids in ((AuthorityOutcome.UNAVAILABLE,unavailable),(AuthorityOutcome.DENIED,denied),(AuthorityOutcome.AUTHORIZED,authorized)):
+            for case_id in case_ids:
+                with self.subTest(case_id=case_id): self.assertIs(expected, actual(fixture(case_id)))
+
+    def test_incomplete_phi_history_precedes_cumulative_denial(self) -> None:
+        payload=fixture("LAB-V1-472")
+        payload["_trusted_anchor_context"][0]["phi_disclosure_authority_context"]["history_complete"]=False
+        result=evaluate(OracleInput.from_fixture(payload))
+        self.assertIs(AuthorityOutcome.UNAVAILABLE,result.outcome)
+        self.assertEqual("PHI_HISTORY_UNAVAILABLE",result.reasons[0].code)
+
+    def test_candidate_cannot_supply_trusted_phi_disclosure_context(self) -> None:
+        path=CASES/"LAB-V1-464.json"
+        raw=json.loads(path.read_text(encoding="utf-8"))
+        raw["_trusted_phi_disclosure_context"]={}
+        with patch("authority_lab.runner.Path.open") as opened:
+            opened.return_value.__enter__.return_value.read.return_value=json.dumps(raw)
+            opened.return_value.__enter__.return_value.__iter__.return_value=iter(())
+            with self.assertRaisesRegex(ValueError,"trusted PHI disclosure"):
+                load_fixture(path)
+
+    def test_phi_protected_context_rejects_unknown_fields(self) -> None:
+        payload=fixture("LAB-V1-469")
+        payload["_trusted_anchor_context"][0]["phi_disclosure_authority_context"]["candidate_controlled"]=True
+        with self.assertRaisesRegex(ValueError,"contain exactly"):
+            evaluate(OracleInput.from_fixture(payload))
+
+    def test_phi_positive_reaches_existing_canonical_t3(self) -> None:
+        payload=fixture("LAB-V1-469")
+        binding=payload["t3"]["facts"]["phi_disclosure_binding"]["value"]
+        event=payload["_trusted_anchor_context"][0]["t3_execution_event"]
+        self.assertEqual(binding["execution_event_id"],event["execution_event_id"])
+        self.assertEqual(binding["effect_digest"],event["execution_event_digest"])
+        self.assertEqual(binding["tool_context_id"],event["tool_context_id"])
+        self.assertIs(AuthorityOutcome.AUTHORIZED,actual(payload))
 
     def test_fixture_files_are_valid_json_objects(self) -> None:
         for path in discover(CASES):

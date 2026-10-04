@@ -1,0 +1,71 @@
+{
+  "baseline_head": "74cd883736c7acde1ff0d0d2ad765f6e8771def0",
+  "checks": {
+    "all_fixture_runner": {
+      "count": 478,
+      "mismatches": "[]",
+      "ok": true,
+      "stderr": ""
+    },
+    "authority_lab_tests": {
+      "ok": true,
+      "output_sha256": "785e9d4007db25e7037a428a8e52598f79ce7d9556283cbf39096cc7b929c1c3",
+      "returncode": 0,
+      "test_count": 265
+    },
+    "diff_check": {
+      "ok": true,
+      "stderr": "",
+      "stdout": ""
+    },
+    "diff_sha256": "39c912aa5d934fbc98cccd0b079fabd8035b1f023eda7b8cb2792234230556d6",
+    "fixture_count": {
+      "actual": 478,
+      "expected": 478,
+      "ok": true
+    },
+    "frozen_public_structure": {
+      "ok": true,
+      "six_invariants": true,
+      "six_tuple_fields": true,
+      "three_outcomes": true
+    },
+    "head": {
+      "actual": "b5c261ddde9a783263d02587d1a29e1ab0d344ec",
+      "baseline": "74cd883736c7acde1ff0d0d2ad765f6e8771def0",
+      "baseline_is_ancestor": true,
+      "ok": true
+    },
+    "hostile_review": {
+      "ok": true,
+      "output_sha256": "77b80c89204f1b6db3f337dfd42c4a32facc34f401c8aea592815d4dbeb64541",
+      "returncode": 0
+    },
+    "phi_fixture_presence": {
+      "missing": [],
+      "ok": true
+    },
+    "phi_manifest": {
+      "entries": 12,
+      "ok": true
+    },
+    "remote": {
+      "ok": true,
+      "value": "origin\thttps://github.com/groundtruthexhibit-beep/ground-truth-exhibit.git (fetch)\norigin\thttps://github.com/groundtruthexhibit-beep/ground-truth-exhibit.git (push)"
+    },
+    "working_tree_has_changes": {
+      "ok": true,
+      "status": [
+        " M PHI_IMPLEMENTATION_VERIFICATION.json",
+        " M PHI_IMPLEMENTATION_VERIFICATION.md",
+        " M authority_lab/phi_disclosure.py",
+        " M tests/test_authority_lab.py",
+        " M verify_ground_truth_phi_v1.py",
+        "?? __pycache__/",
+        "?? authority_lab/__pycache__/",
+        "?? tests/__pycache__/"
+      ]
+    }
+  },
+  "overall_pass": true
+}

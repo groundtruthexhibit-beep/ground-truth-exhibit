@@ -46,6 +46,9 @@ from .model import (
 )
 
 
+from .phi_disclosure import evaluate_phi_disclosure
+
+
 def _canonical_digest(domain: str, value: Mapping[str, Any]) -> str:
     payload = json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
     return hashlib.sha256(f"{domain}\0{payload}".encode("utf-8")).hexdigest()
@@ -4156,6 +4159,14 @@ def evaluate(case: OracleInput) -> OracleResult:
     t3_result = _evaluate_t3_execution_event(case, active_state)
     if t3_result is not None:
         return t3_result
+
+    phi_result = evaluate_phi_disclosure(case)
+    if phi_result is not None and phi_result.outcome is not AuthorityOutcome.AUTHORIZED:
+        return OracleResult(
+            phi_result.outcome,
+            (Reason(phi_result.code, phi_result.detail, phi_result.facts),),
+            _engaged(case),
+        )
 
     delegation_result, protected_terminal_grant = _evaluate_delegation_authority(
         case, active_state
