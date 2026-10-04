@@ -2787,6 +2787,13 @@ class AuthorityLabTests(unittest.TestCase):
             for case_id in case_ids:
                 with self.subTest(case_id=case_id): self.assertIs(expected, actual(fixture(case_id)))
 
+    def test_incomplete_phi_history_precedes_cumulative_denial(self) -> None:
+        payload=fixture("LAB-V1-472")
+        payload["_trusted_anchor_context"][0]["phi_disclosure_authority_context"]["history_complete"]=False
+        result=evaluate(OracleInput.from_fixture(payload))
+        self.assertIs(AuthorityOutcome.UNAVAILABLE,result.outcome)
+        self.assertEqual("PHI_HISTORY_UNAVAILABLE",result.reasons[0].code)
+
     def test_candidate_cannot_supply_trusted_phi_disclosure_context(self) -> None:
         path=CASES/"LAB-V1-464.json"
         raw=json.loads(path.read_text(encoding="utf-8"))

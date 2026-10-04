@@ -161,13 +161,13 @@ def evaluate_phi_disclosure(case: Any) -> PHIGateResult | None:
         return _result(AuthorityOutcome.DENIED, "PHI_RECIPIENT_PROHIBITED", "Current protected PHI policy prohibits the requested recipient.", "recipient_id")
     if context["authority_state"] in {"REVOKED", "REJECTED", "PROHIBITED"}:
         return _result(AuthorityOutcome.DENIED, "PHI_AUTHORITY_REVOKED", "Current protected PHI authority basis is negative.", "authority_basis_id")
-    cumulative = set(context["history_classes"]) | set(binding["information_classes"])
-    if len(cumulative) > context["max_cumulative_classes"]:
-        return _result(AuthorityOutcome.DENIED, "PHI_CUMULATIVE_DISCLOSURE_PROHIBITED", "Current effective-domain disclosure exceeds protected cumulative policy.", "history_head_id", "recipient_id")
     if context["authority_state"] != "ACTIVE":
         return _result(AuthorityOutcome.UNAVAILABLE, "PHI_AUTHORITY_BASIS_UNAVAILABLE", "Current PHI authority basis is not active.", "authority_basis_id")
     if not context["history_complete"]:
         return _result(AuthorityOutcome.UNAVAILABLE, "PHI_HISTORY_UNAVAILABLE", "Current monotonic PHI disclosure history is incomplete.", "history_head_id")
+    cumulative = set(context["history_classes"]) | set(binding["information_classes"])
+    if len(cumulative) > context["max_cumulative_classes"]:
+        return _result(AuthorityOutcome.DENIED, "PHI_CUMULATIVE_DISCLOSURE_PROHIBITED", "Current effective-domain disclosure exceeds protected cumulative policy.", "history_head_id", "recipient_id")
     if context["recipient_domain_state"] != "ACTIVE":
         return _result(AuthorityOutcome.UNAVAILABLE, "PHI_RECIPIENT_DOMAIN_UNAVAILABLE", "Effective recipient domain is unavailable.", "recipient_id")
     if binding["purpose_id"] != context["purpose_id"]:

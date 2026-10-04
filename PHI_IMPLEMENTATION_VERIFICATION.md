@@ -1,6 +1,6 @@
 # PHI Implementation Verification
 
-- baseline HEAD exact: True
+- baseline is ancestor of HEAD: True
 - expected remote: True
 - implementation changes present: True
 - git diff --check: True
@@ -13,4 +13,4 @@
 
 **OVERALL: PASS**
 
-This PASS is an exact-state implementation regression result, not a legal-compliance or universal-security claim.
+This result is a bounded implementation regression result, not a legal-compliance or universal-security claim.

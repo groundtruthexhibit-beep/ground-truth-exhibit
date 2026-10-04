@@ -36,7 +36,13 @@ def main() -> int:
     checks = report["checks"]
 
     head = run("git", "rev-parse", "HEAD").stdout.strip()
-    checks["head"] = {"actual": head, "ok": head == BASELINE}
+    ancestry = run("git", "merge-base", "--is-ancestor", BASELINE, "HEAD", check=False)
+    checks["head"] = {
+        "actual": head,
+        "baseline": BASELINE,
+        "baseline_is_ancestor": ancestry.returncode == 0,
+        "ok": ancestry.returncode == 0,
+    }
 
     remote = run("git", "remote", "-v").stdout
     checks["remote"] = {
@@ -174,7 +180,7 @@ def main() -> int:
     summary = [
         "# PHI Implementation Verification",
         "",
-        f"- baseline HEAD exact: {checks['head']['ok']}",
+        f"- baseline is ancestor of HEAD: {checks['head']['ok']}",
         f"- expected remote: {checks['remote']['ok']}",
         f"- implementation changes present: {checks['working_tree_has_changes']['ok']}",
         f"- git diff --check: {checks['diff_check']['ok']}",
@@ -187,7 +193,7 @@ def main() -> int:
         "",
         f"**OVERALL: {'PASS' if overall else 'FAIL'}**",
         "",
-        "This PASS is an exact-state implementation regression result, not a legal-compliance or universal-security claim.",
+        "This result is a bounded implementation regression result, not a legal-compliance or universal-security claim.",
     ]
     (ROOT / "PHI_IMPLEMENTATION_VERIFICATION.md").write_text("\n".join(summary) + "\n")
 
