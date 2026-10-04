@@ -35,3 +35,26 @@ The paper is written against the remotely inspectable Ground Truth v1 research s
 - Authority Lab fixtures at frozen research HEAD: 466/466 PASS
 
 PASS is a bounded failure-to-falsify result under the exact stated model, corpus, implementation, assumptions, and Git state. It is not a claim of universal security, formal proof, production readiness, or complete authority modeling.
+
+## Post-freeze PHI disclosure-authority paper
+
+**Ground Truth for PHI: Deterministic Authorization of Semantic Disclosure in AI Systems**
+
+Publication-candidate artifacts:
+- `Ground_Truth_for_PHI_Preprint_v1_0_David_B_Boyd.md`
+- `Ground_Truth_for_PHI_Preprint_v1_0_David_B_Boyd.docx`
+- `Ground_Truth_for_PHI_Preprint_v1_0_David_B_Boyd.pdf`
+- `PHI_SHA256SUMS.txt` — SHA-256 checksums for the PHI Markdown, DOCX, and PDF artifacts
+
+Evidence binding:
+- pinned case study: `ethereum/zkapi@045b444ea1b52538d1b40273c7cb6ed09468a052`
+- reviewed feature head: `0b88a4814496c32c2a729f350106e0038f1b8e63`
+- merged Ground Truth state: `05ab14a7c260e8d94e737a8d4a524385bb673515`
+- schema: unchanged `authority-lab-v1`
+- fixture corpus: 478
+- Authority Lab regression: 265/265 PASS
+- all-fixture runner: PASS
+- hostile review: PASS
+- final bounded implementation verifier: OVERALL PASS
+
+This PHI paper is a post-freeze extension. It does not rewrite the historical evidence binding of the v1.0 authority-continuity preprint above.

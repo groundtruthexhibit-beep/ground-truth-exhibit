@@ -24,6 +24,26 @@ and its v1 research-freeze evidence package.
 - `cases/authority_lab/`
 - `tests/test_authority_lab.py`
 
+## Post-freeze PHI publication extension
+
+Included as a later, separately identified research extension:
+- `PHI_AUTHORITY_LAB_INTEGRATION_DESIGN.md`
+- `PHI_DISCLOSURE_AUTHORITY_CONTRACT_V1.md`
+- `PHI_INTEGRATION_HOSTILE_REVIEW.md`
+- `PHI_REPRODUCIBILITY_MANIFEST_V1.md`
+- `PHI_IMPLEMENTATION_VERIFICATION.md`
+- `PHI_IMPLEMENTATION_VERIFICATION.json`
+- `authority_lab/phi_disclosure.py`
+- `cases/authority_lab/LAB-V1-467.json` through `LAB-V1-478.json`
+- `cases/authority_lab/trusted_phi_disclosure_state.json`
+- `paper/Ground_Truth_for_PHI_Preprint_v1_0_David_B_Boyd.md`
+- `paper/Ground_Truth_for_PHI_Preprint_v1_0_David_B_Boyd.docx`
+- `paper/Ground_Truth_for_PHI_Preprint_v1_0_David_B_Boyd.pdf`
+- `paper/PHI_SHA256SUMS.txt`
+- `paper/phi/index.html`
+
+This extension was merged by PR #25 at `05ab14a7c260e8d94e737a8d4a524385bb673515`. It does not retroactively alter the historical Ground Truth v1 freeze checkpoint below.
+
 ## Intentionally excluded
 
 - private-core source implementation not intentionally published here;

@@ -109,3 +109,43 @@ A concise principle retained from the successor/shutdown frontier is:
 > Same apparent state does not imply the same authorized history.
 
 This principle is consistent with the broader literature above: recovered or apparently equivalent execution state is not, by itself, evidence that current authority has survived the transition.
+
+## Semantic disclosure authority, privacy, and health-information context
+
+### Privacy risk management
+
+NIST's Privacy Framework is a voluntary privacy-risk management framework intended to help organizations identify and manage privacy risk. NIST published an initial public draft of Privacy Framework 1.1 in April 2025.
+
+Primary sources:
+- https://www.nist.gov/privacy-framework
+- https://csrc.nist.gov/pubs/cswp/40/nist-privacy-framework-11/ipd
+
+Ground Truth relationship:
+- Privacy risk management and semantic disclosure authority are adjacent but not identical.
+- Ground Truth does not infer a disclosure policy from the Privacy Framework; it evaluates current authority facts supplied by an admitted policy/evidence boundary.
+- A privacy-risk control may motivate an authority predicate, but the external policy remains the source of that predicate.
+
+### HIPAA minimum-necessary context
+
+HHS explains that the HIPAA Privacy Rule generally requires covered entities to make reasonable efforts to limit uses, disclosures, and requests for PHI to the minimum necessary for an intended purpose when the standard applies. HHS also documents important exceptions, including certain treatment disclosures and uses/disclosures made pursuant to an individual's authorization.
+
+Primary sources:
+- https://www.hhs.gov/hipaa/for-professionals/privacy/guidance/minimum-necessary-requirement/
+- https://www.hhs.gov/hipaa/for-professionals/faq/minimum-necessary/
+
+Ground Truth relationship:
+- These legal rules are context- and role-dependent and are not encoded as a universal technical PHI rule.
+- Ground Truth does not determine whether HIPAA applies, whether a person or organization is a covered entity/business associate, or whether a disclosure is legally permitted.
+- Where a governing legal/policy process produces an admitted authority proposition, Ground Truth can test currentness, exact binding, cumulative history, recipient/purpose continuity, and T3 convergence of that proposition.
+
+### zkAPI privacy/payment architecture as bounded case study
+
+The PHI paper pins `ethereum/zkapi@045b444ea1b52538d1b40273c7cb6ed09468a052`. At that state, public zkAPI documentation describes prompt-free proof authorization for lease issuance and separates it from later inference performed with an issued provider key.
+
+Primary source:
+- https://github.com/ethereum/zkapi/tree/045b444ea1b52538d1b40273c7cb6ed09468a052
+
+Ground Truth relationship:
+- No zkAPI vulnerability is claimed.
+- The architecture is useful as a property-separation case study: correct cryptographic/payment authorization does not itself establish authority for the exact semantic contents of a later model request.
+- Ground Truth therefore treats privacy/payment authority and semantic disclosure authority as distinct propositions that may be enforced by different layers.
