@@ -42,6 +42,8 @@ def load_fixture(path: str | Path) -> dict[str, Any]:
         raise ValueError("fixture cannot supply harness-owned trusted tool connector state")
     if "_trusted_t3_execution_event" in value:
         raise ValueError("fixture cannot supply harness-owned trusted T3 execution event")
+    if "_trusted_phi_disclosure_context" in value:
+        raise ValueError("fixture cannot supply harness-owned trusted PHI disclosure state")
     manifest_path = fixture_path.parent / "trusted_commitment_state.json"
     if value.get("schema_version") == "authority-lab-v1" and manifest_path.exists():
         with manifest_path.open("r", encoding="utf-8") as handle:
@@ -58,6 +60,20 @@ def load_fixture(path: str | Path) -> dict[str, Any]:
         if not isinstance(context, list) or not all(isinstance(item, dict) for item in context):
             raise ValueError("trusted anchor state manifest entry is invalid")
         value["_trusted_anchor_context"] = context
+    phi_manifest_path = fixture_path.parent / "trusted_phi_disclosure_state.json"
+    if value.get("schema_version") == "authority-lab-v1" and phi_manifest_path.exists():
+        with phi_manifest_path.open("r", encoding="utf-8") as handle:
+            manifest = json.load(handle)
+        entry = manifest.get(fixture_path.name)
+        if entry is not None:
+            if (not isinstance(entry, dict) or set(entry) != {"anchor_index", "context"}
+                or isinstance(entry["anchor_index"], bool) or not isinstance(entry["anchor_index"], int)
+                or entry["anchor_index"] < 0 or not isinstance(entry["context"], dict)):
+                raise ValueError("trusted PHI disclosure state manifest entry is invalid")
+            anchors = value.get("_trusted_anchor_context")
+            if not isinstance(anchors, list) or entry["anchor_index"] >= len(anchors):
+                raise ValueError("trusted PHI disclosure state anchor is unavailable")
+            anchors[entry["anchor_index"]]["phi_disclosure_authority_context"] = entry["context"]
     return value
 
 

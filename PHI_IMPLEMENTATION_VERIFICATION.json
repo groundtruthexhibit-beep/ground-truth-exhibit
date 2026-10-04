@@ -1,0 +1,89 @@
+{
+  "baseline_head": "74cd883736c7acde1ff0d0d2ad765f6e8771def0",
+  "checks": {
+    "all_fixture_runner": {
+      "count": 478,
+      "mismatches": "[]",
+      "ok": true,
+      "stderr": ""
+    },
+    "authority_lab_tests": {
+      "ok": true,
+      "output_sha256": "6dcd19c899d2b1a210c3cc64fd3112eb2210a9f56c53ab1938d41fc2cb209091",
+      "returncode": 0,
+      "test_count": 264
+    },
+    "diff_check": {
+      "ok": true,
+      "stderr": "",
+      "stdout": ""
+    },
+    "diff_sha256": "40d4814d7669923bce7c2c1af2ad8a479a319613a1fafe1c1b5ce4055834fda4",
+    "fixture_count": {
+      "actual": 478,
+      "expected": 478,
+      "ok": true
+    },
+    "frozen_public_structure": {
+      "ok": true,
+      "six_invariants": true,
+      "six_tuple_fields": true,
+      "three_outcomes": true
+    },
+    "head": {
+      "actual": "74cd883736c7acde1ff0d0d2ad765f6e8771def0",
+      "ok": true
+    },
+    "hostile_review": {
+      "ok": true,
+      "output_sha256": "75493626ad65cbf284680334c560c3e26302d205d5ed0751cf76d9ef11ebd9f9",
+      "returncode": 0
+    },
+    "phi_fixture_presence": {
+      "missing": [],
+      "ok": true
+    },
+    "phi_manifest": {
+      "entries": 12,
+      "ok": true
+    },
+    "remote": {
+      "ok": true,
+      "value": "origin\thttps://github.com/groundtruthexhibit-beep/ground-truth-exhibit.git (fetch)\norigin\thttps://github.com/groundtruthexhibit-beep/ground-truth-exhibit.git (push)"
+    },
+    "working_tree_has_changes": {
+      "ok": true,
+      "status": [
+        " M authority_lab/README.md",
+        " M authority_lab/oracle.py",
+        " M authority_lab/runner.py",
+        " M cases/authority_lab/trusted_anchor_state.json",
+        " M cases/authority_lab/trusted_commitment_state.json",
+        " M tests/test_authority_lab.py",
+        "?? PHI_AUTHORITY_LAB_INTEGRATION_DESIGN.md",
+        "?? PHI_DISCLOSURE_AUTHORITY_CONTRACT_V1.md",
+        "?? PHI_INTEGRATION_HOSTILE_REVIEW.md",
+        "?? PHI_REPRODUCIBILITY_MANIFEST_V1.md",
+        "?? authority_lab/__pycache__/",
+        "?? authority_lab/phi_disclosure.py",
+        "?? cases/authority_lab/LAB-V1-467.json",
+        "?? cases/authority_lab/LAB-V1-468.json",
+        "?? cases/authority_lab/LAB-V1-469.json",
+        "?? cases/authority_lab/LAB-V1-470.json",
+        "?? cases/authority_lab/LAB-V1-471.json",
+        "?? cases/authority_lab/LAB-V1-472.json",
+        "?? cases/authority_lab/LAB-V1-473.json",
+        "?? cases/authority_lab/LAB-V1-474.json",
+        "?? cases/authority_lab/LAB-V1-475.json",
+        "?? cases/authority_lab/LAB-V1-476.json",
+        "?? cases/authority_lab/LAB-V1-477.json",
+        "?? cases/authority_lab/LAB-V1-478.json",
+        "?? cases/authority_lab/trusted_phi_disclosure_state.json",
+        "?? post_apply_phi_hostile_review.py",
+        "?? tests/__pycache__/",
+        "?? verify_ground_truth_phi_v1.py"
+      ]
+    }
+  },
+  "overall_pass": true
+}
