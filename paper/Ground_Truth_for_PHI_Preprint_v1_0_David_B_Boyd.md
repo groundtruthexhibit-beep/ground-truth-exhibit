@@ -154,10 +154,10 @@ Synthetic executable tests currently cover:
 - positive current-history path remains AUTHORIZED
 - incomplete/falsely restored history fails closed
 
-The next planned attack is authorization-to-execution mutation: authorize one exact
-request, then mutate prompt/effect, recipient, purpose, provider, or disclosure history
-before transmission. A stored `AUTHORIZED` result must not become execution authority
-unless all required relations converge at the exact T3 event.
+The subsequent experiments extend this baseline through authorization-to-execution
+mutation, transformation closure, recipient-domain correlation, revocation timing,
+ambiguous effects, memory continuity, provider migration, and final hostile composition.
+Those later results are reported below.
 
 
 ## 12. Attack 3: authorization-to-execution mutation
@@ -408,8 +408,9 @@ The executable research now covers:
 6. consent/revocation race and delayed execution;
 7. partial execution / ambiguous send outcome.
 
-The remaining planned attack families are cross-session/memory contamination,
-model/provider migration continuity, and final composite adversarial composition.
+The subsequent experiments complete the attack series with cross-session/memory
+contamination, model/provider migration continuity, and final composite adversarial
+composition.
 
 
 ## 22. Attack 8: cross-session and memory contamination
@@ -458,8 +459,8 @@ The executable research now covers:
 7. partial execution / ambiguous send outcome;
 8. cross-session / memory contamination.
 
-Two planned attacks remain before closure: model/provider migration continuity and a final
-composite adversarial attack.
+The final two attack families examine model/provider migration continuity and a composite
+adversarial trace that combines the prior failure classes.
 
 
 ## 24. Attack 9: model/provider migration continuity
@@ -507,15 +508,14 @@ The executable research now covers:
 8. cross-session / memory contamination;
 9. model/provider migration continuity.
 
-One planned attack remains before expansion stops: a composite adversarial trace that
-combines several individually repaired classes and tests whether authority can be
-laundered across their composition.
+The final attack combines the prior PHI failure classes and tests whether any interaction
+escapes the individual repairs.
 
 
 ## 26. Attack 10: composite adversarial disclosure continuity
 
-The final planned attack composes the earlier PHI failure classes rather than introducing
-a new local mechanism.
+The final attack composes the earlier PHI failure classes rather than introducing a new
+standalone category.
 
 A hostile synthetic trace begins with a valid source authorization, then crosses session
 scope, expands the artifact through transformation, collapses recipient labels onto one
