@@ -1,6 +1,6 @@
 # Architecture
 
-[Overview](README.md) · [Security model](SECURITY_MODEL.md) · [Evidence model](EVIDENCE_MODEL.md) · [Alpha completion](ALPHA_COMPLETION.md) · [Disclosure boundary](DISCLOSURE_BOUNDARY.md)
+[Overview](README.md) · [Security model](SECURITY_MODEL.md) · [Evidence model](EVIDENCE_MODEL.md) · [Alpha completion](ALPHA_COMPLETION.md) · [Disclosure boundary](DISCLOSURE_BOUNDARY.md) · [Current platform status](CURRENT_PLATFORM_STATUS.md)
 
 Ground Truth is a vendor-neutral authority and verification plane for autonomous systems.
 
@@ -63,6 +63,40 @@ The authority plane uses exactly these authority outcomes:
 `UNAVAILABLE`: A fact required to establish the applicable boundary, exact tuple, objective binding, authority-relevant state, continuity, evidence relationship, freshness, consumption state, or decision cannot be established.
 
 All outcomes preserve the separation between a decision and execution. `DENIED` and `UNAVAILABLE` result in no authority-consuming transition; uncertainty does not degrade into permission.
+
+## Integration boundary: Ground Truth + MobiPute
+
+The current engineering stack extends the authority model into a separate governed-execution plane without collapsing the two roles.
+
+```text
+Proposal / requested action
+        ↓
+Ground Truth
+(current authority)
+        ↓ only while exact authority remains established
+MobiPute
+(governed compute / verification / durable evidence)
+        ↓
+Protected effect / settlement evidence where applicable
+```
+
+The current division of responsibility is:
+
+- **Ground Truth** — authority plane: currentness, revocation, rollback resistance, authorization state, and the decision whether a protected transition is permitted.
+- **MobiPute** — governed execution, verification, evidence, and settlement-execution plane: workload coordination, mobile execution, independent result verification, durable evidence, protected-effect gating, and settlement-related evidence.
+- **TruthPute** — operator/integration application: presents lifecycle and evidence to an operator; it does not mint authority by presentation.
+
+The combined architecture preserves these distinctions:
+
+```text
+CAPABILITY != AUTHORIZATION
+VERIFIED != AUTHORIZED
+AUTHORIZED != SETTLED
+NO VERIFIED COMPUTATION -> NO BALANCE MUTATION
+NO CURRENT AUTHORITY -> NO PROTECTED SETTLEMENT EFFECT
+```
+
+This integration material is a later engineering context. It is not part of the historical Ground Truth v1 research-freeze evidence unless explicitly identified as such. See [Current platform status](CURRENT_PLATFORM_STATUS.md) for the latest bounded public status snapshot.
 
 ## Lifecycle discipline
 
