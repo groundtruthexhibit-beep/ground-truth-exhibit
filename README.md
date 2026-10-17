@@ -34,6 +34,32 @@ T1 is evaluation, T2 is non-authoritative preparation, and T3 is the irreversibl
 
 Conventional agent systems often collapse proposal, evidence, and permission into one control loop: the component that decides what to do also produces the rationale and proceeds with the action. Ground Truth deliberately separates those concerns so capability can be evaluated without being mistaken for permission, and evidence can be checked without being mistaken for authority.
 
+## Current engineering direction
+
+The broader engineering stack now separates authority from governed execution:
+
+```text
+Proposal / requested action
+        ↓
+Ground Truth — current authority
+        ↓ only while the exact action remains authorized
+MobiPute — governed execution / verification / evidence
+        ↓
+Protected effect and, where applicable, settlement evidence
+```
+
+Ground Truth is the authority plane. MobiPute is the governed compute, verification, evidence, and settlement-execution plane. TruthPute is an operator/integration application and is not itself the authority source.
+
+The combined engineering model preserves several important distinctions:
+
+- `CAPABILITY != AUTHORIZATION`
+- `VERIFIED != AUTHORIZED`
+- `AUTHORIZED != SETTLED`
+- `NO VERIFIED COMPUTATION -> NO BALANCE MUTATION`
+- `NO CURRENT AUTHORITY -> NO PROTECTED SETTLEMENT EFFECT`
+
+See [Current platform status](CURRENT_PLATFORM_STATUS.md) for the latest bounded public engineering snapshot. This post-freeze implementation context does not modify the historical research freeze described below.
+
 ## Threat posture
 
 Ground Truth's public model emphasizes:
@@ -57,7 +83,7 @@ Alpha completion means that bounded lifecycle reached its terminal control state
 
 This repository is a **public architecture, evidence, and falsification exhibit**.
 
-It is not the private Ground Truth core and is not a source-code mirror of the private authority implementation. It does include the bounded public Authority Lab v1, its public fixture corpus, reproducibility material, and the exact reviewed research-freeze history. Private-core implementation details, protected operational evidence, secrets, and non-public hostile material remain outside this exhibit.
+It is not the private Ground Truth core, not the private MobiPute runtime, and not a source-code mirror of either system. It does include the bounded public Authority Lab v1, its public fixture corpus, reproducibility material, the exact reviewed research-freeze history, and deliberately exported high-level integration/status material. Private implementation details, protected operational evidence, secrets, and non-public hostile material remain outside this exhibit.
 
 ## Design rules
 
@@ -75,6 +101,7 @@ A crawler-friendly publication site is prepared at `https://groundtruthexhibit-b
 
 ## Public materials
 
+- [Current platform status](CURRENT_PLATFORM_STATUS.md) — bounded public snapshot of the current Ground Truth + MobiPute engineering direction, evidence, and remaining gates.
 - [Ground Truth v1 research freeze](GROUND_TRUTH_RESEARCH_FREEZE.md) — exact frozen release-candidate state and bounded PASS meaning.
 - [Ground Truth paper](paper/README.md) — v1.0 preprint, checksums, and exact evidence-binding metadata.
 - [Ground Truth for PHI paper](paper/Ground_Truth_for_PHI_Preprint_v1_0_David_B_Boyd.md) — post-freeze semantic-disclosure authority extension, merged implementation evidence, and pinned zkAPI case study.
