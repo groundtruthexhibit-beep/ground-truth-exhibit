@@ -34,14 +34,26 @@ jobs:
         run: |
           set -euo pipefail
           rm -rf _site
-          mkdir -p _site/paper
+          mkdir -p _site/paper/phi _site/researcher _site/assets
           cp site/index.html _site/index.html
           cp site/robots.txt _site/robots.txt
           cp site/sitemap.xml _site/sitemap.xml
+          cp site/assets/exhibit.css _site/assets/exhibit.css
+          cp site/assets/governable-intelligence-wolf.png _site/assets/governable-intelligence-wolf.png
+          cp site/researcher/index.html _site/researcher/index.html
           cp paper/index.html _site/paper/index.html
           cp paper/Ground_Truth_Paper_v1_0_Preprint_David_B_Boyd.pdf _site/paper/
           cp paper/Ground_Truth_Paper_v1_0_Preprint_David_B_Boyd.docx _site/paper/
           cp paper/SHA256SUMS.txt _site/paper/
+          cp paper/phi/index.html _site/paper/phi/index.html
+          cp paper/Ground_Truth_for_PHI_Preprint_v1_0_David_B_Boyd.pdf _site/paper/
+          cp paper/Ground_Truth_for_PHI_Preprint_v1_0_David_B_Boyd.docx _site/paper/
+          cp paper/Ground_Truth_for_PHI_Preprint_v1_0_David_B_Boyd.md _site/paper/
+          cp paper/PHI_SHA256SUMS.txt _site/paper/
+          test -s _site/assets/governable-intelligence-wolf.png
+          test -s _site/researcher/index.html
+          test -s _site/paper/phi/index.html
+          test -s _site/paper/Ground_Truth_for_PHI_Preprint_v1_0_David_B_Boyd.pdf
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3

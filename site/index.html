@@ -3,36 +3,207 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Ground Truth — Authority Infrastructure for Autonomous Systems</title>
-  <meta name="description" content="Ground Truth is authority infrastructure for autonomous systems. Reviewed Root Authority foundations establish delegation, revocation, current lineage and authority-state currentness; end-to-end protected-effect authorization remains future integration work.">
-  <link rel="canonical" href="https://groundtruthexhibit-beep.github.io/ground-truth-exhibit/">
+  <title>Ground Truth &amp; Governable Intelligence — AI Authority Research by David B. Boyd</title>
+  <meta name="description" content="David Boyd, an independent AI researcher in Antigonish, Nova Scotia, presents Governable Intelligence: HERCULES, Ground Truth, MobiPute, TruthPute, BBAR, and publicly bounded AI authority research.">
   <meta name="robots" content="index,follow">
-  <meta name="theme-color" content="#070707">
+  <meta name="theme-color" content="#080b11">
+  <link rel="canonical" href="https://groundtruthexhibit-beep.github.io/ground-truth-exhibit/">
+  <link rel="icon" type="image/png" href="assets/governable-intelligence-wolf.png">
+  <link rel="stylesheet" href="assets/exhibit.css">
   <meta property="og:type" content="website">
-  <meta property="og:title" content="Ground Truth — Authority Infrastructure for Autonomous Systems">
-  <meta property="og:description" content="Root Authority foundations for autonomous systems, with governed-effect authorization and integration clearly identified as next steps.">
+  <meta property="og:title" content="Ground Truth &amp; Governable Intelligence — Authority Before Action">
+  <meta property="og:description" content="Public AI-governance research by David B. Boyd in Antigonish, Nova Scotia: authority, protected effects, distributed verification, and retained evidence.">
   <meta property="og:url" content="https://groundtruthexhibit-beep.github.io/ground-truth-exhibit/">
+  <meta property="og:image" content="https://groundtruthexhibit-beep.github.io/ground-truth-exhibit/assets/governable-intelligence-wolf.png">
+  <meta property="og:image:alt" content="Canadian wolf shield with a red maple leaf — Governable Intelligence">
   <meta name="twitter:card" content="summary">
-  <meta name="twitter:title" content="Ground Truth — Authority Before Action">
-  <meta name="twitter:description" content="Capability is not authority. Prove current lineage before protected effects.">
-  <style>
-    :root{--bg:#070707;--panel:#111;--panel2:#171717;--text:#f2f2f2;--muted:#a9a9a9;--line:#2a2a2a;--soft:#d8d8d8;--max:1120px}
-    *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:radial-gradient(circle at 15% -8%,rgba(255,255,255,.07),transparent 32rem),linear-gradient(180deg,#070707,#090909 55%,#050505);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;line-height:1.55;-webkit-font-smoothing:antialiased}a{color:inherit;text-decoration:none}a:focus-visible{outline:3px solid #fff;outline-offset:3px}.wrap{width:min(calc(100% - 36px),var(--max));margin:0 auto}
-    header{position:sticky;top:0;z-index:10;backdrop-filter:blur(14px);background:rgba(7,7,7,.82);border-bottom:1px solid #202020}nav{min-height:68px;display:flex;align-items:center;justify-content:space-between;gap:18px}.brand{display:inline-flex;align-items:center;gap:12px;font-weight:800;letter-spacing:-.02em}.eggmark{width:38px;height:42px;display:grid;place-items:center}.eggmark svg{width:100%;height:100%;display:block}.navlinks{display:flex;gap:20px;color:var(--muted);font-size:14px}.navlinks a:hover{color:#fff}
-    .hero{padding:104px 0 72px}.eyebrow{display:inline-flex;align-items:center;gap:9px;color:#d0d0d0;font:700 12px/1.2 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.12em;text-transform:uppercase}.eyebrow:before{content:"";width:8px;height:8px;border-radius:50%;background:#fff;box-shadow:0 0 16px rgba(255,255,255,.35)}h1{margin:20px 0 18px;max-width:920px;font-size:clamp(52px,9vw,108px);line-height:.94;letter-spacing:-.065em}.hero h1 span{color:#8f8f8f}.lead{max-width:790px;margin:0;color:#c4c4c4;font-size:clamp(19px,3vw,25px);letter-spacing:-.02em}.lead strong{color:#fff}.actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:34px}.btn{display:inline-flex;align-items:center;justify-content:center;min-height:46px;padding:0 18px;border-radius:10px;border:1px solid var(--line);font-weight:750;font-size:14px;transition:.16s}.btn:hover{transform:translateY(-1px);border-color:#666}.btn-primary{background:#f2f2f2;border-color:#f2f2f2;color:#070707}.btn-secondary{background:#101010;color:#f2f2f2}.invariant{margin-top:54px;padding:18px 20px;border:1px solid #303030;border-radius:14px;background:#0e0e0e;color:#d8d8d8;font:650 clamp(14px,2.3vw,17px)/1.7 ui-monospace,SFMono-Regular,Menlo,monospace}
-    section{padding:74px 0;border-top:1px solid #202020}.section-kicker{margin:0 0 10px;color:#cfcfcf;font:700 12px/1.2 ui-monospace,SFMono-Regular,Menlo,monospace;text-transform:uppercase;letter-spacing:.12em}h2{margin:0 0 16px;font-size:clamp(32px,5vw,52px);line-height:1.04;letter-spacing:-.045em}.section-intro{max-width:780px;margin:0 0 34px;color:var(--muted);font-size:18px}.flow{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}.flow-card,.metric,.resource{border:1px solid var(--line);border-radius:16px;background:linear-gradient(180deg,#141414,#0d0d0d)}.flow-card{padding:24px;min-height:210px}.number{color:#bcbcbc;font:800 12px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.1em}.flow-card h3{margin:30px 0 8px;font-size:24px;letter-spacing:-.03em}.flow-card p{margin:0;color:var(--muted)}.flow-card.truthpute{border-color:#444;background:linear-gradient(180deg,#181818,#101010)}.arrow-line{margin:26px 0 0;color:#8f8f8f;font:600 13px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace}
-    .metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.metric{padding:22px}.metric strong{display:block;font-size:clamp(28px,5vw,42px);line-height:1;letter-spacing:-.045em}.metric span{display:block;margin-top:8px;color:var(--muted);font-size:13px}.metric.pending strong{color:#d7d7d7;font-size:21px;line-height:1.15}.status-note{margin-top:18px;padding:16px 18px;border-left:3px solid #eee;background:#111;color:#bdbdbd;font-size:14px}.solana-word{background:linear-gradient(90deg,#9945FF 0%,#14F195 100%);-webkit-background-clip:text;background-clip:text;color:transparent;font-weight:800}.resources{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}.resource{padding:24px;transition:.16s}.resource:hover{transform:translateY(-2px);border-color:#666}.resource .tag{color:#bdbdbd;font:700 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;text-transform:uppercase;letter-spacing:.1em}.resource h3{margin:16px 0 8px;font-size:22px;letter-spacing:-.025em}.resource p{margin:0;color:var(--muted);font-size:15px}.resource .go{display:inline-block;margin-top:20px;color:#f2f2f2;font-weight:750;font-size:14px}.statement{padding:72px 0 82px;text-align:center}.statement p{margin:0 auto;max-width:900px;font-size:clamp(30px,5vw,56px);line-height:1.08;letter-spacing:-.045em;font-weight:800}.statement span{color:#8e8e8e}footer{border-top:1px solid #202020;padding:26px 0 42px;color:#7d7d7d;font-size:13px}.footer-row{display:flex;justify-content:space-between;gap:18px;flex-wrap:wrap}
-    @media(max-width:820px){.navlinks{display:none}.hero{padding-top:76px}.flow{grid-template-columns:1fr}.metrics{grid-template-columns:repeat(2,1fr)}.resources{grid-template-columns:1fr}}@media(max-width:480px){.wrap{width:min(calc(100% - 28px),var(--max))}.hero{padding:64px 0 56px}h1{font-size:clamp(48px,17vw,72px)}section{padding:58px 0}.metrics{grid-template-columns:1fr 1fr}.metric{padding:18px}.btn{width:100%}}
-  </style>
+  <meta name="twitter:title" content="Governable Intelligence | David B. Boyd">
+  <meta name="twitter:description" content="Capability is not authority. Research and engineering for verifiable AI action.">
+  <meta name="twitter:image" content="https://groundtruthexhibit-beep.github.io/ground-truth-exhibit/assets/governable-intelligence-wolf.png">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "name": "Ground Truth — Governable Intelligence Public Research Exhibit",
+    "url": "https://groundtruthexhibit-beep.github.io/ground-truth-exhibit/",
+    "description": "Public architecture, papers, and bounded falsification evidence for AI authority and governed effects.",
+    "author": {
+      "@type": "Person",
+      "name": "David B. Boyd",
+      "url": "https://groundtruthexhibit-beep.github.io/ground-truth-exhibit/researcher/"
+    }
+  }
+  </script>
 </head>
 <body>
-<header><div class="wrap"><nav aria-label="Primary"><a class="brand" href="#top" aria-label="Ground Truth home"><span class="eggmark" aria-hidden="true"><svg viewBox="0 0 64 74" xmlns="http://www.w3.org/2000/svg"><path d="M32 3C20 3 9 22 9 43c0 16 10 27 23 27s23-11 23-27C55 22 44 3 32 3Z" fill="#f2f2f2" stroke="#777" stroke-width="1.5"/><path d="M18 26l9 8-5 7 10 8-6 9M39 18l-5 9 9 7-6 8 8 9" fill="none" stroke="#444" stroke-width="2" stroke-linecap="round"/><path d="M24 31h7m-10 23h7m11-24h7m-9 18h8" stroke="#888" stroke-width="1.4"/></svg></span><span>Ground Truth</span></a><div class="navlinks"><a href="#architecture">Architecture</a><a href="#status">Status</a><a href="#research">Research</a><a href="https://github.com/groundtruthexhibit-beep/ground-truth-exhibit">GitHub</a></div></nav></div></header>
-<main id="top">
-  <div class="wrap hero"><div class="eyebrow">Public research + engineering exhibit</div><h1>Authority <span>before</span> action.</h1><p class="lead"><strong>Authority infrastructure for autonomous systems.</strong> Capability tells you what an agent can do. Ground Truth determines whether it currently has authority to do it. The reviewed Root Authority foundation is not yet an end-to-end protected-effect authorization system.</p><div class="actions"><a class="btn btn-primary" href="https://github.com/groundtruthexhibit-beep/ground-truth-exhibit/blob/main/CURRENT_PLATFORM_STATUS.md">Current platform status</a><a class="btn btn-secondary" href="paper/">Read the research paper</a><a class="btn btn-secondary" href="https://github.com/groundtruthexhibit-beep/ground-truth-exhibit">View public evidence</a></div><div class="invariant">CAPABILITY != AUTHORITY &nbsp;·&nbsp; PROPOSED != AUTHORIZED &nbsp;·&nbsp; AUTHORIZED != EXECUTED</div></div>
-  <section id="architecture"><div class="wrap"><p class="section-kicker">System model</p><h2>Authority, execution and operations stay separate.</h2><p class="section-intro">The architecture separates capability, current authority, exact authorization and execution. Reviewed foundations are distinguished from planned policy activation, Broker consumption and cross-system integration.</p><div class="flow"><article class="flow-card"><div class="number">01 / AUTHORITY</div><h3>Ground Truth</h3><p>Reviewed runtime foundation: legitimate Root Authority, canonical principal, typed delegation and attenuation, revocation, recovery, current lineage and per-domain Authority State Version. This is not complete effect authorization.</p></article><article class="flow-card"><div class="number">02 / EXECUTION</div><h3>MobiPute</h3><p>Distributed compute, verification and evidence infrastructure. Root-governed admission and protected-effect integration are not yet established end to end.</p></article><article class="flow-card truthpute"><div class="number">03 / OPERATIONS</div><h3>TruthPute</h3><p>Operator and integration application for jobs, results and evidence. Integration with the new Root Authority authorization chain is future work.</p></article></div><div class="arrow-line">REVIEWED: ROOT AUTHORITY + CURRENT LINEAGE + AUTHORITY STATE VERSION &nbsp;→&nbsp; NEXT: POLICY + EXACT AUTHORIZATION + BROKER &nbsp;→&nbsp; NOT INTEGRATED: MOBIPUTE / TRUTHPUTE</div></div></section>
-  <section id="status"><div class="wrap"><p class="section-kicker">Current engineering snapshot</p><h2>Reviewed foundation. Authorization chain still in progress.</h2><p class="section-intro">Root Authority State Version v1 was independently reviewed at the pinned runtime foundation. Passing tests and CI do not imply that the full cross-system authorization chain is implemented or deployed.</p><div class="metrics"><div class="metric"><strong>ROOT</strong><span>genesis, principal and delegated capability</span></div><div class="metric"><strong>CURRENT</strong><span>lineage, revocation and recovery</span></div><div class="metric"><strong>VERSIONED</strong><span>per-domain authority state; stale-snapshot / ABA defense</span></div><div class="metric pending"><strong>NOT INTEGRATED</strong><span>complete protected-effect authorization</span></div></div><div class="status-note">Reviewed runtime foundation: PR #77, starting exact-head 07a660f479dbaeb6e40b71faa965e4a02cf1a23b; documentation synchronization at 95481b84dfbd65ba2bb8844448dea78c29203735 remains draft and unmerged. Authority State Version currentness is <strong>not</strong> complete authorization currentness. Not yet provided: authoritative policy activation, policy_state_version, Root-governed ProtectedEffectAuthorizationV1, issuer/store, Broker compare-and-consume, MobiPute/TruthPute integration, protected-effect execution or durable/distributed authority state. No malicious same-process isolation claim.</div></div></section>
-  <section id="research"><div class="wrap"><p class="section-kicker">Public material</p><h2>Research, architecture and falsification evidence.</h2><p class="section-intro">This repository is a deliberate public exhibit, not a mirror of private runtime implementation. Claims remain bounded to the published model, corpus, assumptions and reviewed Git state.</p><div class="resources"><a class="resource" href="paper/"><span class="tag">Research paper</span><h3>Deterministic Falsification of Authority Continuity</h3><p>The core Ground Truth research preprint on authority continuity in autonomous systems.</p><span class="go">Read paper →</span></a><a class="resource" href="paper/phi/"><span class="tag">PHI extension</span><h3>Deterministic Authorization of Semantic Disclosure</h3><p>Bounded post-freeze extension applying the authority model to semantic disclosure in AI systems.</p><span class="go">Read PHI paper →</span></a><a class="resource" href="https://github.com/groundtruthexhibit-beep/ground-truth-exhibit/blob/main/ARCHITECTURE.md"><span class="tag">Architecture</span><h3>Ground Truth + MobiPute + TruthPute</h3><p>Public system boundaries and the responsibility split between authority, execution and operations.</p><span class="go">View architecture →</span></a><a class="resource" href="https://github.com/groundtruthexhibit-beep/ground-truth-exhibit"><span class="tag">Evidence</span><h3>Public exhibit repository</h3><p>Deterministic harnesses, adversarial fixtures, publication artifacts and bounded engineering evidence.</p><span class="go">Open GitHub →</span></a></div></div></section>
-  <div class="wrap statement"><p>Machines should not ask us to <span>trust them more.</span> They should be required to <span>prove more before acting.</span></p></div>
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+  <div class="wrap nav">
+    <a class="brand" href="#top" aria-label="Governable Intelligence Ground Truth exhibit home">
+      <img src="assets/governable-intelligence-wolf.png" alt="" width="52" height="58">
+      <span><strong>Ground Truth</strong><small>Governable Intelligence Exhibit</small></span>
+    </a>
+    <nav class="navlinks" aria-label="Main navigation">
+      <a href="#architecture">Systems</a>
+      <a href="#boundaries">Security model</a>
+      <a href="#evidence">Evidence</a>
+      <a href="#research">Research</a>
+      <a href="researcher/">David Boyd</a>
+    </nav>
+  </div>
+</header>
+<main id="main">
+  <div class="wrap hero" id="top">
+    <div>
+      <p class="eyebrow">Independent Canadian AI authority research</p>
+      <h1>Authority <em>before</em> action.</h1>
+      <p class="lead"><strong>Intelligence is not permission.</strong> Governable Intelligence studies how to separate what an AI can do, what it is currently authorized to do, what actually executes, and what independent evidence can establish afterward.</p>
+      <p class="byline"><strong>David B. Boyd</strong> · Independent AI researcher and developer · Antigonish, Nova Scotia, Canada</p>
+      <div class="actions">
+        <a class="btn btn-primary" href="#architecture">Explore the systems</a>
+        <a class="btn" href="paper/">Read the research</a>
+        <a class="btn" href="researcher/">Researcher profile</a>
+      </div>
+    </div>
+    <figure class="hero-art">
+      <img src="assets/governable-intelligence-wolf.png" width="1214" height="1295" alt="Silver wolf within a dark shield, topped by a red Canadian maple leaf">
+      <figcaption>GOVERNABLE INTELLIGENCE · CANADA</figcaption>
+    </figure>
+  </div>
+  <div class="wrap">
+    <aside class="notice">
+      <strong>Public evidence boundary:</strong> this site documents research, separately qualified components, and integration goals. It is not a mirror of private source code, a claim of end-to-end production deployment, a security certification, or authorization for financial settlement.
+    </aside>
+  </div>
+
+  <section id="architecture">
+    <div class="wrap">
+      <p class="kicker">The engineering system</p>
+      <h2>Five roles. Different trust boundaries. One coherent aim.</h2>
+      <p class="intro">An AI assistant, an authority verifier, a physical compute worker and an audit record should never be allowed to impersonate one another. The combined architecture is being integrated and qualified; the diagram of responsibilities is not proof that every interface is live.</p>
+      <div class="grid five">
+        <article class="system">
+          <div class="number">01 / OPERATOR &amp; AI RUNTIME</div>
+          <h3>HERCULES</h3>
+          <p>The wolf's operator console and multi-model engineering runtime. Models can reason and propose; protected tools require a separately established, current authority path. Provider and tool integration remain subject to live qualification.</p>
+        </article>
+        <article class="system">
+          <div class="number">02 / AUTHORITY</div>
+          <h3>Ground Truth</h3>
+          <p>Root authority, delegation, revocation, policy and exact protected-effect boundaries. Evidence and model agreement cannot create their own authorization. Ambiguous required authority fails closed.</p>
+        </article>
+        <article class="system">
+          <div class="number">03 / COMPUTATION</div>
+          <h3>MobiPute</h3>
+          <p>Distributed Android execution, job provenance, deterministic verification and governed admission, with financial settlement logic kept separate. A five-device physical rehearsal is a qualification goal, not a completed pilot.</p>
+        </article>
+        <article class="system">
+          <div class="number">04 / OPERATOR EVIDENCE</div>
+          <h3>TruthPute</h3>
+          <p>Requester and operator experience for jobs, results and evidence, including planned HERCULES presentation. A displayed result is not itself an independent verification or an authority source.</p>
+        </article>
+        <article class="system">
+          <div class="number">05 / RETAINED EVIDENCE</div>
+          <h3>BBAR</h3>
+          <p>A black-box evidence plane intended for independent audit, retention, custody and recovery. Evidence may explain an action afterward; recording it does not retroactively authorize the action.</p>
+        </article>
+      </div>
+      <div class="rail"><strong>Optional settlement/evidence rail — Solana:</strong> development and devnet receipt work remain separate from the authority source. Mainnet payouts are disabled for the initial nonfinancial rehearsal. On-chain visibility does not repair missing authorization or an unfinalized transaction.</div>
+    </div>
+  </section>
+
+  <section id="boundaries">
+    <div class="wrap">
+      <p class="kicker">Hostile conditions</p>
+      <h2>Built around the moment a proposal tries to become an effect.</h2>
+      <p class="intro">The architecture is designed to contain failure modes that conventional model-first systems can blur together. Coverage for any particular attack requires an exact implementation, an adversarial test and observed evidence; a design rule alone is not a security guarantee.</p>
+      <div class="grid principles">
+        <article class="principle"><h3>Prompt or tool manipulation</h3><p>Model output, injected instructions, substituted connectors and self-reported permission must not be treated as trusted authorization.</p></article>
+        <article class="principle"><h3>Stale and replayed authority</h3><p>Revocation, changed policy, expired grants, copied receipts and rollback need evaluation at the effect-consuming boundary.</p></article>
+        <article class="principle"><h3>Unverified results</h3><p>Worker claims, mismatched provenance or unverifiable computation must not mutate a balance merely because a job completed.</p></article>
+        <article class="principle"><h3>Premature financial effects</h3><p>Settlement eligibility, ledger commitment and finalized on-chain outcomes are separate requirements, not interchangeable statuses.</p></article>
+        <article class="principle"><h3>Ambiguous recovery</h3><p>Restarts, duplicates, lost acknowledgments and uncertain external outcomes must not silently create additional authority or payouts.</p></article>
+        <article class="principle"><h3>Unaccountable history</h3><p>Evidence identity, independent custody, retention and reconstruction are needed before claims can be defended after a failure.</p></article>
+      </div>
+      <div class="invariants" aria-label="Core invariants">
+        <code>CAPABILITY ≠ AUTHORITY</code>
+        <code>VERIFIED ≠ AUTHORIZED</code>
+        <code>AUTHORIZED ≠ EXECUTED</code>
+        <code>NO CURRENT AUTHORITY → NO PROTECTED EFFECT</code>
+        <code>NO VERIFIED COMPUTATION → NO BALANCE MUTATION</code>
+        <code>NO FINALIZED SOLANA TX → NO COMPLETE SETTLEMENT</code>
+      </div>
+    </div>
+  </section>
+
+  <section id="evidence">
+    <div class="wrap">
+      <p class="kicker">Evidence, not theatre</p>
+      <h2>What is published, and what remains gated.</h2>
+      <p class="intro">A PASS is attached to a particular revision, test corpus and environment. Source checkpointing, local tests, hostile review, live provider requests, physical devices, merging and deployment are separate milestones.</p>
+      <div class="status-grid">
+        <article class="status-item">
+          <span class="state state-evidence">Historical research evidence</span>
+          <h3>Ground Truth v1 research freeze</h3>
+          <p>The published freeze records 260/260 tests and 466/466 Authority Lab fixtures passing at the pinned research revision. This is a bounded failure-to-falsify result, not formal proof or production assurance.</p>
+        </article>
+        <article class="status-item">
+          <span class="state state-evidence">Post-freeze evidence</span>
+          <h3>PHI semantic-disclosure extension</h3>
+          <p>The separate published extension records 265/265 local Authority Lab tests and 478 fixtures passing, with a bounded hostile review. These results do not revise the original frozen corpus or establish real-world deployment.</p>
+        </article>
+        <article class="status-item">
+          <span class="state state-gated">Integration qualification outstanding</span>
+          <h3>HERCULES and protected tools</h3>
+          <p>Working console and provider behavior have been operator-reported in earlier stages; later checkpoint and local-test evidence are distinct. The complete live provider → current authority → protected workspace effect chain is not established by the public exhibit.</p>
+        </article>
+        <article class="status-item">
+          <span class="state state-gated">Physical pilot not qualified</span>
+          <h3>MobiPute, TruthPute and BBAR</h3>
+          <p>Local backend and integration evidence exists in private development, but branch composition, retained independent evidence, five real-device commissioning and refreshed source-to-screen verification remain gates. A synthetic 25-device test is not a physical pilot.</p>
+        </article>
+      </div>
+      <p class="disclaimer">Public snapshot context: exhibit source dated 23 October 2026; Project Control Room dated 4 November 2026. Private branch and operational states may have advanced. No new CI, live provider, physical-device or deployment verification is asserted by this website update.</p>
+      <div class="actions">
+        <a class="btn" href="https://github.com/groundtruthexhibit-beep/ground-truth-exhibit/blob/main/GROUND_TRUTH_RESEARCH_FREEZE.md">Research freeze record</a>
+        <a class="btn" href="https://github.com/groundtruthexhibit-beep/ground-truth-exhibit/blob/main/CURRENT_PLATFORM_STATUS.md">Historical platform snapshot</a>
+      </div>
+    </div>
+  </section>
+
+  <section id="research">
+    <div class="wrap">
+      <p class="kicker">Open research and falsification</p>
+      <h2>Follow the paper, test corpus and limits.</h2>
+      <p class="intro">The public repository is a deliberate export of selected architecture, papers, reproducibility material and hostile examples. Private runtime code, credentials and restricted operational evidence are not included.</p>
+      <div class="resources">
+        <a class="resource" href="paper/"><small>Foundational preprint</small><h3>Deterministic Falsification of Authority Continuity</h3><p>David B. Boyd's Ground Truth v1.0 preprint, canonical PDF and paper checksums.</p><span>Read the paper →</span></a>
+        <a class="resource" href="paper/phi/"><small>PHI extension</small><h3>Deterministic Authorization of Semantic Disclosure</h3><p>A separately bounded post-freeze research extension addressing sensitive semantic disclosure.</p><span>Explore the PHI paper →</span></a>
+        <a class="resource" href="https://github.com/groundtruthexhibit-beep/ground-truth-exhibit/tree/main/authority_lab"><small>Reproducibility</small><h3>Public Authority Lab</h3><p>Deterministic fixtures and falsification harness under the published contract and exact reviewed state.</p><span>Inspect the lab →</span></a>
+        <a class="resource" href="https://github.com/groundtruthexhibit-beep/ground-truth-exhibit"><small>Evidence boundary</small><h3>Public source and disclosure record</h3><p>Architecture, threat models, limitations, provenance manifests and historical review evidence.</p><span>Open the GitHub exhibit →</span></a>
+      </div>
+    </div>
+  </section>
+
+  <section id="researcher">
+    <div class="wrap">
+      <div class="researcher">
+        <div>
+          <p class="kicker">Independent research · Antigonish, Nova Scotia</p>
+          <h2>David B. Boyd</h2>
+          <p>Independent AI researcher and developer working on authority continuity, governed effects, distributed verification and evidence that can be interrogated after an AI action. The central question: <strong>who had permission, what actually happened, and how can we prove it?</strong></p>
+        </div>
+        <a class="btn btn-primary" href="researcher/">Researcher profile →</a>
+      </div>
+    </div>
+  </section>
 </main>
-<footer><div class="wrap footer-row"><span>Ground Truth — Independent research & engineering exhibit</span><span>David B. Boyd · Nova Scotia, Canada</span></div></footer>
-</body></html>
+<footer class="footer">
+  <div class="wrap">
+    <span>Ground Truth · Governable Intelligence · Public research exhibit</span>
+    <span>David B. Boyd · Antigonish, Nova Scotia, Canada</span>
+    <span><a href="researcher/">Researcher</a> · <a href="https://github.com/groundtruthexhibit-beep/ground-truth-exhibit">GitHub evidence</a></span>
+  </div>
+</footer>
+</body>
+</html>
