@@ -51,7 +51,7 @@ h1 em { color: var(--silver); font-style: normal; }
 .btn-primary:hover { background: #d71426; }
 .hero-art { text-align: center; position: relative; }
 .hero-art::before { content: ""; position: absolute; inset: 12% 3%; border-radius: 50%; background: radial-gradient(circle, #ad1b2940, transparent 60%); filter: blur(18px); }
-.hero-art img { position: relative; display: block; width: min(100%, 468px); margin: auto; filter: drop-shadow(0 22px 55px #000a); }
+.hero-art img { position: relative; display: block; width: min(100%, 468px); height: auto; margin: auto; filter: drop-shadow(0 22px 55px #000a); }
 .hero-art figcaption { position: relative; text-align: center; font: 700 11px/1.4 ui-monospace, monospace; letter-spacing: .16em; color: #adbacb; }
 .notice { padding: 17px 21px; border: 1px solid #4a3c45; border-left: 4px solid var(--red); border-radius: 9px; background: #201923; color: #d7d9e0; font-size: 14px; }
 main section { padding-block: 84px; border-top: 1px solid #273447; }
@@ -101,7 +101,7 @@ main section h2 { font-size: clamp(32px, 4.6vw, 54px); line-height: 1.08; letter
 .paper-layout p, .paper-layout li { color: #c3ccda; }
 .paper-layout strong { color: #fff; }
 .paper-layout a { text-underline-offset: 3px; }
-.paper-layout .profile-wolf { display: block; width: 150px; margin-bottom: 28px; }
+.paper-layout .profile-wolf { display: block; width: 150px; max-width: 100%; height: auto; margin-bottom: 28px; }
 @media (max-width: 980px) {
   .nav { align-items: flex-start; padding-block: 14px; }
   .navlinks { gap: 11px; }
